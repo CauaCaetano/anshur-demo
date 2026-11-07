@@ -18,10 +18,19 @@
   $('.lateral-rodape').textContent = OP ? 'Dados reais da sua revenda, guardados só neste navegador.' : 'Dados demonstrativos de uma revenda fictícia.';
   menuPerfil.innerHTML = `<p><b>${OP ? esc(A.revenda.nome) : 'Seu Antônio'}</b><span>${OP ? 'Ambiente com dados reais' : 'Proprietário · ' + esc(A.revenda.nome)}</span></p>
     <button type="button" role="menuitem" id="m-premissas">Premissas da revenda</button>
+    <button type="button" role="menuitem" id="m-seg">Segurança dos dados</button>
     <button type="button" role="menuitem" id="m-ambiente">${OP ? 'Voltar para a demonstração' : 'Usar com os dados da minha revenda'}</button>
     ${OP ? '<button type="button" role="menuitem" id="m-nome">Nome da revenda</button><button type="button" role="menuitem" id="m-apagar">Apagar dados da minha revenda</button>' : '<button type="button" role="menuitem" id="m-restaurar">Restaurar dados demonstrativos</button>'}`;
   const fechaMenu = () => { menuPerfil.hidden = true; btnPerfil.setAttribute('aria-expanded', 'false'); };
   $('#m-premissas').onclick = () => { fechaMenu(); abrirPremissas(); };
+  $('#m-seg').onclick = () => { fechaMenu(); abrirCamada('modal', `<h2>Segurança dos dados</h2>
+      <p class="sub" style="margin-bottom:12px">O que acontece hoje com os seus números, sem promessa além do que existe.</p>
+      <ul style="margin:0;padding-left:20px;display:grid;gap:8px;font-size:16px">
+        <li><b>Nesta versão, nada sai do seu computador.</b> Planilhas importadas, avaliações e trocas ficam guardadas só neste navegador.</li>
+        <li>A demonstração e o ambiente com os dados da sua revenda são separados e não se misturam.</li>
+        <li>Você pode apagar os dados da sua revenda a qualquer momento pelo menu do perfil.</li>
+        <li>As planilhas exportadas são suas: dá para levar os dados para outro sistema quando quiser.</li>
+      </ul>`); };
   $('#m-ambiente').onclick = () => { fechaMenu(); confirmar(OP ? 'Voltar para a demonstração?' : 'Usar com os dados da sua revenda?', OP ? 'Seus dados continuam guardados neste navegador; você pode voltar quando quiser.' : 'Abre um ambiente separado, vazio, para importar o histórico real de trocas. A demonstração não se mistura com ele.', 'Trocar', () => { K.repo.trocarAmbiente(OP ? 'demo' : 'op'); location.hash = OP ? '#visao' : '#teste'; location.reload(); }); };
   if (OP) {
     $('#m-nome').onclick = () => { fechaMenu(); abrirCamada('modal', `<h2>Nome da revenda</h2><div class="campos" style="margin-top:12px"><div class="campo"><label for="n-nome">Nome</label><input id="n-nome" value="${esc(estado.nomeRevenda || '')}"></div><div class="campo"><label for="n-cid">Cidade</label><input id="n-cid" value="${esc(estado.cidadeRevenda || '')}"></div></div><div class="acoes"><button class="btn btn-ouro" type="button" id="n-ok">Salvar</button></div>`, (c) => { $('#n-ok', c).onclick = () => { estado.nomeRevenda = $('#n-nome', c).value.trim(); estado.cidadeRevenda = $('#n-cid', c).value.trim(); salvar(); location.reload(); }; }); };
@@ -36,11 +45,14 @@
       <div class="campo" style="margin-top:14px"><label for="p-juros">Custo do capital: <b id="p-jv">${pct(cfg.jurosMes)}</b> ao mês</label><input class="deslizar" id="p-juros" type="range" min="0.5" max="3" step="0.1" value="${(cfg.jurosMes * 100).toFixed(1)}"><span class="ajuda">Taxa que a revenda paga ou deixa de ganhar com o dinheiro parado (ex.: CDI, capital de giro, floor plan).</span></div>
       <div class="campo" style="margin-top:14px"><label for="p-base">Base do custo do capital</label><select id="p-base"><option value="aquisicao" ${cfg.baseJuros === 'aquisicao' ? 'selected' : ''}>Valor pago na troca</option><option value="total" ${cfg.baseJuros === 'total' ? 'selected' : ''}>Valor pago + preparação</option></select></div>
       <p class="conta">Custo do capital por máquina = base × taxa mensal × dias no pátio ÷ 30. É uma estimativa de custo de oportunidade: não entra no custo da máquina nem é prejuízo realizado.</p>
+      <div class="campos" style="margin-top:14px"><div class="campo"><label for="p-com">Comissão do vendedor (% da venda do usado)</label><input id="p-com" inputmode="decimal" value="${(cfg.comissaoPct * 100).toLocaleString('pt-BR')}"></div>
+      <div class="campo"><label for="p-desc">Parte do valor pago acima do recomendado que sai da comissão (%)</label><input id="p-desc" inputmode="numeric" value="${Math.round(cfg.descontoAcima * 100)}"></div>
+      <div class="campo"><label for="p-hora">Valor da hora da oficina (R$)</label><input id="p-hora" inputmode="numeric" value="${cfg.valorHora}"></div></div>
       <div class="acoes"><button class="btn btn-ouro" type="button" id="p-ok">Aplicar</button><button class="btn btn-linha" type="button" id="p-pad">Voltar ao padrão</button></div>`, (c) => {
       const m = $('#p-margem', c), j = $('#p-juros', c);
       m.oninput = () => { $('#p-mv', c).textContent = m.value + '%'; }; j.oninput = () => { $('#p-jv', c).textContent = String(j.value).replace('.', ',') + '%'; };
-      const aplicar = (v) => { Object.assign(cfg, v); A.margemAlvo = cfg.margemAlvo; estado.config = { margemAlvo: cfg.margemAlvo, jurosMes: cfg.jurosMes, baseJuros: cfg.baseJuros }; delete estado.margem; salvar(); cacheLimpa(); fecharCamada(); toast('Premissas aplicadas.'); rota(); };
-      $('#p-ok', c).onclick = () => aplicar({ margemAlvo: +m.value / 100, jurosMes: +j.value / 100, baseJuros: $('#p-base', c).value });
+      const aplicar = (v) => { Object.assign(cfg, v); A.margemAlvo = cfg.margemAlvo; estado.config = { margemAlvo: cfg.margemAlvo, jurosMes: cfg.jurosMes, baseJuros: cfg.baseJuros, comissaoPct: cfg.comissaoPct, descontoAcima: cfg.descontoAcima, valorHora: cfg.valorHora }; delete estado.margem; salvar(); cacheLimpa(); fecharCamada(); toast('Premissas aplicadas.'); rota(); };
+      $('#p-ok', c).onclick = () => aplicar({ margemAlvo: +m.value / 100, jurosMes: +j.value / 100, baseJuros: $('#p-base', c).value, comissaoPct: Math.max(0, num($('#p-com', c).value)) / 100, descontoAcima: Math.min(100, Math.max(0, num($('#p-desc', c).value))) / 100, valorHora: Math.max(0, num($('#p-hora', c).value)) || K.PADRAO.valorHora });
       $('#p-pad', c).onclick = () => aplicar({ ...K.PADRAO });
     });
   }
@@ -154,6 +166,16 @@
     pulverizador: ic('<path d="M4 15V8h6l2 3h6v4z"/><path d="M1 13h22M3 13v2M21 13v2"/><circle cx="7" cy="17" r="2.5"/><circle cx="16" cy="17" r="2.5"/>', 'ico maq-svg'),
     plantadeira: ic('<path d="M2 9h20M3 9l2-3h14l2 3M5 9v6M10 9v6M15 9v6M20 9v6"/><circle cx="5" cy="17" r="1.6"/><circle cx="10" cy="17" r="1.6"/><circle cx="15" cy="17" r="1.6"/><circle cx="20" cy="17" r="1.6"/>', 'ico maq-svg')
   };
+  const VENDEDORES = () => { const l = [...new Set(A.trocas.map((t) => t.vendedor).filter((v) => v && !/Avalia|demonstra/i.test(v)))].sort(); return l.length ? l : ['Gerente de usados']; };
+  // calendário agrícola da região (cana, soja e milho no nordeste paulista): quando cada tipo de máquina costuma ter procura
+  const SAFRA = {
+    colhedora: { janela: 'janeiro a março', motivo: 'usinas e fornecedores fecham frota antes da safra da cana, que começa em abril', meses: [0, 1, 2] },
+    pulverizador: { janela: 'julho a setembro', motivo: 'preparação para o plantio da soja e para os tratos da cana', meses: [6, 7, 8] },
+    plantadeira: { janela: 'julho a setembro', motivo: 'o plantio da soja começa com as chuvas, a partir de setembro', meses: [6, 7, 8] },
+    trator: { janela: 'março a junho e agosto a outubro', motivo: 'colheita e preparo de solo puxam a procura em duas épocas', meses: [2, 3, 4, 5, 7, 8, 9] }
+  };
+  const janelaVenda = (tipo) => { const s = SAFRA[tipo]; if (!s) return ''; const m = new Date().getMonth(); return s.meses.includes(m) ? `Estamos na melhor época para vender (${s.janela}): ${s.motivo}.` : `Melhor época para vender: ${s.janela}, porque ${s.motivo}.`; };
+
   // risco em 3 níveis, com cor + ícone + texto
   const nivelRisco = (i) => (i.dias > 90 || i.margem < 0.06 ? { nome: 'Alto', cls: 'alto', ico: ICO.alto } : i.dias > 60 || i.margem < 0.10 ? { nome: 'Médio', cls: 'medio', ico: ICO.medio } : { nome: 'Baixo', cls: 'baixo', ico: ICO.baixo });
 
@@ -396,19 +418,28 @@
       <div class="campos" style="margin-top:16px">
         <div class="campo"><label for="t-valor">Valor pago na troca</label><input id="t-valor" inputmode="numeric" value="${r.teto.toLocaleString('pt-BR')}"></div>
         <div class="campo"><label for="t-data">Data</label><input id="t-data" type="date" value="${hojeISO()}" max="${hojeISO()}"></div>
+        <div class="campo"><label for="t-vend">Vendedor</label><select id="t-vend">${VENDEDORES().map((v) => `<option>${esc(v)}</option>`).join('')}</select></div>
+        <div class="campo" id="t-aprov-box" hidden><label for="t-aprov">Aprovado por (gerente)</label><input id="t-aprov" placeholder="Nome de quem autorizou"></div>
+        <div class="campo inteiro" id="t-mot-box" hidden><label for="t-mot">Motivo para pagar acima</label><input id="t-mot" placeholder="Ex.: cliente fecha a compra de uma colhedora nova"></div>
       </div>
       <p class="conta" id="t-aviso">Valor máximo recomendado: ${real(r.teto)}.</p>
       <div class="acoes"><button class="btn btn-ouro" type="button" id="t-ok">Confirmar troca</button><button class="btn btn-linha" type="button" id="t-nao">Cancelar</button></div>`, (c) => {
       const inp = $('#t-valor', c), aviso = $('#t-aviso', c);
-      const checar = () => { const v = num(inp.value), d = v - r.teto; aviso.innerHTML = !(v > 0) ? '<span class="neg">Informe o valor pago.</span>' : d > 0 ? `<span class="neg">${real(d)} acima do valor máximo recomendado. A margem projetada cai para ${pct((r.venda - v - r.preparo) / r.venda)}.</span>` : `Dentro do valor máximo recomendado (${real(r.teto)}). Margem projetada: ${pct((r.venda - v - r.preparo) / r.venda)}.`; };
+      const checar = () => {
+        const v = num(inp.value), d = v - r.teto;
+        $('#t-aprov-box', c).hidden = !(d > 0); $('#t-mot-box', c).hidden = !(d > 0);
+        aviso.innerHTML = !(v > 0) ? '<span class="neg">Informe o valor pago.</span>' : d > 0 ? `<span class="neg">${real(d)} acima do valor máximo recomendado. A margem projetada cai para ${pct((r.venda - v - r.preparo) / r.venda)}. Precisa da aprovação do gerente; pela regra da revenda, ${pct(K.cfg.descontoAcima, 0)} do valor acima (${real(d * K.cfg.descontoAcima)}) sai da comissão do vendedor.</span>` : `Dentro do valor máximo recomendado (${real(r.teto)}). Margem projetada: ${pct((r.venda - v - r.preparo) / r.venda)}.`;
+      };
       inp.oninput = checar; checar();
       $('#t-nao', c).onclick = () => fecharCamada();
       $('#t-ok', c).onclick = (e) => {
         const v = num(inp.value), dt = $('#t-data', c).value || hojeISO();
         if (!(v > 0)) { inp.focus(); toast('Informe o valor pago na troca.', true); return; }
+        const acima = v > r.teto, aprov = $('#t-aprov', c).value.trim(), mot = $('#t-mot', c).value.trim();
+        if (acima && (!aprov || !mot)) { (aprov ? $('#t-mot', c) : $('#t-aprov', c)).focus(); toast('Acima do recomendado: informe quem aprovou e o motivo.', true); return; }
         const b = e.currentTarget; b.classList.add('carregando');
         setTimeout(() => {
-          const t = K.fecharTroca(estado, maq, r, v, dt, { vendedor: 'Avaliação registrada', origem: av.local || 'Troca registrada',
+          const t = K.fecharTroca(estado, maq, r, v, dt, { vendedor: $('#t-vend', c).value, aprovacao: acima ? { por: aprov, motivo: mot, excesso: v - r.teto, data: hojeISO() } : null, origem: av.local || 'Troca registrada',
             manutencoes: av.declarado ? [{ servico: av.declarado, horas: av.horas, comNota: av.verif.notas }] : [], fotos: av.fotos.filter(Boolean), verif: { ...av.verif } });
           const id = t.id;
           A.trocas.push({ ...t }); salvar(); cacheLimpa();
@@ -458,6 +489,8 @@
     contar();
   }
 
+  const linhaItem = (it) => `<div class="item-prep" style="display:grid;grid-template-columns:2fr 1fr 0.7fr;gap:8px"><input class="campo-in" data-f="desc" aria-label="Serviço ou peça" placeholder="Ex.: troca do kit de embreagem" value="${esc(it.desc || '')}"><input class="campo-in" data-f="pecas" inputmode="numeric" aria-label="Peças em reais" placeholder="Peças R$" value="${it.pecas ? it.pecas.toLocaleString('pt-BR') : ''}"><input class="campo-in" data-f="horas" inputmode="decimal" aria-label="Horas de oficina" placeholder="Horas" value="${it.horas || ''}"></div>`;
+
   function detalheMaquina(id) {
     const t = A.trocas.find((x) => x.id === id); if (!t) return;
     const i = infoPatio(t);
@@ -473,11 +506,17 @@
         <div><span>Custo financeiro estimado</span><b>${real(i.juros)}</b></div><div><span>Recomendação</span><b>${esc(i.acao)}</b></div>
       </div>
       ${t.previsto ? `<p class="conta">Previsto no dia da troca (${data(t.previsto.data)}): valor máximo ${real(t.previsto.teto)}, venda ${real(t.previsto.venda)}, preparo ${real(t.previsto.preparo)}, ${t.previsto.dias || '—'} dias de pátio, qualidade ${t.previsto.confianca}. Pago: ${real(t.pago)}.</p>` : ''}
-      <section class="painel" style="margin-top:6px"><h2>Registrar o que aconteceu</h2>
-        <p class="sub" style="margin:4px 0 12px">Preparo real e venda alimentam a comparação previsto x realizado e ensinam o motor.</p>
+      <p class="conta">${esc(janelaVenda(t.tipo))}</p>
+      ${t.aprovacao ? `<p class="conta">Troca acima do recomendado em ${real(t.aprovacao.excesso)}, aprovada por ${esc(t.aprovacao.por)}: ${esc(t.aprovacao.motivo)}.</p>` : ''}
+      <section class="painel" style="margin-top:6px"><h2>Ordem de preparo na oficina</h2>
+        <p class="sub" style="margin:4px 0 12px">Peças e horas de mão de obra (R$ ${K.cfg.valorHora}/h). O total vira o preparo real e é comparado com o previsto${t.preparoEst ? ` (${real(t.preparoEst)})` : ''}.</p>
+        <div id="itens-prep" style="display:grid;gap:8px">${((estado.preparos[t.id] && estado.preparos[t.id].itens) || []).map((it) => linhaItem(it)).join('') || linhaItem({})}</div>
+        <div class="acoes" style="margin-top:10px"><button class="btn btn-linha" type="button" id="add-item">Adicionar item</button><span class="conta" id="tot-prep" style="margin:0"></span></div>
+        <div class="acoes" style="margin-top:8px"><button class="btn btn-ouro" type="button" id="g-prep-ok">Salvar preparo</button></div>
+      </section>
+      <section class="painel" style="margin-top:6px"><h2>Registrar a venda</h2>
+        <p class="sub" style="margin:4px 0 12px">A venda fecha a conta da máquina e ensina o motor.</p>
         <div class="campos">
-          <div class="campo"><label for="g-prep">Preparação real</label><input id="g-prep" inputmode="numeric" value="${(t.preparo || 0).toLocaleString('pt-BR')}"></div>
-          <div class="campo" style="align-self:end"><button class="btn btn-linha" type="button" id="g-prep-ok">Salvar preparo</button></div>
           <div class="campo"><label for="g-venda">Valor da venda</label><input id="g-venda" inputmode="numeric" placeholder="R$"></div>
           <div class="campo"><label for="g-data">Data da venda</label><input id="g-data" type="date" value="${hojeISO()}" min="${t.entrada}" max="${hojeISO()}"></div>
         </div>
@@ -504,9 +543,14 @@
         ap.disabled = !(+s.value > 0); ap.dataset.novo = novo;
       };
       s.oninput = atual; atual();
+      const lerItens = () => $$('.item-prep', c).map((l) => ({ desc: $('[data-f=desc]', l).value.trim(), pecas: num($('[data-f=pecas]', l).value), horas: num($('[data-f=horas]', l).value) })).filter((it) => it.desc || it.pecas || it.horas);
+      const totalItens = () => lerItens().reduce((s, it) => s + it.pecas + it.horas * K.cfg.valorHora, 0);
+      const mostraTotal = () => { const tot = totalItens(); $('#tot-prep', c).innerHTML = `Total: <b>${real(tot)}</b>${t.preparoEst ? ` · previsto ${real(t.preparoEst)} · <span class="${tot > t.preparoEst ? 'neg' : 'pos'}">${tot > t.preparoEst ? '+' : ''}${real(tot - t.preparoEst)}</span>` : ''}`; };
+      $('#itens-prep', c).addEventListener('input', mostraTotal); mostraTotal();
+      $('#add-item', c).onclick = () => { $('#itens-prep', c).insertAdjacentHTML('beforeend', linhaItem({})); $$('.item-prep', c).at(-1).querySelector('input').focus(); };
       $('#g-prep-ok', c).onclick = () => {
-        const v = num($('#g-prep', c).value); if (!(v >= 0)) { toast('Informe o valor da preparação.', true); return; }
-        K.registrarPreparo(estado, t.id, v, hojeISO()); t.preparo = Math.round(v); salvar(); cacheLimpa(); toast('Preparação registrada.'); rota();
+        const itens = lerItens(), v = totalItens(); if (!itens.length) { toast('Adicione ao menos um item de preparo.', true); return; }
+        K.registrarPreparo(estado, t.id, v, hojeISO()); estado.preparos[t.id].itens = itens; t.preparo = Math.round(v); salvar(); cacheLimpa(); toast('Preparo registrado: ' + real(v) + '.'); rota();
       };
       $('#g-vender', c).onclick = () => {
         const v = num($('#g-venda', c).value), dv = $('#g-data', c).value;
@@ -581,6 +625,12 @@
           ${tiposVal.map((k) => { const q = val.porTipo[k]; return `<tr><td>${NOMES[k]}</td><td class="n">${q.n}</td><td class="n">${q.n >= M.QUALIDADE.minimoValidacao ? pct(q.mape) : 'amostra pequena'}</td><td class="n">${q.n >= M.QUALIDADE.minimoValidacao ? mil(q.mae) : '—'}</td></tr>`; }).join('')}</tbody></table></div>
         <p class="nota-rodape">Para cada venda, o motor só conheceu o que já tinha sido vendido antes da data daquela troca. As ${val.total - val.n} vendas mais antigas ficaram sem teste porque ainda não havia histórico suficiente.</p>`
         : `<p class="vazio">Ainda não há vendas suficientes com data de troca e de venda para medir o erro (mínimo ${M.QUALIDADE.minimoValidacao}).</p>`}
+      </section>
+      <section class="painel bloco"><div class="painel-cab"><h2>${ICO.linha}Calendário de vendas da região</h2><p>Safra da cana, plantio da soja e o que a sua revenda já vendeu em cada mês</p></div>
+        ${Object.keys(NOMES).map((k) => { const s = SAFRA[k], mesAt = new Date().getMonth(), vendasMes = Array(12).fill(0); C.vendidas().filter((t) => t.tipo === k).forEach((t) => { vendasMes[+t.saida.slice(5, 7) - 1]++; });
+          return `<div style="margin:14px 0 4px"><b style="font-size:17px">${NOMES[k]}</b> <span class="sub">· melhor época: ${s.janela} (${s.motivo})</span></div>
+          <div class="cal">${['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'].map((m, i) => `<span class="${s.meses.includes(i) ? 'on' : ''} ${i === mesAt ? 'hoje' : ''}" title="${vendasMes[i]} vendas da revenda em ${m}">${m}<br><small>${vendasMes[i]}</small></span>`).join('')}</div>`; }).join('')}
+        <p class="nota-rodape">Verde: época de maior procura na região. Número embaixo: quantas máquinas desse tipo a revenda vendeu naquele mês no histórico. Com dados reais, o calendário passa a refletir o giro da própria revenda.</p>
       </section>
       <section class="painel bloco"><div class="painel-cab"><h2>Previsto x realizado</h2><p>Últimas vendas com previsão</p></div>
         <div class="tabela-wrap"><table class="tabela"><thead><tr><th>Máquina</th><th class="n">Venda prev. · real</th><th class="n">Preparo prev. · real</th><th class="n">Margem prev. · real</th><th class="n">Pátio prev. · real</th><th>Origem</th></tr></thead><tbody>
@@ -736,7 +786,7 @@
       if (C.resultado(t) < 0) x.prej++;
       if (r && t.pago > r.teto) { x.acima += t.pago - r.teto; x.nAcima++; }
     });
-    return Object.values(g).map((x) => ({ ...x, margem: x.resultado / x.venda, diasMedio: x.dias / x.trocas })).sort((a, b) => b.resultado - a.resultado);
+    return Object.values(g).map((x) => { const bruta = x.venda * K.cfg.comissaoPct, desconto = Math.min(bruta, x.acima * K.cfg.descontoAcima); return { ...x, margem: x.resultado / x.venda, diasMedio: x.dias / x.trocas, comissao: bruta, desconto, comissaoFinal: bruta - desconto }; }).sort((a, b) => b.resultado - a.resultado);
   }
   function telaVendedores() {
     const vs = porVendedor();
@@ -754,7 +804,11 @@
       <section class="painel"><div class="painel-cab"><h2>${ICO.alvo}Ranking por resultado bruto</h2><p>Venda menos aquisição e preparo</p></div>
         <div class="ranking escalonado">${vs.map((x, i) => `<div class="rank ${i === 0 ? 'ouro' : ''}"><span class="pos">${i + 1}º</span><div><b>${esc(x.nome)}</b><span>${x.trocas} trocas · margem ${pct(x.margem)} · ${Math.round(x.diasMedio)} dias de pátio em média · ${x.prej} com prejuízo</span></div>
           <div class="num"><b>${mil(x.resultado)}</b><span class="${x.acima > 0 ? 'neg' : ''}">${mil(x.acima)} pago acima</span></div></div>`).join('')}</div>
-        <p class="nota-rodape">"Pago acima" compara o valor pago na troca com o máximo que o Anshur indicaria na data, usando só as vendas anteriores. É um ponto para conversar com o vendedor, não uma acusação.</p></section>`;
+        <p class="nota-rodape">"Pago acima" compara o valor pago na troca com o máximo que o Anshur indicaria na data, usando só as vendas anteriores. É um ponto para conversar com o vendedor, não uma acusação.</p></section>
+      <section class="painel bloco"><div class="painel-cab"><h2>${ICO.moedas}Comissão atrelada ao usado</h2><p>Regra da revenda: ${pct(K.cfg.comissaoPct)} da venda, menos ${pct(K.cfg.descontoAcima, 0)} do que foi pago acima do recomendado</p></div>
+        <div class="tabela-wrap"><table class="tabela grande"><thead><tr><th>Vendedor</th><th class="n">Comissão cheia</th><th class="n">Desconto por troca acima</th><th class="n">Comissão final</th></tr></thead><tbody>
+        ${vs.map((x) => `<tr><td><b>${esc(x.nome)}</b></td><td class="n">${real(x.comissao)}</td><td class="n ${x.desconto > 0 ? 'neg' : ''}">${x.desconto > 0 ? '−' : ''}${real(x.desconto)}</td><td class="n forte">${real(x.comissaoFinal)}</td></tr>`).join('')}</tbody></table></div>
+        <p class="nota-rodape">Percentuais configuráveis em Premissas. Trocas acima do recomendado exigem a aprovação de um gerente, registrada com nome e motivo.</p></section>`;
     contar();
   }
 

@@ -20,7 +20,8 @@
   const estado = repo.ler();
 
   // premissas configuráveis pela revenda (nunca resultado garantido)
-  const PADRAO = { margemAlvo: 0.14, jurosMes: 0.012, baseJuros: 'aquisicao' };
+  // comissão e valor da hora da oficina também são políticas da revenda (configuráveis)
+  const PADRAO = { margemAlvo: 0.14, jurosMes: 0.012, baseJuros: 'aquisicao', comissaoPct: 0.015, descontoAcima: 0.5, valorHora: 180 };
   const cfg = Object.assign({}, PADRAO, estado.config);
   if (typeof estado.margem === 'number') cfg.margemAlvo = estado.margem; // compatível com a v2
   A.margemAlvo = cfg.margemAlvo;

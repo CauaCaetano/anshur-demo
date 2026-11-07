@@ -473,3 +473,9 @@ main { max-width: 1480px; }
 @media (min-width: 1100px) { .grade-2.larga { grid-template-columns: 2fr 1fr; } }
 .marca-movel { flex: none; } .marca-movel .logo-img { width: 118px; max-width: none; }
 @media (max-width: 600px) { .kpis { grid-template-columns: 1fr; } .kpi { min-height: 0; } .cab-info { display: none; } .selo-demo { display: none; } }
+.campo-in { min-height: 48px; padding: 9px 12px; border-radius: 10px; border: 1px solid rgba(17, 24, 32, .16); background: #fff; font-size: 16px; width: 100%; }
+.campo-in:focus { outline: none; border-color: var(--ouro); box-shadow: 0 0 0 3px rgba(193, 163, 106, .2); }
+.cal { display: grid; grid-template-columns: repeat(12, 1fr); gap: 4px; margin-top: 6px; }
+.cal span { text-align: center; font-size: 12.5px; padding: 6px 0; border-radius: 6px; background: #F3EFE6; color: var(--cinza); }
+.cal span.on { background: #3E6B57; color: #fff; font-weight: 700; }
+.cal span.hoje { outline: 2px solid var(--ouro); }
