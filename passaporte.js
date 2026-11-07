@@ -13,8 +13,7 @@
     ['Horímetro conferido na entrada', v.horimetro], ['Chassi e número de série conferidos', v.chassi],
     ['Notas ou ordens de serviço entregues', v.notas], ['Registro no ID Agro (Renagro)', t.idAgro]
   ];
-  const galeria = (t.fotos && t.fotos.length) ? t.fotos.slice(0, 4).map((f) => `<div style="background-image:url(${f})" role="img" aria-label="Foto da máquina"></div>`).join('')
-    : '<div>Fotos da inspeção da revenda</div><div>Horímetro, pneus e cabine</div>';
+  const galeria = [0, 1, 2, 3].map((k) => { const f = window.FOTOS.de(t, k); return `<div style="background-image:url('${f.propria ? f.u : (k ? window.FOTOS.mini(f.u) : f.u)}')" role="img" aria-label="Foto da máquina"></div>`; }).join('');
   const mov = [{ d: t.entrada, x: 'Entrada no pátio da revenda' }].concat((t.precos || []).map((p) => ({ d: p.data, x: `${p.motivo}: ${real(p.valor)}` }))).sort((a, b) => a.d.localeCompare(b.d));
 
   tela.innerHTML = `
@@ -50,7 +49,7 @@
           : '<p style="color:var(--cinza)">Nenhuma manutenção registrada ainda.</p>'}
         <p class="aviso">${comNota.length} de ${mans.length} manutenções têm comprovante.</p></section>
     </div>
-    <p class="aviso">Este passaporte organiza informações da revenda. Não é laudo técnico nem certificação. Revenda e dados fictícios, só para demonstração.</p>`;
+    <p class="aviso">Este passaporte organiza informações da revenda. Não é laudo técnico nem certificação. Revenda e dados fictícios, só para demonstração. Fotos de demonstração: Wikimedia Commons, licenças livres.</p>`;
 
   const url = location.href;
   try { const qr = window.qrcode(0, 'M'); qr.addData(url); qr.make(); document.getElementById('qr').innerHTML = qr.createSvgTag({ cellSize: 4, margin: 0, scalable: true }); }

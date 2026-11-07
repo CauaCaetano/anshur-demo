@@ -51,7 +51,7 @@
       <div class="acoes"><button class="btn btn-ouro" type="button" id="p-ok">Aplicar</button><button class="btn btn-linha" type="button" id="p-pad">Voltar ao padrão</button></div>`, (c) => {
       const m = $('#p-margem', c), j = $('#p-juros', c);
       m.oninput = () => { $('#p-mv', c).textContent = m.value + '%'; }; j.oninput = () => { $('#p-jv', c).textContent = String(j.value).replace('.', ',') + '%'; };
-      const aplicar = (v) => { Object.assign(cfg, v); A.margemAlvo = cfg.margemAlvo; estado.config = { margemAlvo: cfg.margemAlvo, jurosMes: cfg.jurosMes, baseJuros: cfg.baseJuros, comissaoPct: cfg.comissaoPct, descontoAcima: cfg.descontoAcima, valorHora: cfg.valorHora }; delete estado.margem; salvar(); cacheLimpa(); fecharCamada(); toast('Premissas aplicadas.'); rota(); };
+      const aplicar = (v) => { Object.assign(cfg, v); A.margemAlvo = cfg.margemAlvo; estado.config = { margemAlvo: cfg.margemAlvo, jurosMes: cfg.jurosMes, baseJuros: cfg.baseJuros, comissaoPct: cfg.comissaoPct, descontoAcima: cfg.descontoAcima, valorHora: cfg.valorHora }; delete estado.margem; K.registrar('config', 'Regras comerciais alteradas'); salvar(); cacheLimpa(); fecharCamada(); toast('Premissas aplicadas.'); rota(); };
       $('#p-ok', c).onclick = () => aplicar({ margemAlvo: +m.value / 100, jurosMes: +j.value / 100, baseJuros: $('#p-base', c).value, comissaoPct: Math.max(0, num($('#p-com', c).value)) / 100, descontoAcima: Math.min(100, Math.max(0, num($('#p-desc', c).value))) / 100, valorHora: Math.max(0, num($('#p-hora', c).value)) || K.PADRAO.valorHora });
       $('#p-pad', c).onclick = () => aplicar({ ...K.PADRAO });
     });
@@ -225,7 +225,7 @@
     const nomesRosca = { normal: 'Até 30 dias', atencao: '31 a 60 dias', alerta: '61 a 90 dias', critico: 'Acima de 90 dias' };
     tela.innerHTML = `
       <div class="titulo"><div><h1>Visão geral da revenda</h1><p>Onde está o seu dinheiro e o que fazer hoje.</p></div>
-        <div class="acoes"><a class="btn btn-linha" href="#patio">Ver pátio completo</a><button class="btn btn-linha" type="button" id="premissas-v">Premissas</button></div></div>
+        <div class="acoes"><a class="btn btn-linha" href="#patio">Ver pátio completo</a><button class="btn btn-linha" type="button" id="premissas-v">Premissas</button>${botaoAdicionar([{ nome: 'Nova avaliação', desc: 'Quanto pagar no usado da troca', acao: () => { location.hash = '#avaliar'; } }, { nome: 'Máquina no pátio', desc: 'Cadastrar à mão', acao: () => addMaquinaManual() }, { nome: 'Documento ou planilha', desc: 'Foto, PDF, CSV ou Excel', acao: () => { location.hash = '#documentos'; } }])}</div></div>
       <div class="kpis escalonado">
         <a class="kpi k-marfim" href="#patio"><span class="rot">${ICO.moedas}Capital imobilizado</span><span class="val">${conta(capital, 'mil')}</span><span class="exp">Pago nas ${itens.length} máquinas do pátio</span></a>
         <a class="kpi k-salvia" href="#trocas"><span class="rot">${ICO.pct}Margem média realizada</span><span class="val">${conta(margemReal, 'pct')}</span><span class="exp">Nas ${vendidas.length} trocas vendidas</span></a>
@@ -243,7 +243,7 @@
       </section>
       <section class="painel bloco agir"><div class="painel-cab"><div><h2>${ICO.alvo}Onde você precisa agir</h2><p>${agir.length} máquinas que mais pesam no seu capital hoje</p></div></div>
         <div class="tabela-wrap"><table class="tabela grande"><thead><tr><th>Máquina</th><th>Idade (dias)</th><th class="n">Capital preso</th><th class="n">Margem estimada</th><th>Risco</th><th>Recomendação</th></tr></thead>
-        <tbody>${agir.map((i) => { const nv = nivelRisco(i); return `<tr class="clicavel" tabindex="0" data-id="${i.t.id}"><td class="maq"><span class="maq-ico">${ICO[i.t.tipo]}</span><span><b>${esc(NOMES[i.t.tipo].split(' ')[0] + ' ' + i.t.marca + ' ' + i.t.modelo)}</b><span>${i.t.ano} · ${i.t.horas.toLocaleString('pt-BR')} h</span></span></td>
+        <tbody>${agir.map((i) => { const nv = nivelRisco(i); return `<tr class="clicavel" tabindex="0" data-id="${i.t.id}"><td class="maq">${fotoMini(i.t)}<span><b>${esc(NOMES[i.t.tipo].split(' ')[0] + ' ' + i.t.marca + ' ' + i.t.modelo)}</b><span>${i.t.ano} · ${i.t.horas.toLocaleString('pt-BR')} h</span></span></td>
           <td><span class="dias ${i.faixa}">${i.dias} dias</span></td><td class="n forte">${mil(i.t.pago)}</td><td class="n ${i.margem < 0.06 ? 'neg' : ''}">${pct(i.margem)}</td><td><span class="risco ${nv.cls}">${nv.ico}${nv.nome}</span></td><td><span class="reco">${ICO.etiqueta}${esc(i.acao)}</span></td></tr>`; }).join('')}</tbody></table></div>
       </section>`;
     $$('tr.clicavel', tela).forEach((tr) => { const abre = () => detalheMaquina(tr.dataset.id); tr.onclick = abre; tr.onkeydown = (e) => { if (e.key === 'Enter') abre(); }; });
@@ -263,7 +263,7 @@
   function telaAvaliar() {
     const nomesPasso = ['Identificação', 'Inspeção', 'Evidências', 'Resultado'];
     tela.innerHTML = `
-      <div class="titulo"><div><h1>Avaliar troca</h1><p>Quanto vale pagar no usado que o cliente oferece, com base nas trocas que a ${esc(A.revenda.nome)} já vendeu.</p></div></div>
+      <div class="titulo"><div><h1>Avaliar troca</h1><p>Quanto vale pagar no usado que o cliente oferece, com base nas trocas que a ${esc(A.revenda.nome)} já vendeu.</p></div>${botaoAdicionar([{ nome: 'Preencher com documento', desc: 'Foto da nota ou do CRV da máquina', acao: () => { location.hash = '#documentos'; } }, { nome: 'Novo modelo no catálogo', desc: 'Modelo que ainda não está na lista', acao: () => { location.hash = '#config'; } }])}</div>
       <nav class="etapas" aria-label="Etapas da avaliação">${nomesPasso.map((n, i) => `<button type="button" data-p="${i + 1}" ${av.passo === i + 1 ? 'aria-current="step"' : ''} class="${av.passo > i + 1 ? 'feita' : ''}">${n}</button>`).join('')}</nav>
       <div id="passo"></div>
       ${estado.avaliacoes.length ? `<section class="painel bloco"><div class="painel-cab"><h2>Avaliações registradas</h2><p>${estado.avaliacoes.length} nesta demonstração</p></div>
@@ -423,7 +423,7 @@
     $('#registrar').onclick = (e) => {
       const b = e.currentTarget; b.classList.add('carregando');
       // a avaliação congela os números e as premissas do dia: não é recalculada quando o modelo muda
-      setTimeout(() => { estado.avaliacoes.push({ id: 'AV' + Date.now(), data: hojeISO(), maq, teto: r.teto, venda: r.venda, preparo: r.preparo, faixa: r.faixa, confianca: r.confianca, amostras: r.base, mape: r.qualidade ? r.qualidade.mape : null, premissas: { margemAlvo: r.margem, jurosMes: K.cfg.jurosMes } }); salvar(); b.classList.remove('carregando'); toast('Avaliação registrada com as premissas de hoje.'); telaAvaliar(); }, 450);
+      setTimeout(() => { estado.avaliacoes.push({ id: 'AV' + Date.now(), data: hojeISO(), maq, teto: r.teto, venda: r.venda, preparo: r.preparo, faixa: r.faixa, confianca: r.confianca, amostras: r.base, mape: r.qualidade ? r.qualidade.mape : null, premissas: { margemAlvo: r.margem, jurosMes: K.cfg.jurosMes } }); log('avaliacao', `Avaliação registrada: ${maq.marca} ${maq.modelo} ${maq.ano}, máximo ${real(r.teto)}`); salvar(); b.classList.remove('carregando'); toast('Avaliação registrada com as premissas de hoje.'); telaAvaliar(); }, 450);
     };
     $('#premissas').onclick = abrirPremissas;
     $('#fechar-troca').onclick = () => abrirCamada('modal', `<h2>Fechar troca</h2><p class="sub">Registre o valor efetivamente negociado. Ele pode ser diferente do valor máximo recomendado.</p>
@@ -431,7 +431,7 @@
         <div class="campo"><label for="t-valor">Valor pago na troca</label><input id="t-valor" inputmode="numeric" value="${r.teto.toLocaleString('pt-BR')}"></div>
         <div class="campo"><label for="t-data">Data</label><input id="t-data" type="date" value="${hojeISO()}" max="${hojeISO()}"></div>
         <div class="campo"><label for="t-vend">Vendedor</label><select id="t-vend">${VENDEDORES().map((v) => `<option>${esc(v)}</option>`).join('')}</select></div>
-        <div class="campo" id="t-aprov-box" hidden><label for="t-aprov">Aprovado por (gerente)</label><input id="t-aprov" placeholder="Nome de quem autorizou"></div>
+        <div class="campo" id="t-aprov-box" hidden><label for="t-aprov">Aprovado por (gerente)</label><input id="t-aprov" list="dl-gerentes" placeholder="Nome de quem autorizou" value="${podeAprovar() ? esc(eu().nome) : ''}">${lista('dl-gerentes', estado.usuarios.filter((u) => ['dono', 'gerente'].includes(u.perfil)).map((u) => u.nome))}</div>
         <div class="campo inteiro" id="t-mot-box" hidden><label for="t-mot">Motivo para pagar acima</label><input id="t-mot" placeholder="Ex.: cliente fecha a compra de uma colhedora nova"></div>
       </div>
       <p class="conta" id="t-aviso">Valor máximo recomendado: ${real(r.teto)}.</p>
@@ -454,7 +454,7 @@
           const t = K.fecharTroca(estado, maq, r, v, dt, { vendedor: $('#t-vend', c).value, negociacao: av.nova || null, aprovacao: acima ? { por: aprov, motivo: mot, excesso: v - r.teto, data: hojeISO() } : null, origem: av.local || 'Troca registrada',
             manutencoes: av.declarado ? [{ servico: av.declarado, horas: av.horas, comNota: av.verif.notas }] : [], fotos: av.fotos.filter(Boolean), verif: { ...av.verif } });
           const id = t.id;
-          A.trocas.push({ ...t }); salvar(); cacheLimpa();
+          A.trocas.push({ ...t }); log('troca', `Troca fechada: ${t.marca} ${t.modelo} por ${real(t.pago)} (máximo recomendado ${real(r.teto)})${t.aprovacao ? `, acima do teto, aprovada por ${t.aprovacao.por}` : ''}`, { ref: t.id }); salvar(); cacheLimpa();
           fecharCamada(true);
           abrirCamada('modal', `<h2>Troca registrada</h2><p class="sub">${esc(t.marca + ' ' + t.modelo)} entrou no pátio por ${real(t.pago)}. O passaporte foi criado e a visão geral já foi atualizada.</p>
             <div class="acoes"><a class="btn btn-ouro" href="passaporte.html?id=${id}">Abrir passaporte</a><a class="btn btn-linha" href="#patio" id="ir-patio">Ver no pátio</a></div>`, (cc) => { $('#ir-patio', cc).onclick = () => fecharCamada(true); });
@@ -469,32 +469,37 @@
   const fp = { tipo: '', marca: '', idade: '', ordem: 'risco' };
   function telaPatio() {
     const todos = C.patio().map(infoPatio);
-    let itens = todos.filter((i) => (!fp.tipo || i.t.tipo === fp.tipo) && (!fp.marca || i.t.marca === fp.marca) && (!fp.idade || i.faixa === fp.idade));
+    const q = (fp.busca || '').toLowerCase();
+    let itens = todos.filter((i) => (!q || [i.t.marca, i.t.modelo, i.t.chassi, i.t.vendedor].join(' ').toLowerCase().includes(q)) && (!fp.tipo || i.t.tipo === fp.tipo) && (!fp.marca || i.t.marca === fp.marca) && (!fp.idade || i.faixa === fp.idade));
     const ord = { risco: (a, b) => b.risco - a.risco, capital: (a, b) => b.t.pago - a.t.pago, dias: (a, b) => b.dias - a.dias, margem: (a, b) => a.margem - b.margem };
     itens.sort(ord[fp.ordem]);
     const cap = itens.reduce((s, i) => s + i.t.pago, 0), velhos = itens.filter((i) => i.dias > 90);
     const marcas = [...new Set(todos.map((i) => i.t.marca))].sort();
     tela.innerHTML = `
       <div class="titulo"><div><h1>Pátio de máquinas</h1><p>Saiba onde seu capital está parado e quais equipamentos exigem atenção.</p></div>
-        <div class="acoes"><button class="btn btn-linha" type="button" id="exportar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Exportar planilha</button></div></div>
+        <div class="acoes"><button class="btn btn-linha" type="button" id="exportar">${ic('<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>')}Exportar</button><button class="btn btn-linha" type="button" id="comparar">Comparar (<span id="n-comp">${comparar.size}</span>)</button>${botaoAdicionar([{ nome: 'Cadastrar à mão', desc: 'Máquina que entrou no pátio', acao: () => addMaquinaManual() }, { nome: 'Puxar de documento', desc: 'Foto da nota, PDF ou planilha', acao: () => { location.hash = '#documentos'; } }, { nome: 'Avaliar uma troca', desc: 'Calcular o valor máximo antes de fechar', acao: () => { location.hash = '#avaliar'; } }])}</div></div>
       <div class="kpis escalonado">
-        <div class="kpi"><span class="rot">Máquinas no pátio</span><span class="val">${conta(itens.length, 'int')}</span></div>
-        <div class="kpi"><span class="rot">Capital imobilizado</span><span class="val">${conta(cap, 'mil')}</span></div>
-        <div class="kpi"><span class="rot">Permanência média</span><span class="val">${conta(itens.reduce((s, i) => s + i.dias, 0) / Math.max(1, itens.length), 'dias')}</span></div>
-        <div class="kpi risco"><span class="rot">Acima de 90 dias</span><span class="val">${velhos.length} · ${mil(velhos.reduce((s, i) => s + i.t.pago, 0))}</span></div>
+        <div class="kpi k-marfim"><span class="rot">${ICO.barras}Máquinas no pátio</span><span class="val">${conta(itens.length, 'int')}</span></div>
+        <div class="kpi k-marfim"><span class="rot">${ICO.moedas}Capital imobilizado</span><span class="val">${conta(cap, 'mil')}</span></div>
+        <div class="kpi k-salvia"><span class="rot">${ICO.linha}Permanência média</span><span class="val">${conta(itens.reduce((s, i) => s + i.dias, 0) / Math.max(1, itens.length), 'dias')}</span></div>
+        <div class="kpi k-risco"><span class="rot">${ICO.alerta}Acima de 90 dias</span><span class="val">${velhos.length} ${velhos.length === 1 ? 'máquina' : 'máquinas'}</span><span class="pilula">${mil(velhos.reduce((s, i) => s + i.t.pago, 0))}</span></div>
       </div>
+      <div class="campo" style="margin-bottom:12px"><label for="p-busca">Buscar no pátio</label><input id="p-busca" placeholder="Modelo, marca, chassi ou vendedor" value="${esc(fp.busca || '')}"></div>
       <div class="filtros">
         <div class="campo"><label for="p-tipo">Categoria</label><select id="p-tipo"><option value="">Todas</option>${Object.keys(NOMES).map((k) => `<option value="${k}" ${fp.tipo === k ? 'selected' : ''}>${NOMES[k]}</option>`).join('')}</select></div>
         <div class="campo"><label for="p-marca">Fabricante</label><select id="p-marca"><option value="">Todos</option>${marcas.map((m) => `<option ${fp.marca === m ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select></div>
         <div class="campo"><label for="p-idade">Tempo de pátio</label><select id="p-idade"><option value="">Todos</option>${['normal', 'atencao', 'alerta', 'critico'].map((f) => `<option value="${f}" ${fp.idade === f ? 'selected' : ''}>${C.NOMES_IDADE[f]}</option>`).join('')}</select></div>
         <div class="campo"><label for="p-ordem">Ordenar por</label><select id="p-ordem">${[['risco', 'Maior risco de margem'], ['capital', 'Maior capital imobilizado'], ['dias', 'Maior tempo no pátio'], ['margem', 'Menor margem projetada']].map(([v, n]) => `<option value="${v}" ${fp.ordem === v ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
       </div>
-      <section class="painel"><div class="tabela-wrap"><table class="tabela"><thead><tr><th>Máquina</th><th>Entrada</th><th class="n">Dias</th><th class="n">Aquisição</th><th class="n">Preparo</th><th class="n">Custo total</th><th class="n">Anunciado</th><th class="n">Venda estimada</th><th class="n">Margem</th><th>Situação</th></tr></thead>
-        <tbody>${itens.length ? itens.map((i) => `<tr class="clicavel" tabindex="0" data-id="${i.t.id}"><td class="maq"><b>${esc(i.t.marca + ' ' + i.t.modelo)}</b><span>${NOMES[i.t.tipo]} · ${i.t.ano} · ${i.t.horas.toLocaleString('pt-BR')} h</span></td>
+      <section class="painel"><div class="tabela-wrap"><table class="tabela"><thead><tr><th><span class="sr">Comparar</span></th><th>Máquina</th><th>Entrada</th><th class="n">Dias</th><th class="n">Aquisição</th><th class="n">Preparo</th><th class="n">Custo total</th><th class="n">Anunciado</th><th class="n">Venda estimada</th><th class="n">Margem</th><th>Situação</th></tr></thead>
+        <tbody>${itens.length ? itens.map((i) => `<tr class="clicavel" tabindex="0" data-id="${i.t.id}"><td><input type="checkbox" class="comp-chk" value="${i.t.id}" ${comparar.has(i.t.id) ? 'checked' : ''} aria-label="Comparar ${esc(i.t.modelo)}"></td><td class="maq">${fotoMini(i.t)}<span><b>${esc(i.t.marca + ' ' + i.t.modelo)}</b><span>${NOMES[i.t.tipo]} · ${i.t.ano} · ${i.t.horas.toLocaleString('pt-BR')} h</span></span></td>
           <td>${data(i.t.entrada)}</td><td class="n">${i.dias} <span class="tag ${i.faixa}">${C.NOMES_IDADE[i.faixa]}</span></td><td class="n">${mil(i.t.pago)}</td><td class="n">${mil(i.t.preparo)}</td><td class="n">${mil(i.custo)}</td><td class="n">${mil(i.t.anuncio)}</td><td class="n">${mil(i.venda)}</td>
-          <td class="n ${i.margem < 0.06 ? 'neg' : ''}">${pct(i.margem)}</td><td>${esc(i.acao)}</td></tr>`).join('') : '<tr><td colspan="10" class="vazio">Nenhuma máquina com esses filtros.</td></tr>'}</tbody></table></div>
+          <td class="n ${i.margem < 0.06 ? 'neg' : ''}">${pct(i.margem)}</td><td>${esc(i.acao)}</td></tr>`).join('') : `<tr><td colspan="11" class="vazio">${todos.length ? 'Nenhuma máquina com esses filtros.' : 'O pátio está vazio. Use Adicionar para cadastrar a primeira máquina.'}</td></tr>`}</tbody></table></div>
         <p class="nota-rodape">Toque numa máquina para ver os detalhes, simular redução de preço e abrir o passaporte.</p></section>`;
     ['tipo', 'marca', 'idade', 'ordem'].forEach((k) => { $('#p-' + k).onchange = (e) => { fp[k] = e.target.value; telaPatio(); }; });
+    let tb; $('#p-busca').oninput = (e) => { clearTimeout(tb); tb = setTimeout(() => { fp.busca = e.target.value; telaPatio(); const el = $('#p-busca'); el.focus(); el.setSelectionRange(el.value.length, el.value.length); }, 250); };
+    $$('.comp-chk', tela).forEach((c) => { c.onclick = (e) => e.stopPropagation(); c.onchange = () => { if (c.checked) { if (comparar.size >= 3) { c.checked = false; toast('Compare no máximo 3 máquinas.', true); return; } comparar.add(c.value); } else comparar.delete(c.value); $('#n-comp').textContent = comparar.size; }; });
+    $('#comparar').onclick = abrirComparacao;
     $$('tr.clicavel', tela).forEach((tr) => { const abre = () => detalheMaquina(tr.dataset.id); tr.onclick = abre; tr.onkeydown = (e) => { if (e.key === 'Enter') abre(); }; });
     $('#exportar').onclick = () => baixarCSV('anshur-patio.csv', [['Máquina', 'Categoria', 'Ano', 'Horas', 'Entrada', 'Dias', 'Aquisição', 'Preparo', 'Custo total', 'Anunciado', 'Venda estimada', 'Margem projetada', 'Situação']]
       .concat(itens.map((i) => [i.t.marca + ' ' + i.t.modelo, NOMES[i.t.tipo], i.t.ano, i.t.horas, data(i.t.entrada), i.dias, i.t.pago, i.t.preparo, i.custo, i.t.anuncio, i.venda, (i.margem * 100).toFixed(1).replace('.', ',') + '%', i.acao])));
@@ -509,6 +514,7 @@
     const mov = [{ data: t.entrada, txt: `Entrada no pátio por ${real(t.pago)}` }, { data: t.entrada, txt: `Preparo: ${real(t.preparo)}${t.preparoEst ? ` (previsto ${real(t.preparoEst)})` : ''}` }]
       .concat((t.precos || []).map((p) => ({ data: p.data, txt: `${p.motivo}: ${real(p.valor)}` }))).sort((a, b) => a.data.localeCompare(b.data));
     abrirCamada('gaveta', `
+      <div class="galeria-ficha">${[0, 1, 2].map((k) => { const f = F.de(t, k); return `<img src="${f.propria ? f.u : (k ? F.mini(f.u) : f.u)}" alt="Foto ${k + 1} de ${esc(t.marca + ' ' + t.modelo)}" loading="lazy">`; }).join('')}</div>
       <span class="tag ${i.faixa}">${C.NOMES_IDADE[i.faixa]} · ${i.dias} dias</span>
       <h2 style="font-size:22px;margin-top:10px">${esc(t.marca + ' ' + t.modelo)}</h2><p class="sub">${NOMES[t.tipo]} · ${t.ano} · ${t.horas.toLocaleString('pt-BR')} h · ${esc(t.origem)}</p>
       <div class="det">
@@ -541,8 +547,9 @@
         <div class="det" id="sim-res"></div>
         <button class="btn btn-linha" type="button" id="aplicar" disabled>Aplicar novo preço</button>
       </section>
-      <section style="margin-top:18px"><h2 style="font-size:15px;margin-bottom:12px">Histórico de movimentações</h2>
-        <ul class="linha-tempo">${mov.map((m) => `<li>${esc(m.txt)}<span>${data(m.data)}</span></li>`).join('')}</ul></section>
+      <section style="margin-top:18px"><h2 style="font-size:18px;margin-bottom:12px">Linha do tempo da máquina</h2>
+        <ul class="linha-tempo">${mov.map((m) => `<li>${esc(m.txt)}<span>${data(m.data)}</span></li>`).concat(estado.atividades.filter((a) => a.ref === t.id).map((a) => `<li>${esc(a.texto)}<span>${new Date(a.quando).toLocaleString('pt-BR')} · ${esc(a.usuario)}</span></li>`)).join('')}</ul></section>
+      <section style="margin-top:12px"><h2 style="font-size:18px;margin-bottom:8px">Documentos</h2>${(t.docs || []).length ? `<ul class="lista-motivos">${t.docs.map((d) => { const doc = estado.documentos.find((x) => x.id === d); return `<li><span>${esc(doc ? doc.nome : d)}</span><b>${doc ? esc(doc.tipo) : ''}</b></li>`; }).join('')}</ul>` : '<p class="sub">Nenhum documento anexado.</p>'}<a class="btn btn-linha" href="#documentos" style="margin-top:8px">Anexar documento</a></section>
       <div class="acoes"><a class="btn btn-ouro" href="passaporte.html?id=${t.id}">Abrir passaporte</a></div>`, (c) => {
       const s = $('#sim', c), res = $('#sim-res', c), ap = $('#aplicar', c);
       const atual = () => {
@@ -562,7 +569,7 @@
       $('#add-item', c).onclick = () => { $('#itens-prep', c).insertAdjacentHTML('beforeend', linhaItem({})); $$('.item-prep', c).at(-1).querySelector('input').focus(); };
       $('#g-prep-ok', c).onclick = () => {
         const itens = lerItens(), v = totalItens(); if (!itens.length) { toast('Adicione ao menos um item de preparo.', true); return; }
-        K.registrarPreparo(estado, t.id, v, hojeISO()); estado.preparos[t.id].itens = itens; t.preparo = Math.round(v); salvar(); cacheLimpa(); toast('Preparo registrado: ' + real(v) + '.'); rota();
+        K.registrarPreparo(estado, t.id, v, hojeISO()); estado.preparos[t.id].itens = itens; t.preparo = Math.round(v); log('preparo', `Preparo de ${t.marca} ${t.modelo} registrado: ${real(v)}`, { ref: t.id }); salvar(); cacheLimpa(); toast('Preparo registrado: ' + real(v) + '.'); rota();
       };
       $('#g-vender', c).onclick = () => {
         const v = num($('#g-venda', c).value), dv = $('#g-data', c).value;
@@ -570,13 +577,13 @@
         if (!dv || dv < t.entrada) { toast('A data da venda não pode ser antes da troca.', true); return; }
         const res = v - t.pago - t.preparo;
         confirmar('Registrar venda?', `${t.marca} ${t.modelo} vendida por ${real(v)} em ${data(dv)}. Resultado bruto: ${real(res)} (${pct(res / v)}). A máquina sai do pátio.`, 'Registrar venda', () => {
-          K.registrarVenda(estado, t.id, v, dv); t.vendido = Math.round(v); t.saida = dv; t.diasPatio = diasEntre(t.entrada, dv); salvar(); cacheLimpa();
+          K.registrarVenda(estado, t.id, v, dv); t.vendido = Math.round(v); t.saida = dv; t.diasPatio = diasEntre(t.entrada, dv); log('venda', `Venda registrada: ${t.marca} ${t.modelo} por ${real(v)}`, { ref: t.id }); salvar(); cacheLimpa();
           toast('Venda registrada. Veja o previsto x realizado em Inteligência de trocas.'); rota();
         });
       };
       ap.onclick = () => confirmar('Aplicar novo preço?', `O anúncio passa de ${real(t.anuncio)} para ${real(+ap.dataset.novo)}.`, 'Aplicar', () => {
         const reg = { data: hojeISO(), valor: +ap.dataset.novo, motivo: 'Redução de preço' };
-        (estado.precos[t.id] = estado.precos[t.id] || []).push(reg); t.precos = (t.precos || []).concat(reg); t.anuncio = reg.valor; salvar();
+        (estado.precos[t.id] = estado.precos[t.id] || []).push(reg); t.precos = (t.precos || []).concat(reg); t.anuncio = reg.valor; log('preco', `Preço de ${t.marca} ${t.modelo} alterado para ${real(reg.valor)}`, { ref: t.id }); salvar();
         toast('Novo preço aplicado.'); rota();
       });
     });
@@ -609,7 +616,7 @@
 
     tela.innerHTML = `
       <div class="titulo"><div><h1>Inteligência de trocas</h1><p>Onde a revenda ganhou e onde perdeu dinheiro nas trocas já vendidas.</p></div>
-        <div class="acoes"><button class="btn btn-linha" type="button" id="exportar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Exportar planilha</button></div></div>
+        <div class="acoes"><button class="btn btn-linha" type="button" id="exportar">${ic('<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>')}Exportar</button>${botaoAdicionar([{ nome: 'Venda antiga à mão', desc: 'Troca que já foi vendida', acao: addVendaManual }, { nome: 'Importar planilha', desc: 'Histórico do seu sistema', acao: () => { tc.modo = 'minhas'; location.hash = '#teste'; } }, { nome: 'Puxar de documento', desc: 'Foto, PDF ou Excel', acao: () => { location.hash = '#documentos'; } }])}</div></div>
       <div class="filtros">
         <div class="campo"><label for="t-per">Período</label><select id="t-per">${[['12', 'Últimos 12 meses'], ['24', 'Últimos 24 meses'], ['tudo', 'Todo o histórico']].map(([v, n]) => `<option value="${v}" ${ft.periodo === v ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
         <div class="campo"><label for="t-tipo">Categoria</label><select id="t-tipo"><option value="">Todas</option>${Object.keys(NOMES).map((k) => `<option value="${k}" ${ft.tipo === k ? 'selected' : ''}>${NOMES[k]}</option>`).join('')}</select></div>
@@ -669,7 +676,7 @@
     const recentes = C.vendidas().filter((t) => rec(t)).sort((a, b) => b.saida.localeCompare(a.saida)).slice(0, 16);
     if (!tc.selecionadas) tc.selecionadas = new Set(recentes.slice(0, 8).map((t) => t.id));
     tela.innerHTML = `
-      <div class="titulo"><div><h1>Quanto você pagou a mais sem perceber?</h1><p>O Anshur avalia trocas antigas sem ver quanto foi pago, usando só o que tinha sido vendido antes de cada uma. Depois revelamos e comparamos.</p></div></div>
+      <div class="titulo"><div><h1>Quanto você pagou a mais sem perceber?</h1><p>O Anshur avalia trocas antigas sem ver quanto foi pago, usando só o que tinha sido vendido antes de cada uma. Depois revelamos e comparamos.</p></div>${botaoAdicionar([{ nome: 'Colar ou abrir planilha', desc: 'Trocas antigas do seu sistema', acao: () => { tc.modo = 'minhas'; telaTeste(); } }, { nome: 'Venda antiga à mão', desc: 'Uma troca por vez', acao: addVendaManual }])}</div>
       <div class="abas-modo" role="group" aria-label="Origem das trocas">
         <button type="button" data-m="revenda" aria-pressed="${tc.modo === 'revenda'}">${OP ? 'Trocas já importadas' : 'Trocas da demonstração'}</button>
         <button type="button" data-m="minhas" aria-pressed="${tc.modo === 'minhas'}">${OP ? 'Importar planilha' : 'Usar minhas trocas'}</button>
@@ -775,10 +782,10 @@
     const itens = C.patio().map(infoPatio).sort((a, b) => b.t.entrada.localeCompare(a.t.entrada));
     if (!itens.length) { tela.innerHTML = '<div class="titulo"><div><h1>Passaportes</h1><p>Nenhuma máquina no pátio. Ao fechar uma troca, o passaporte é criado automaticamente.</p></div></div><a class="btn btn-ouro" href="#avaliar">Avaliar uma troca</a>'; return; }
     tela.innerHTML = `
-      <div class="titulo"><div><h1>Passaportes</h1><p>A ficha pública de cada usado do pátio: o comprador aponta o celular no QR Code e vê inspeção, documentos e manutenções.</p></div></div>
+      <div class="titulo"><div><h1>Passaportes</h1><p>A ficha pública de cada usado do pátio: o comprador aponta o celular no QR Code e vê inspeção, documentos e manutenções.</p></div>${botaoAdicionar([{ nome: 'Máquina no pátio', desc: 'O passaporte é criado junto', acao: () => addMaquinaManual() }])}</div>
       <div class="cartoes escalonado">${itens.map((i) => {
         const comp = (i.t.manutencoes || []).filter((m) => m.comNota).length, tot = (i.t.manutencoes || []).length;
-        return `<article class="cartao-pp"><span class="id">ANS-${esc(i.t.id)}</span><h2 style="font-size:17px">${esc(i.t.marca + ' ' + i.t.modelo)}</h2>
+        return `<article class="cartao-pp"><img class="pp-foto" src="${F.de(i.t).propria ? F.de(i.t).u : F.mini(F.de(i.t).u)}" alt="${esc(i.t.marca + ' ' + i.t.modelo)}" loading="lazy"><span class="id">ANS-${esc(i.t.id)}</span><h2 style="font-size:17px">${esc(i.t.marca + ' ' + i.t.modelo)}</h2>
           <p class="sub">${NOMES[i.t.tipo]} · ${i.t.ano} · ${i.t.horas.toLocaleString('pt-BR')} h · anunciado ${mil(i.t.anuncio)}</p>
           <p class="sub"><span class="tag comprovado">${comp} comprovadas</span> <span class="tag declarado">${tot - comp} declaradas</span></p>
           <div class="acoes" style="margin-top:4px"><a class="btn btn-ouro" href="passaporte.html?id=${i.t.id}">Abrir</a><button class="btn btn-linha" type="button" data-copiar="${i.t.id}">Copiar link</button></div></article>`;
@@ -817,7 +824,7 @@
     const melhorMargem = vs.slice().sort((a, b) => b.margem - a.margem)[0];
     const maisAcima = vs.slice().sort((a, b) => b.acima - a.acima)[0];
     tela.innerHTML = `
-      <div class="titulo"><div><h1>Vendedores</h1><p>Quem traz resultado nas trocas e quem paga caro demais no usado.</p></div></div>
+      <div class="titulo"><div><h1>Vendedores</h1><p>Quem traz resultado nas trocas e quem paga caro demais no usado.</p></div>${botaoAdicionar([{ nome: 'Adicionar vendedor', desc: 'Entra na equipe com perfil de vendedor', acao: () => addUsuario({ perfil: 'vendedor', nome: '', email: '' }) }])}</div>
       <div class="kpis escalonado">
         <div class="kpi k-marfim"><span class="rot">${ICO.moedas}Melhor resultado</span><span class="val">${esc(vs[0].nome)}</span><span class="exp">${mil(vs[0].resultado)} em ${vs[0].trocas} trocas</span></div>
         <div class="kpi k-salvia"><span class="rot">${ICO.pct}Melhor margem</span><span class="val">${pct(melhorMargem.margem)}</span><span class="exp">${esc(melhorMargem.nome)}</span></div>
@@ -839,7 +846,7 @@
   const fg = { status: '' };
   function telaGarantias() {
     const lista = (A.garantias || []).slice().sort((a, b) => b.data.localeCompare(a.data));
-    if (!lista.length) { tela.innerHTML = '<div class="titulo"><div><h1>Garantias a receber</h1><p>Nenhuma ordem de serviço em garantia cadastrada. Na implantação importamos as OS do seu sistema.</p></div></div>'; return; }
+    if (!lista.length) { tela.innerHTML = `<div class="titulo"><div><h1>Garantias a receber</h1><p>Nenhuma ordem de serviço em garantia cadastrada.</p></div>${botaoAdicionar([{ nome: 'OS à mão', desc: 'Serviço feito em garantia', acao: () => addGarantia() }, { nome: 'Puxar de documento', desc: 'Foto ou PDF', acao: () => { location.hash = '#documentos'; } }])}</div>`; return; }
     const aReceber = lista.filter((g) => g.status === 'aguardando');
     const glosa = lista.reduce((s, g) => s + (g.status === 'parcial' || g.status === 'negado' ? g.valor - g.pago : 0), 0);
     const vencidas = aReceber.filter((g) => diasDesde(g.data) > 60);
@@ -849,7 +856,7 @@
     const porMarca = {}; lista.forEach((g) => { if (g.status !== 'pago') porMarca[g.marca] = (porMarca[g.marca] || 0) + g.valor - g.pago; });
     tela.innerHTML = `
       <div class="titulo"><div><h1>Garantias a receber</h1><p>Serviços que a oficina fez em garantia e o que o fabricante ainda não pagou ou pagou a menos.</p></div>
-        <div class="acoes"><button class="btn btn-linha" type="button" id="exp-gar">Exportar cobrança</button></div></div>
+        <div class="acoes"><button class="btn btn-linha" type="button" id="exp-gar">Exportar cobrança</button>${botaoAdicionar([{ nome: 'OS à mão', desc: 'Serviço feito em garantia', acao: () => addGarantia() }, { nome: 'Puxar de documento', desc: 'Foto ou PDF da OS ou do extrato', acao: () => { location.hash = '#documentos'; } }])}</div></div>
       <div class="kpis escalonado">
         <div class="kpi k-marfim"><span class="rot">${ICO.moedas}A receber do fabricante</span><span class="val">${conta(aReceber.reduce((s, g) => s + g.valor, 0), 'mil')}</span><span class="exp">${aReceber.length} ordens aguardando pagamento</span></div>
         <div class="kpi k-risco"><span class="rot">${ICO.alerta}Glosado ou negado</span><span class="val">${conta(glosa, 'mil')}</span><span class="exp">Diferença entre o serviço feito e o que foi pago</span></div>
@@ -881,11 +888,11 @@
   }
   function telaFinanciamento() {
     const lista = (A.financiadas || []).map((f) => ({ f, j: jurosFin(f) })).sort((a, b) => b.j.aposVenda - a.j.aposVenda);
-    if (!lista.length) { tela.innerHTML = '<div class="titulo"><div><h1>Estoque financiado</h1><p>Nenhuma máquina financiada cadastrada.</p></div></div>'; return; }
+    if (!lista.length) { tela.innerHTML = `<div class="titulo"><div><h1>Estoque financiado</h1><p>Nenhuma máquina financiada cadastrada.</p></div>${botaoAdicionar([{ nome: 'Máquina financiada à mão', desc: 'Chassi, valor, banco e taxa', acao: () => addFinanciada() }, { nome: 'Puxar de documento', desc: 'Contrato ou extrato', acao: () => { location.hash = '#documentos'; } }])}</div>`; return; }
     const vendidasAbertas = lista.filter((x) => x.f.venda && !x.f.quitacao);
     const perdido = lista.reduce((s, x) => s + x.j.aposVenda, 0);
     tela.innerHTML = `
-      <div class="titulo"><div><h1>Estoque financiado</h1><p>Máquinas novas no floor plan: juros que continuam correndo depois que a máquina já foi vendida.</p></div></div>
+      <div class="titulo"><div><h1>Estoque financiado</h1><p>Máquinas novas no floor plan: juros que continuam correndo depois que a máquina já foi vendida.</p></div>${botaoAdicionar([{ nome: 'Máquina financiada à mão', desc: 'Chassi, valor, banco e taxa', acao: () => addFinanciada() }, { nome: 'Puxar de documento', desc: 'Contrato ou extrato do banco', acao: () => { location.hash = '#documentos'; } }])}</div>
       <div class="kpis escalonado">
         <div class="kpi k-marfim"><span class="rot">${ICO.moedas}Financiado em estoque</span><span class="val">${conta(lista.filter((x) => !x.f.venda).reduce((s, x) => s + x.f.valor, 0), 'mil')}</span><span class="exp">${lista.filter((x) => !x.f.venda).length} máquinas novas no pátio</span></div>
         <div class="kpi k-risco"><span class="rot">${ICO.alerta}Juros pagos após a venda</span><span class="val">${conta(perdido, 'mil')}</span><span class="exp">Dinheiro que dava para ter economizado quitando no dia da venda</span></div>
@@ -894,7 +901,7 @@
       </div>
       <section class="painel"><div class="painel-cab"><h2>${ICO.etiqueta}Máquinas financiadas</h2><p>Ordenado pelo juro pago depois da venda</p></div>
         <div class="tabela-wrap"><table class="tabela"><thead><tr><th>Máquina</th><th class="n">Valor</th><th>Entrada</th><th>Venda</th><th>Quitação</th><th class="n">Juros até hoje</th><th class="n">Por dia</th><th class="n">Juros após venda</th><th>Situação</th></tr></thead><tbody>
-        ${lista.map(({ f, j }) => { const sit = !f.venda ? (j.emCarencia ? ['baixo', 'Em carência'] : ['medio', 'No pátio, pagando juros']) : !f.quitacao ? ['alto', 'Vendida, quitar já'] : j.aposVenda > 0 ? ['medio', 'Quitada com atraso'] : ['baixo', 'Quitada no prazo']; return `<tr><td class="maq"><span class="maq-ico">${ICO[f.tipo]}</span><span><b>${esc(f.marca + ' ' + f.modelo)}</b><span>${f.chassi} · ${esc(f.banco)}</span></span></td><td class="n">${mil(f.valor)}</td><td>${data(f.entrada)}</td><td>${data(f.venda)}</td><td>${data(f.quitacao)}</td><td class="n">${real(j.total)}</td><td class="n ${!f.quitacao && !j.emCarencia ? 'neg forte' : ''}">${!f.quitacao && !j.emCarencia ? real(f.valor * f.taxaMes / 30) : '—'}</td><td class="n ${j.aposVenda > 0 ? 'neg forte' : ''}">${real(j.aposVenda)}</td><td><span class="risco ${sit[0]}">${sit[1]}</span></td></tr>`; }).join('')}</tbody></table></div>
+        ${lista.map(({ f, j }) => { const sit = !f.venda ? (j.emCarencia ? ['baixo', 'Em carência'] : ['medio', 'No pátio, pagando juros']) : !f.quitacao ? ['alto', 'Vendida, quitar já'] : j.aposVenda > 0 ? ['medio', 'Quitada com atraso'] : ['baixo', 'Quitada no prazo']; return `<tr><td class="maq">${fotoMini(f)}<span><b>${esc(f.marca + ' ' + f.modelo)}</b><span>${f.chassi} · ${esc(f.banco)}</span></span></td><td class="n">${mil(f.valor)}</td><td>${data(f.entrada)}</td><td>${data(f.venda)}</td><td>${data(f.quitacao)}</td><td class="n">${real(j.total)}</td><td class="n ${!f.quitacao && !j.emCarencia ? 'neg forte' : ''}">${!f.quitacao && !j.emCarencia ? real(f.valor * f.taxaMes / 30) : '—'}</td><td class="n ${j.aposVenda > 0 ? 'neg forte' : ''}">${real(j.aposVenda)}</td><td><span class="risco ${sit[0]}">${sit[1]}</span></td></tr>`; }).join('')}</tbody></table></div>
         <p class="nota-rodape">Na implantação, o Anshur cruza o extrato do floor plan com as notas de venda e avisa no mesmo dia em que uma máquina financiada é vendida.</p></section>`;
     contar();
   }
@@ -903,15 +910,16 @@
   function listaAlertas() {
     const out = [];
     C.patio().map(infoPatio).forEach((i) => {
-      if (i.dias > 90) out.push({ nivel: 'alto', titulo: `${i.t.marca} ${i.t.modelo} passou de 90 dias no pátio`, txt: `${mil(i.t.pago)} parados há ${i.dias} dias · ${i.acao}`, ir: '#patio' });
-      else if (i.dias > 60 && i.dias <= 67) out.push({ nivel: 'medio', titulo: `${i.t.marca} ${i.t.modelo} entrou na faixa de alerta`, txt: `${i.dias} dias no pátio`, ir: '#patio' });
-      if (i.margem < 0.06) out.push({ nivel: 'alto', titulo: `Margem baixa: ${i.t.marca} ${i.t.modelo}`, txt: `Margem projetada de ${pct(i.margem)}`, ir: '#patio' });
+      if (i.dias > 90) out.push({ id: 'p90-' + i.t.id, cat: 'Estoque', nivel: 'alto', titulo: `${i.t.marca} ${i.t.modelo} passou de 90 dias no pátio`, txt: `${mil(i.t.pago)} parados há ${i.dias} dias · ${i.acao}`, ir: '#patio' });
+      else if (i.dias > 60 && i.dias <= 67) out.push({ id: 'p60-' + i.t.id, cat: 'Estoque', nivel: 'medio', titulo: `${i.t.marca} ${i.t.modelo} entrou na faixa de alerta`, txt: `${i.dias} dias no pátio`, ir: '#patio' });
+      if (i.margem < 0.06) out.push({ id: 'mg-' + i.t.id, cat: 'Financeiro', nivel: 'alto', titulo: `Margem baixa: ${i.t.marca} ${i.t.modelo}`, txt: `Margem projetada de ${pct(i.margem)}`, ir: '#patio' });
     });
-    (A.financiadas || []).forEach((f) => { if (f.venda && !f.quitacao) out.push({ nivel: 'alto', titulo: `Quitar ${f.marca} ${f.modelo} com o banco`, txt: `Vendida em ${data(f.venda)} e o juro continua correndo`, ir: '#financiamento' }); });
+    (A.financiadas || []).forEach((f) => { if (f.venda && !f.quitacao) out.push({ id: 'fp-' + f.chassi, cat: 'Financeiro', nivel: 'alto', titulo: `Quitar ${f.marca} ${f.modelo} com o banco`, txt: `Vendida em ${data(f.venda)} e o juro continua correndo`, ir: '#financiamento' }); });
     const gv = (A.garantias || []).filter((g) => g.status === 'aguardando' && diasDesde(g.data) > 60);
-    if (gv.length) out.push({ nivel: 'medio', titulo: `${gv.length} garantias paradas há mais de 60 dias`, txt: `${mil(gv.reduce((s, g) => s + g.valor, 0))} para cobrar do fabricante`, ir: '#garantias' });
+    if (gv.length) out.push({ id: 'gar-' + gv.length, cat: 'Garantia', nivel: 'medio', titulo: `${gv.length} garantias paradas há mais de 60 dias`, txt: `${mil(gv.reduce((s, g) => s + g.valor, 0))} para cobrar do fabricante`, ir: '#garantias' });
     const ult = estado.fechadas.slice(-3).filter((t) => t.previsto && t.pago > t.previsto.teto);
-    ult.forEach((t) => out.push({ nivel: 'medio', titulo: `Troca acima do recomendado: ${t.marca} ${t.modelo}`, txt: `Pago ${real(t.pago)}, máximo indicado ${real(t.previsto.teto)}`, ir: '#patio' }));
+    ult.forEach((t) => out.push({ id: 'ac-' + t.id, cat: 'Comercial', nivel: 'medio', titulo: `Troca acima do recomendado: ${t.marca} ${t.modelo}`, txt: `Pago ${real(t.pago)}, máximo indicado ${real(t.previsto.teto)}`, ir: '#patio' }));
+    (A.trocas || []).filter((t) => !t.vendido && t.preparoEst && t.preparo > t.preparoEst * 1.4).forEach((t) => out.push({ id: 'of-' + t.id, cat: 'Oficina', nivel: 'medio', titulo: `Preparo acima do previsto: ${t.marca} ${t.modelo}`, txt: `${real(t.preparo)} contra ${real(t.preparoEst)} previstos`, ir: '#patio' }));
     return out.sort((a, b) => (a.nivel === 'alto' ? 0 : 1) - (b.nivel === 'alto' ? 0 : 1));
   }
   function abrirAlertas() {
@@ -1011,8 +1019,423 @@
     if (c) c.onclick = () => { K.repo.trocarAmbiente('op'); location.hash = '#teste'; location.reload(); };
   }
 
+  // =====================================================================================
+  // V5: fotos, usuários e permissões, auditoria, adicionar em todas as páginas, documentos,
+  // configurações, relatórios por período, busca global, notificações, comparação e instalação
+  // =====================================================================================
+  const F = window.FOTOS;
+  const fotoMini = (t, cls = 'maq-foto') => { const f = F.de(t); const src = f.propria ? f.u : F.mini(f.u); return `<img class="${cls}" src="${src}" alt="" loading="lazy" onerror="this.outerHTML='<span class=&quot;maq-ico&quot;>${ICO[t.tipo] ? '' : ''}</span>'">`; };
+  const eu = () => K.usuarioAtual();
+  const PERM = {
+    dono: ['visao', 'avaliar', 'patio', 'trocas', 'teste', 'passaportes', 'vendedores', 'garantias', 'financiamento', 'relatorio', 'documentos', 'atividades', 'usuarios', 'config'],
+    gerente: ['visao', 'avaliar', 'patio', 'trocas', 'teste', 'passaportes', 'vendedores', 'garantias', 'financiamento', 'relatorio', 'documentos', 'atividades'],
+    vendedor: ['visao', 'avaliar', 'patio', 'passaportes', 'documentos'],
+    oficina: ['patio', 'passaportes', 'garantias', 'documentos'],
+    financeiro: ['visao', 'patio', 'trocas', 'garantias', 'financiamento', 'relatorio', 'documentos', 'atividades']
+  };
+  const pode = (aba) => (PERM[eu().perfil] || PERM.dono).includes(aba);
+  const podeAprovar = () => ['dono', 'gerente'].includes(eu().perfil);
+  const log = (tipo, texto, extra) => { K.registrar(tipo, texto, extra); };
+
+  // ---------- botão Adicionar (manual ou puxando de documento) ----------
+  function botaoAdicionar(opcoes) {
+    const id = 'add' + Math.random().toString(36).slice(2, 7);
+    setTimeout(() => {
+      const b = document.getElementById(id); if (!b) return;
+      const m = b.nextElementSibling;
+      b.onclick = (e) => { e.stopPropagation(); m.hidden = !m.hidden; b.setAttribute('aria-expanded', !m.hidden); };
+      document.addEventListener('click', () => { m.hidden = true; }, { once: true });
+      $$('button', m).forEach((x, i) => x.onclick = () => { m.hidden = true; opcoes[i].acao(); });
+    });
+    return `<div class="add-wrap"><button class="btn btn-ouro" type="button" id="${id}" aria-haspopup="menu" aria-expanded="false">${ic('<path d="M12 5v14M5 12h14"/>')}Adicionar</button>
+      <div class="add-menu" role="menu" hidden>${opcoes.map((o) => `<button type="button" role="menuitem"><b>${esc(o.nome)}</b><span>${esc(o.desc)}</span></button>`).join('')}</div></div>`;
+  }
+  const lista = (id, itens) => `<datalist id="${id}">${[...new Set(itens.filter(Boolean))].map((v) => `<option value="${esc(v)}">`).join('')}</datalist>`;
+  const sugestoes = () => lista('dl-marca', A.modelos.map((m) => m.marca)) + lista('dl-modelo', A.modelos.map((m) => m.modelo)) + lista('dl-vend', VENDEDORES()) + lista('dl-cidade', ['Orlândia, SP', 'Sertãozinho, SP', 'Morro Agudo, SP', 'Guaíra, SP', 'Bebedouro, SP', 'Jaboticabal, SP', 'Ituverava, SP', 'São Joaquim da Barra, SP', 'Batatais, SP', 'Franca, SP', 'Ribeirão Preto, SP'])
+    + lista('dl-banco', ['Banco da montadora', 'Banco do Brasil', 'Sicredi', 'Bradesco', 'Santander']) + lista('dl-servico', (A.garantias || []).map((g) => g.servico));
+
+  // formulário genérico com sugestões que aceitam texto livre
+  function formulario(titulo, campos, valores, aoSalvar, sub = '') {
+    abrirCamada('modal', `<h2>${esc(titulo)}</h2>${sub ? `<p class="sub">${sub}</p>` : ''}${sugestoes()}
+      <form class="campos" style="margin-top:14px" novalidate>${campos.map((c) => `<div class="campo ${c.inteiro ? 'inteiro' : ''}"><label for="fm-${c.k}">${esc(c.r)}${c.obr ? ' *' : ''}${c.conf ? ` <span class="conf-campo ${c.conf}">${c.conf === 'alta' ? 'lido com segurança' : c.conf === 'media' ? 'confira' : 'não encontrado'}</span>` : ''}</label>
+        ${c.tipo === 'select' ? `<select id="fm-${c.k}">${c.ops.map(([v, n]) => `<option value="${esc(v)}" ${String(valores[c.k] ?? '') === String(v) ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>`
+        : `<input id="fm-${c.k}" ${c.lista ? `list="${c.lista}"` : ''} type="${c.tipo === 'data' ? 'date' : 'text'}" ${c.num ? 'inputmode="decimal"' : ''} value="${esc(valores[c.k] ?? '')}" placeholder="${esc(c.ph || '')}" autocomplete="off">`}<span class="erro-campo" id="er-${c.k}"></span></div>`).join('')}
+      </form><div class="acoes"><button class="btn btn-ouro" type="button" id="fm-ok">Salvar</button><button class="btn btn-linha" type="button" id="fm-nao">Cancelar</button></div>`, (cx) => {
+      $('#fm-nao', cx).onclick = () => fecharCamada();
+      $('#fm-ok', cx).onclick = () => {
+        const v = {}; let ok = true;
+        campos.forEach((c) => { const el = $('#fm-' + c.k, cx); let x = el.value.trim(); if (c.num) x = x ? num(x) : ''; v[c.k] = x;
+          const er = $('#er-' + c.k, cx); er.textContent = c.obr && (x === '' || (c.num && !(x > 0))) ? 'Preencha este campo.' : ''; if (er.textContent) ok = false; });
+        if (!ok) { toast('Confira os campos marcados.', true); return; }
+        aoSalvar(v);
+      };
+    });
+  }
+  const CAMPOS_MAQ = [
+    { k: 'tipo', r: 'Categoria', tipo: 'select', ops: Object.entries(NOMES), obr: true }, { k: 'marca', r: 'Fabricante', lista: 'dl-marca', obr: true },
+    { k: 'modelo', r: 'Modelo', lista: 'dl-modelo', obr: true }, { k: 'ano', r: 'Ano', num: true, obr: true }, { k: 'horas', r: 'Horas', num: true },
+    { k: 'pago', r: 'Valor pago na troca (R$)', num: true, obr: true }, { k: 'preparo', r: 'Preparo (R$)', num: true }, { k: 'entrada', r: 'Data de entrada', tipo: 'data', obr: true },
+    { k: 'anuncio', r: 'Preço anunciado (R$)', num: true }, { k: 'vendedor', r: 'Vendedor', lista: 'dl-vend' }, { k: 'origem', r: 'Origem / cliente', lista: 'dl-cidade', ph: 'Faz. Santa Helena, Orlândia' },
+    { k: 'referencia', r: 'Fipe da máquina (se o modelo for novo)', num: true }, { k: 'chassi', r: 'Chassi / número de série' }
+  ];
+  function criarMaquina(v, extra = {}) {
+    const est = 3, cond = 70;
+    const id = 'M' + String(estado.fechadas.length + 1).padStart(3, '0') + (OP ? 'R' : '');
+    const t = { id, tipo: v.tipo, marca: v.marca, modelo: v.modelo, ano: +v.ano, horas: +v.horas || 0, cond, ficha: { motor: est, transmissao: est, hidraulico: est, pneus: est, cabine: est, lataria: est },
+      pago: Math.round(v.pago), preparo: Math.round(v.preparo || 0), preparoEst: null, vendido: v.vendido ? Math.round(v.vendido) : null, entrada: v.entrada, saida: v.saida || null,
+      diasPatio: v.saida ? diasEntre(v.entrada, v.saida) : null, anuncio: Math.round(v.anuncio || v.pago * 1.15), precos: [{ data: v.entrada, valor: Math.round(v.anuncio || v.pago * 1.15), motivo: 'Anúncio inicial' }],
+      vendedor: v.vendedor || eu().nome, origem: v.origem || 'Cadastro manual', idAgro: false, manutencoes: [], fotos: [], chassi: v.chassi || '', ...extra };
+    if (v.referencia) t.referencia = v.referencia;
+    if (!M.catalogo(t) && v.referencia) A.modelos.push({ tipo: t.tipo, marca: t.marca, modelo: t.modelo, base: v.referencia, hAno: 800, importado: true });
+    estado.fechadas.push(t); A.trocas.push({ ...t }); return t;
+  }
+  function addMaquinaManual(pre = {}, docId) {
+    formulario('Adicionar máquina ao pátio', CAMPOS_MAQ, { tipo: 'trator', entrada: hojeISO(), ...pre }, (v) => {
+      const t = criarMaquina(v, docId ? { docs: [docId] } : {}); salvar(); cacheLimpa();
+      log('maquina', `Máquina adicionada ao pátio: ${t.marca} ${t.modelo} por ${real(t.pago)}`, { ref: t.id });
+      fecharCamada(true); toast('Máquina adicionada ao pátio.'); location.hash = '#patio'; rota();
+    }, 'Sugestões aparecem enquanto você digita, mas pode escrever qualquer valor.');
+  }
+  function addVendaManual() {
+    formulario('Adicionar venda antiga', CAMPOS_MAQ.concat([{ k: 'vendido', r: 'Valor vendido (R$)', num: true, obr: true }, { k: 'saida', r: 'Data da venda', tipo: 'data', obr: true }]), { tipo: 'trator' }, (v) => {
+      if (v.saida < v.entrada) { toast('A venda não pode ser antes da troca.', true); return; }
+      const t = criarMaquina(v); salvar(); cacheLimpa(); log('venda', `Venda antiga registrada: ${t.marca} ${t.modelo} por ${real(t.vendido)}`, { ref: t.id });
+      fecharCamada(true); toast('Venda adicionada ao histórico.'); rota();
+    });
+  }
+  function addGarantia(pre = {}, docId) {
+    formulario('Adicionar OS de garantia', [{ k: 'os', r: 'Número da OS', obr: true }, { k: 'data', r: 'Data', tipo: 'data', obr: true }, { k: 'marca', r: 'Fabricante', lista: 'dl-marca', obr: true }, { k: 'modelo', r: 'Modelo', lista: 'dl-modelo' },
+      { k: 'servico', r: 'Serviço', lista: 'dl-servico', obr: true, inteiro: true }, { k: 'cliente', r: 'Cliente', lista: 'dl-cidade' }, { k: 'valor', r: 'Valor do serviço (R$)', num: true, obr: true }, { k: 'pago', r: 'Pago pelo fabricante (R$)', num: true },
+      { k: 'status', r: 'Situação', tipo: 'select', ops: [['aguardando', 'Aguardando'], ['pago', 'Pago'], ['parcial', 'Pago a menos'], ['negado', 'Negado']] }, { k: 'motivo', r: 'Motivo (se pago a menos ou negado)' }],
+    { data: hojeISO(), status: 'aguardando', ...pre }, (v) => {
+      const g = { ...v, valor: Math.round(v.valor), pago: Math.round(v.pago || 0), docs: docId ? [docId] : [] };
+      estado.extras.garantias.push(g); A.garantias.push(g); salvar(); log('garantia', `OS de garantia ${g.os} cadastrada (${real(g.valor)})`);
+      fecharCamada(true); toast('OS de garantia adicionada.'); location.hash = '#garantias'; rota();
+    });
+  }
+  function addFinanciada(pre = {}, docId) {
+    formulario('Adicionar máquina financiada', [{ k: 'chassi', r: 'Chassi', obr: true }, { k: 'tipo', r: 'Categoria', tipo: 'select', ops: Object.entries(NOMES) }, { k: 'marca', r: 'Fabricante', lista: 'dl-marca', obr: true }, { k: 'modelo', r: 'Modelo', lista: 'dl-modelo', obr: true },
+      { k: 'valor', r: 'Valor financiado (R$)', num: true, obr: true }, { k: 'banco', r: 'Banco', lista: 'dl-banco' }, { k: 'taxa', r: 'Taxa ao mês (%)', num: true }, { k: 'carencia', r: 'Carência (dias)', num: true },
+      { k: 'entrada', r: 'Entrada no estoque', tipo: 'data', obr: true }, { k: 'venda', r: 'Data da venda', tipo: 'data' }, { k: 'quitacao', r: 'Data da quitação', tipo: 'data' }],
+    { tipo: 'trator', taxa: '1,1', carencia: 90, entrada: hojeISO(), ...pre }, (v) => {
+      const f = { chassi: v.chassi, tipo: v.tipo, marca: v.marca, modelo: v.modelo, valor: Math.round(v.valor), banco: v.banco || '—', taxaMes: (v.taxa || 1.1) / 100, carencia: +v.carencia || 0, entrada: v.entrada, venda: v.venda || null, quitacao: v.quitacao || null, docs: docId ? [docId] : [] };
+      estado.extras.financiadas.push(f); A.financiadas.push(f); salvar(); log('financiamento', `Máquina financiada cadastrada: ${f.marca} ${f.modelo} (${real(f.valor)})`);
+      fecharCamada(true); toast('Máquina financiada adicionada.'); location.hash = '#financiamento'; rota();
+    });
+  }
+  function addUsuario(u) {
+    formulario(u ? 'Editar usuário' : 'Adicionar usuário', [{ k: 'nome', r: 'Nome', obr: true }, { k: 'email', r: 'E-mail' }, { k: 'perfil', r: 'Perfil', tipo: 'select', ops: Object.entries(K.PERFIS) }], u || { perfil: 'vendedor' }, (v) => {
+      if (u) { Object.assign(u, v); log('usuario', `Usuário ${v.nome} alterado para ${K.PERFIS[v.perfil]}`); }
+      else { estado.usuarios.push({ id: 'u' + Date.now(), ...v }); log('usuario', `Usuário ${v.nome} criado como ${K.PERFIS[v.perfil]}`); }
+      salvar(); fecharCamada(true); toast('Usuário salvo.'); rota();
+    });
+  }
+
+  // ---------- documentos: fotos, PDFs e planilhas viram sugestões de preenchimento ----------
+  const idbDoc = (modo, fn) => idb(modo, fn);
+  const carregar = (src) => new Promise((ok, erro) => { if ([...document.scripts].some((s) => s.src === src)) return ok(); const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => erro(new Error('Sem internet para carregar o leitor.')); document.head.appendChild(s); });
+  async function lerTexto(arquivo, progresso) {
+    const nome = arquivo.name.toLowerCase();
+    if (/\.(csv|txt)$/.test(nome)) return { tipo: 'planilha', texto: await arquivo.text() };
+    if (/\.(xlsx|xls|ods)$/.test(nome)) {
+      progresso('Abrindo a planilha…'); await carregar('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+      const wb = window.XLSX.read(await arquivo.arrayBuffer(), { type: 'array' });
+      return { tipo: 'planilha', texto: window.XLSX.utils.sheet_to_csv(wb.Sheets[wb.SheetNames[0]], { FS: ';' }) };
+    }
+    if (/\.pdf$/.test(nome)) {
+      progresso('Lendo o PDF…'); await carregar('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      const pdf = await window.pdfjsLib.getDocument({ data: await arquivo.arrayBuffer() }).promise; let txt = '';
+      for (let p = 1; p <= Math.min(pdf.numPages, 8); p++) { const c = await (await pdf.getPage(p)).getTextContent(); txt += c.items.map((i) => i.str).join(' ') + '\n'; }
+      if (txt.trim().length > 30) return { tipo: 'pdf', texto: txt };
+      return { tipo: 'pdf', texto: '', aviso: 'Este PDF é uma imagem escaneada; tire uma foto da página para ler o texto.' };
+    }
+    if (/^image\//.test(arquivo.type)) {
+      progresso('Lendo o texto da foto (pode levar até 1 minuto)…');
+      await carregar('https://cdn.jsdelivr.net/npm/tesseract.js@5.1.0/dist/tesseract.min.js');
+      const r = await window.Tesseract.recognize(arquivo, 'por', { logger: (m) => { if (m.status === 'recognizing text') progresso(`Lendo o texto da foto… ${Math.round(m.progress * 100)}%`); } });
+      return { tipo: 'foto', texto: r.data.text };
+    }
+    throw new Error('Formato não aceito. Use foto, PDF, CSV ou Excel.');
+  }
+  // extrai campos do texto e diz o quanto confia em cada um
+  function extrair(texto) {
+    const t = ' ' + texto.replace(/\s+/g, ' ') + ' ', low = t.toLowerCase(), c = {};
+    const achar = (re) => { const m = t.match(re); return m ? m[1].trim() : ''; };
+    const tipo = /colhed|colheit|cana/.test(low) ? 'colhedora' : /pulveriz/.test(low) ? 'pulverizador' : /plantadeir|semeadeir/.test(low) ? 'plantadeira' : /trator/.test(low) ? 'trator' : '';
+    if (tipo) c.tipo = { v: tipo, conf: 'media' };
+    const marca = [...new Set(A.modelos.map((m) => m.marca))].find((m) => low.includes(m.toLowerCase())) || (/deere/.test(low) ? 'John Deere' : /massey/.test(low) ? 'Massey Ferguson' : /case/.test(low) ? 'Case IH' : '');
+    if (marca) c.marca = { v: marca, conf: 'alta' };
+    const mod = A.modelos.find((m) => low.includes(m.modelo.toLowerCase().replace(/^mf /, '')));
+    if (mod) { c.modelo = { v: mod.modelo, conf: 'alta' }; c.tipo = { v: mod.tipo, conf: 'alta' }; if (!c.marca) c.marca = { v: mod.marca, conf: 'alta' }; }
+    const ano = achar(/(?:ano(?: de)?(?: fabrica[çc][ãa]o| modelo)?|fab\.?)\s*[:\-]?\s*((?:19|20)\d{2})/i) || achar(/\b((?:20[0-2]\d|199\d))\b/);
+    if (ano) c.ano = { v: ano, conf: /ano/i.test(t) ? 'alta' : 'media' };
+    const horas = achar(/(?:hor[íi]metro|horas)\s*[:\-]?\s*([\d.]{2,7})/i) || achar(/([\d.]{3,7})\s*(?:h|hs|horas)\b/i);
+    if (horas) c.horas = { v: horas.replace(/\./g, ''), conf: 'alta' };
+    const chassi = achar(/(?:chassi|s[ée]rie|n[ºo°]?\s*de\s*s[ée]rie|pin)\s*[:\-]?\s*([A-Z0-9]{6,20})/i);
+    if (chassi) c.chassi = { v: chassi.toUpperCase(), conf: 'alta' };
+    const valores = [...t.matchAll(/R\$\s*([\d.]+,\d{2}|[\d.]{4,})/g)].map((m) => window.IMPORTAR.dinheiro(m[1])).filter((v) => v > 1000).sort((a, b) => b - a);
+    if (valores.length) c.valor = { v: String(valores[0]), conf: valores.length === 1 ? 'alta' : 'media' };
+    const datas = [...t.matchAll(/\b(\d{2}\/\d{2}\/\d{4})\b/g)].map((m) => window.IMPORTAR.dataISO(m[1])).filter((d) => d && d !== 'invalida');
+    if (datas.length) c.data = { v: datas[0], conf: datas.length === 1 ? 'alta' : 'media' };
+    const cnpj = achar(/(\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})/); if (cnpj) c.cnpj = { v: cnpj, conf: 'alta' };
+    const os = achar(/(?:ordem de servi[çc]o|o\.?s\.?)\s*(?:n[ºo°]\.?)?\s*[:\-]?\s*([A-Z0-9\-]{3,12})/i); if (os) c.os = { v: os, conf: 'media' };
+    const cliente = achar(/(?:cliente|propriet[áa]rio|comprador|emitente)\s*[:\-]\s*([A-ZÁÉÍÓÚÂÊÔÃÕÇa-záéíóúâêôãõç .]{4,50}?)(?=\s(?:cpf|cnpj|endere|cidade|rua|av\.|trator|colhed|pulveriz|plantad|ano|hor|chassi|s[ée]rie|valor|data|modelo)|\s{2}|$)/i); if (cliente) c.cliente = { v: cliente, conf: 'media' };
+    const destino = /garantia/.test(low) ? 'garantia' : /floor ?plan|financiad|cédula|alienação/.test(low) ? 'financiada' : 'maquina';
+    return { campos: c, destino };
+  }
+  function telaDocumentos() {
+    const docs = estado.documentos.slice().reverse();
+    tela.innerHTML = `
+      <div class="titulo"><div><h1>Central de documentos</h1><p>Mande foto de nota, ordem de serviço, contrato, PDF ou planilha. O Anshur lê, sugere o preenchimento e você confere antes de salvar.</p></div>${botaoAdicionar([{ nome: 'Escolher arquivo', desc: 'Foto, PDF, CSV ou Excel', acao: () => $('#doc-arq').click() }, { nome: 'Cadastrar sem documento', desc: 'Máquina, garantia ou financiamento à mão', acao: () => addMaquinaManual() }])}</div>
+      <label class="soltar" id="soltar"><input type="file" id="doc-arq" accept="image/*,.pdf,.csv,.txt,.xlsx,.xls,.ods" multiple class="sr">
+        ${ic('<path d="M12 16V4M7 9l5-5 5 5M4 20h16"/>', 'ico grande')}<b>Arraste arquivos aqui ou toque para escolher</b><span>Fotos (JPG, PNG), PDF, CSV e Excel · também dá para tirar foto pelo celular</span></label>
+      <div id="doc-proc"></div>
+      <section class="painel bloco"><div class="painel-cab"><h2>${ICO.etiqueta}Documentos recebidos</h2><p>${docs.length} ${docs.length === 1 ? 'documento' : 'documentos'}</p></div>
+        ${docs.length ? `<div class="tabela-wrap"><table class="tabela"><thead><tr><th>Arquivo</th><th>Tipo</th><th>Virou</th><th>Por</th><th>Quando</th><th></th></tr></thead><tbody>
+          ${docs.map((d) => `<tr><td><b>${esc(d.nome)}</b><br><span class="sub">${Math.round(d.tamanho / 1024)} KB</span></td><td>${esc(d.tipo)}</td><td>${esc(d.virou || 'Arquivado')}</td><td>${esc(d.usuario)}</td><td>${new Date(d.quando).toLocaleString('pt-BR')}</td><td><button class="link" type="button" data-ver="${d.id}">Ver original</button></td></tr>`).join('')}</tbody></table></div>`
+        : '<p class="vazio">Nenhum documento ainda. Comece mandando a foto de uma nota fiscal ou de uma ordem de serviço.</p>'}</section>`;
+    const inp = $('#doc-arq'), zona = $('#soltar');
+    inp.onchange = () => processar([...inp.files]);
+    zona.ondragover = (e) => { e.preventDefault(); zona.classList.add('sobre'); }; zona.ondragleave = () => zona.classList.remove('sobre');
+    zona.ondrop = (e) => { e.preventDefault(); zona.classList.remove('sobre'); processar([...e.dataTransfer.files]); };
+    $$('[data-ver]', tela).forEach((b) => b.onclick = async () => {
+      try { const blob = await idbDoc('readonly', (st) => st.get('doc:' + b.dataset.ver)); if (!blob) { toast('Original não está neste aparelho.', true); return; } window.open(URL.createObjectURL(blob), '_blank'); } catch (e) { toast('Não foi possível abrir o original.', true); }
+    });
+  }
+  async function processar(arquivos) {
+    const caixa = $('#doc-proc'); if (!arquivos.length) return;
+    for (const arq of arquivos) {
+      if (arq.size > 15 * 1024 * 1024) { toast(`${arq.name}: arquivo acima de 15 MB.`, true); continue; }
+      caixa.innerHTML = `<section class="painel bloco"><div class="carregando-linha"><span class="giro"></span><b id="doc-st">Recebendo ${esc(arq.name)}…</b></div></section>`;
+      const prog = (m) => { const s = $('#doc-st'); if (s) s.textContent = m; };
+      let lido;
+      try { lido = await lerTexto(arq, prog); } catch (e) { caixa.innerHTML = `<section class="painel bloco"><p class="neg">${esc(arq.name)}: ${esc(e.message)}</p></section>`; continue; }
+      const id = 'd' + Date.now();
+      try { await idbDoc('readwrite', (st) => st.put(arq, 'doc:' + id)); } catch (e) { /* original fica só nesta sessão */ }
+      const doc = { id, nome: arq.name, tamanho: arq.size, tipo: { planilha: 'Planilha', pdf: 'PDF', foto: 'Foto' }[lido.tipo], quando: new Date().toISOString(), usuario: eu().nome, virou: '' };
+      estado.documentos.push(doc); salvar(); log('documento', `Documento recebido: ${arq.name}`);
+      if (lido.tipo === 'planilha') {
+        const p = window.IMPORTAR.ler(lido.texto, { refDe: M.refDe, anoMax: anoAtual });
+        caixa.innerHTML = `<section class="painel bloco"><h2>${esc(arq.name)}</h2><p class="conta">${p.aceitas.length} linhas reconhecidas como trocas · ${p.rejeitadas.length} com problema.</p>
+          <div class="acoes"><button class="btn btn-ouro" type="button" id="pl-teste">Levar para o teste às cegas</button>${p.comDatas && p.aceitas.length >= 5 ? '<button class="btn btn-linha" type="button" id="pl-hist">Usar como histórico da minha revenda</button>' : ''}</div></section>`;
+        $('#pl-teste').onclick = () => { tc.texto = lido.texto; tc.modo = 'minhas'; tc.previa = p; doc.virou = 'Teste às cegas'; salvar(); location.hash = '#teste'; };
+        const h = $('#pl-hist'); if (h) h.onclick = () => { tc.texto = lido.texto; tc.modo = 'minhas'; tc.previa = p; doc.virou = 'Histórico'; salvar(); location.hash = '#teste'; setTimeout(() => $('#salvar-hist') && $('#salvar-hist').click(), 600); };
+        continue;
+      }
+      const ex = extrair(lido.texto || '');
+      const n = Object.keys(ex.campos).length;
+      caixa.innerHTML = `<section class="painel bloco"><h2>${esc(arq.name)}</h2>
+        ${lido.aviso ? `<p class="conta neg">${esc(lido.aviso)}</p>` : `<p class="conta">${n ? `Encontramos ${n} ${n === 1 ? 'informação' : 'informações'}. Escolha o que este documento vai virar; os campos já vêm sugeridos e você corrige o que quiser.` : 'Não conseguimos ler informações úteis. Você pode preencher à mão; o documento fica anexado.'}</p>`}
+        <details class="texto-lido"><summary>Ver o texto que foi lido</summary><pre>${esc((lido.texto || '').slice(0, 3000))}</pre></details>
+        <div class="acoes"><button class="btn ${ex.destino === 'maquina' ? 'btn-ouro' : 'btn-linha'}" type="button" data-d="maquina">Máquina no pátio</button><button class="btn ${ex.destino === 'garantia' ? 'btn-ouro' : 'btn-linha'}" type="button" data-d="garantia">OS de garantia</button><button class="btn ${ex.destino === 'financiada' ? 'btn-ouro' : 'btn-linha'}" type="button" data-d="financiada">Máquina financiada</button><button class="btn btn-linha" type="button" data-d="arquivar">Só arquivar</button></div></section>`;
+      $$('[data-d]', caixa).forEach((b) => b.onclick = () => {
+        const c = ex.campos, val = (k) => (c[k] ? c[k].v : ''), d = b.dataset.d;
+        const marcar = (campos) => campos.map((x) => { const mapa = { pago: 'valor', valor: 'valor', entrada: 'data', data: 'data' }; const kk = c[x.k] ? x.k : mapa[x.k]; return { ...x, conf: c[kk] ? (c[kk].conf === 'alta' ? 'alta' : 'media') : (x.obr ? 'baixa' : '') }; });
+        if (d === 'arquivar') { doc.virou = 'Arquivado'; salvar(); toast('Documento arquivado.'); telaDocumentos(); return; }
+        if (d === 'maquina') { const campos = CAMPOS_MAQ; formularioDoc('Máquina no pátio', marcar(campos), { tipo: val('tipo') || 'trator', marca: val('marca'), modelo: val('modelo'), ano: val('ano'), horas: val('horas'), pago: val('valor'), entrada: val('data') || hojeISO(), chassi: val('chassi'), origem: val('cliente') }, (v) => { const t = criarMaquina(v, { docs: [id] }); doc.virou = `Máquina ${t.marca} ${t.modelo}`; log('maquina', `Máquina criada a partir do documento ${arq.name}`, { ref: t.id }); return '#patio'; }); }
+        if (d === 'garantia') { fecharCamada(true); addGarantia({ os: val('os'), data: val('data') || hojeISO(), marca: val('marca'), modelo: val('modelo'), valor: val('valor'), cliente: val('cliente') }, id); doc.virou = 'OS de garantia'; salvar(); }
+        if (d === 'financiada') { fecharCamada(true); addFinanciada({ chassi: val('chassi'), tipo: val('tipo') || 'trator', marca: val('marca'), modelo: val('modelo'), valor: val('valor'), entrada: val('data') || hojeISO() }, id); doc.virou = 'Máquina financiada'; salvar(); }
+      });
+    }
+  }
+  function formularioDoc(titulo, campos, valores, criar) {
+    formulario(titulo, campos, valores, (v) => { const destino = criar(v); salvar(); cacheLimpa(); fecharCamada(true); toast('Salvo a partir do documento. Nada foi gravado sem a sua confirmação.'); location.hash = destino; rota(); },
+      'Verde: lido com segurança. Amarelo: confira. Vermelho: não encontramos, preencha.');
+  }
+
+  // ---------- usuários e permissões ----------
+  function telaUsuarios() {
+    const paginas = [['visao', 'Visão geral'], ['avaliar', 'Avaliar troca'], ['patio', 'Pátio'], ['trocas', 'Inteligência'], ['vendedores', 'Vendedores'], ['garantias', 'Garantias'], ['financiamento', 'Financiado'], ['relatorio', 'Relatórios'], ['config', 'Configurações']];
+    tela.innerHTML = `
+      <div class="titulo"><div><h1>Usuários e permissões</h1><p>Quem usa o Anshur e o que cada perfil pode ver e fazer.</p></div>${botaoAdicionar([{ nome: 'Adicionar usuário', desc: 'Nome, e-mail e perfil', acao: () => addUsuario() }])}</div>
+      <section class="painel"><div class="tabela-wrap"><table class="tabela grande"><thead><tr><th>Nome</th><th>Perfil</th><th>E-mail</th><th>Atividades</th><th></th></tr></thead><tbody>
+        ${estado.usuarios.map((u) => `<tr><td><span class="avatar-mini">${esc(u.nome.split(' ').map((p) => p[0]).slice(0, 2).join(''))}</span> <b>${esc(u.nome)}</b>${u.id === eu().id ? ' <span class="tag comprovado">você</span>' : ''}</td><td>${K.PERFIS[u.perfil]}</td><td>${esc(u.email || '—')}</td><td>${estado.atividades.filter((a) => a.usuario === u.nome).length}</td>
+          <td style="white-space:nowrap"><button class="link" type="button" data-entrar="${u.id}">Entrar como</button> · <button class="link" type="button" data-editar="${u.id}">Editar</button>${u.perfil !== 'dono' ? ` · <button class="link neg" type="button" data-tirar="${u.id}">Remover</button>` : ''}</td></tr>`).join('')}</tbody></table></div></section>
+      <section class="painel bloco"><div class="painel-cab"><h2>${ICO.alvo}O que cada perfil acessa</h2></div>
+        <div class="tabela-wrap"><table class="tabela"><thead><tr><th>Perfil</th>${paginas.map(([, n]) => `<th class="n">${n}</th>`).join('')}<th class="n">Aprovar acima do teto</th></tr></thead><tbody>
+        ${Object.entries(K.PERFIS).map(([p, n]) => `<tr><td><b>${n}</b></td>${paginas.map(([k]) => `<td class="n">${PERM[p].includes(k) ? '<span class="pos">✓</span>' : '<span class="sub">—</span>'}</td>`).join('')}<td class="n">${['dono', 'gerente'].includes(p) ? '<span class="pos">✓</span>' : '<span class="sub">—</span>'}</td></tr>`).join('')}</tbody></table></div>
+        <p class="nota-rodape">Nesta versão, "Entrar como" serve para ver o sistema como cada pessoa. O login com senha por usuário entra na versão com servidor.</p></section>`;
+    $$('[data-entrar]', tela).forEach((b) => b.onclick = () => { estado.usuarioAtual = b.dataset.entrar; salvar(); log('usuario', `Entrou como ${eu().nome}`); toast('Agora você está vendo como ' + eu().nome + '.'); location.hash = pode('visao') ? '#visao' : '#patio'; location.reload(); });
+    $$('[data-editar]', tela).forEach((b) => b.onclick = () => addUsuario(estado.usuarios.find((u) => u.id === b.dataset.editar)));
+    $$('[data-tirar]', tela).forEach((b) => b.onclick = () => { const u = estado.usuarios.find((x) => x.id === b.dataset.tirar); confirmar(`Remover ${u.nome}?`, 'A pessoa deixa de aparecer na lista. As atividades dela continuam no histórico.', 'Remover', () => { estado.usuarios = estado.usuarios.filter((x) => x !== u); log('usuario', `Usuário ${u.nome} removido`); salvar(); rota(); }); });
+  }
+
+  // ---------- configurações ----------
+  function telaConfig() {
+    const passos = primeirosPassos();
+    tela.innerHTML = `
+      <div class="titulo"><div><h1>Configurações</h1><p>Dados da revenda, regras comerciais, integrações e os seus dados.</p></div>${botaoAdicionar([{ nome: 'Usuário', desc: 'Gerente, vendedor, oficina ou financeiro', acao: () => addUsuario() }, { nome: 'Modelo no catálogo', desc: 'Com a referência de preço', acao: () => $('#c-modelo').click() }])}</div>
+      <section class="painel"><div class="painel-cab"><h2>${ICO.baixo}Primeiros passos</h2><p>${passos.filter((p) => p.ok).length} de ${passos.length} concluídos</p></div>
+        <div class="progresso"><i style="width:${passos.filter((p) => p.ok).length / passos.length * 100}%"></i></div>
+        <ul class="passos-on">${passos.map((p) => `<li class="${p.ok ? 'ok' : ''}">${p.ok ? ICO.baixo : '<span class="bolinha"></span>'}<span><b>${esc(p.nome)}</b><span>${esc(p.desc)}</span></span>${p.ok ? '' : `<a class="btn btn-linha" href="${p.ir}">Fazer agora</a>`}</li>`).join('')}</ul></section>
+      <div class="grade-2 bloco">
+        <section class="painel"><h2>${ICO.camadas}Dados da revenda</h2>${sugestoes()}
+          <div class="campos" style="margin-top:12px">
+            <div class="campo"><label for="c-nome">Nome da revenda</label><input id="c-nome" value="${esc(estado.nomeRevenda || A.revenda.nome)}"></div>
+            <div class="campo"><label for="c-cnpj">CNPJ</label><input id="c-cnpj" value="${esc(estado.cnpj || '')}" placeholder="00.000.000/0000-00" inputmode="numeric"></div>
+            <div class="campo"><label for="c-cid">Cidade</label><input id="c-cid" list="dl-cidade" value="${esc(estado.cidadeRevenda || A.revenda.cidade)}"></div>
+            <div class="campo"><label for="c-marcas">Marcas que a revenda representa</label><input id="c-marcas" list="dl-marca" value="${esc(estado.marcasRevenda || '')}" placeholder="Ex.: Case IH, Jacto"></div>
+          </div><div class="acoes"><button class="btn btn-ouro" type="button" id="c-salvar">Salvar dados</button></div></section>
+        <section class="painel"><h2>${ICO.moedas}Regras comerciais</h2>
+          <div class="numeros"><div><span>Margem-alvo</span><b>${pct(K.cfg.margemAlvo, 0)}</b></div><div><span>Custo do capital</span><b>${pct(K.cfg.jurosMes)} a.m.</b></div><div><span>Comissão</span><b>${pct(K.cfg.comissaoPct)}</b></div>
+            <div><span>Desconto por troca acima</span><b>${pct(K.cfg.descontoAcima, 0)}</b></div><div><span>Hora da oficina</span><b>${real(K.cfg.valorHora)}</b></div><div><span>Base do custo</span><b>${K.cfg.baseJuros === 'total' ? 'Pago + preparo' : 'Valor pago'}</b></div></div>
+          <div class="acoes"><button class="btn btn-linha" type="button" id="c-prem">Alterar regras</button></div></section>
+      </div>
+      <div class="grade-2 bloco">
+        <section class="painel"><h2>${ICO.barras}Catálogo de modelos</h2><p class="sub" style="margin:6px 0 10px">Referências de preço usadas pelo motor. Modelos novos entram com a Fipe.</p>
+          <div class="tabela-wrap" style="max-height:320px;overflow:auto"><table class="tabela"><thead><tr><th>Modelo</th><th>Categoria</th><th class="n">Referência</th></tr></thead><tbody>${A.modelos.map((m) => `<tr><td><b>${esc(m.marca)}</b> ${esc(m.modelo)}</td><td>${NOMES[m.tipo]}</td><td class="n">${mil(m.base)}</td></tr>`).join('')}</tbody></table></div>
+          <div class="acoes"><button class="btn btn-linha" type="button" id="c-modelo">Adicionar modelo</button></div></section>
+        <section class="painel"><h2>${ICO.linha}Integrações e dados</h2>
+          <ul class="lista-motivos" style="margin-top:8px"><li><span>Sincronização com a pasta do sistema (DMS)</span><b>${estado.ultimaSync ? 'Ligada' : 'Desligada'}</b></li><li><span>Documentos recebidos</span><b>${estado.documentos.length}</b></li><li><span>Atividades registradas</span><b>${estado.atividades.length}</b></li></ul>
+          <div class="acoes"><a class="btn btn-linha" href="#teste">Sincronizar com o sistema</a><button class="btn btn-linha" type="button" id="c-backup">Baixar cópia de segurança</button><label class="btn btn-linha" style="cursor:pointer">Restaurar cópia<input type="file" accept=".json" id="c-restaura" class="sr"></label><button class="btn btn-linha" type="button" id="c-instalar">Instalar o app</button></div></section>
+      </div>`;
+    $('#c-salvar').onclick = () => { estado.nomeRevenda = $('#c-nome').value.trim(); estado.cnpj = $('#c-cnpj').value.trim(); estado.cidadeRevenda = $('#c-cid').value.trim(); estado.marcasRevenda = $('#c-marcas').value.trim(); salvar(); log('config', 'Dados da revenda atualizados'); toast('Dados da revenda salvos.'); setTimeout(() => location.reload(), 600); };
+    $('#c-prem').onclick = abrirPremissas;
+    $('#c-modelo').onclick = () => formulario('Adicionar modelo ao catálogo', [{ k: 'tipo', r: 'Categoria', tipo: 'select', ops: Object.entries(NOMES) }, { k: 'marca', r: 'Fabricante', lista: 'dl-marca', obr: true }, { k: 'modelo', r: 'Modelo', lista: 'dl-modelo', obr: true }, { k: 'base', r: 'Referência de preço seminovo (R$)', num: true, obr: true }], { tipo: 'trator' }, (v) => {
+      A.modelos.push({ tipo: v.tipo, marca: v.marca, modelo: v.modelo, base: v.base, hAno: { trator: 750, colhedora: 2600, pulverizador: 820, plantadeira: 270 }[v.tipo], importado: true });
+      estado.modelosExtra = (estado.modelosExtra || []).concat([{ tipo: v.tipo, marca: v.marca, modelo: v.modelo, base: v.base }]); salvar(); log('config', `Modelo ${v.marca} ${v.modelo} adicionado ao catálogo`); fecharCamada(true); toast('Modelo adicionado.'); rota();
+    });
+    $('#c-backup').onclick = () => { const url = URL.createObjectURL(new Blob([JSON.stringify(estado, null, 1)], { type: 'application/json' })); const a = document.createElement('a'); a.href = url; a.download = `anshur-copia-${hojeISO()}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); log('config', 'Cópia de segurança baixada'); salvar(); toast('Cópia de segurança gerada.'); };
+    $('#c-restaura').onchange = (e) => { const f = e.target.files[0]; if (!f) return; f.text().then((tx) => { let d; try { d = JSON.parse(tx); } catch (er) { toast('Arquivo inválido.', true); return; } if (!d || !Array.isArray(d.fechadas)) { toast('Este arquivo não é uma cópia do Anshur.', true); return; } confirmar('Restaurar esta cópia?', 'Os dados atuais deste ambiente serão substituídos pelos da cópia.', 'Restaurar', () => { K.repo.gravar(d); location.reload(); }); }); };
+    $('#c-instalar').onclick = simularInstalacao;
+  }
+  function primeirosPassos() {
+    return [
+      { nome: 'Dados da revenda', desc: 'Nome, CNPJ e cidade', ok: !!estado.cnpj, ir: '#config' },
+      { nome: 'Regras comerciais', desc: 'Margem-alvo, custo do capital e comissão', ok: !!(estado.config && Object.keys(estado.config).length), ir: '#config' },
+      { nome: 'Equipe', desc: 'Cadastre gerente, vendedores e oficina', ok: estado.usuarios.length > 1, ir: '#usuarios' },
+      { nome: 'Histórico de vendas', desc: 'Importe as trocas já vendidas', ok: C.vendidas().length >= 10, ir: '#teste' },
+      { nome: 'Estoque atual', desc: 'Máquinas que estão hoje no pátio', ok: C.patio().length > 0, ir: '#patio' },
+      { nome: 'Primeira avaliação', desc: 'Avalie uma troca de verdade', ok: estado.avaliacoes.length > 0 || estado.fechadas.some((t) => t.previsto), ir: '#avaliar' },
+      { nome: 'Primeiro relatório', desc: 'Abra o relatório da semana', ok: estado.atividades.some((a) => a.tipo === 'relatorio'), ir: '#relatorio' }
+    ];
+  }
+
+  // ---------- instalação (simulação) ----------
+  let promptInstalar = null;
+  window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); promptInstalar = e; });
+  function simularInstalacao() {
+    abrirCamada('modal', `<div class="instala"><img src="icone-192.png" alt="" width="88" height="88" class="instala-ico"><h2>Instalar o Anshur</h2>
+      <p class="sub" id="ins-txt">Abre direto da tela inicial, em tela cheia, e funciona sem internet no pátio.</p>
+      <div class="progresso grande" id="ins-bar" hidden><i style="width:0%"></i></div>
+      <div class="acoes" style="justify-content:center"><button class="btn btn-ouro" type="button" id="ins-ok">Instalar</button></div></div>`, (c) => {
+      $('#ins-ok', c).onclick = () => {
+        const bar = $('#ins-bar', c), txt = $('#ins-txt', c); $('#ins-ok', c).hidden = true; bar.hidden = false;
+        const etapas = [[20, 'Baixando o aplicativo…'], [55, 'Guardando para usar sem internet…'], [80, 'Criando o atalho na tela inicial…'], [100, 'Pronto! O Anshur está instalado.']];
+        etapas.forEach(([p, m], i) => setTimeout(() => { $('i', bar).style.width = p + '%'; txt.textContent = m; if (p === 100) { c.querySelector('.instala').classList.add('feito'); $('.acoes', c).innerHTML = `<button class="btn btn-ouro" type="button" id="ins-fim">Abrir o Anshur</button>${promptInstalar ? '<button class="btn btn-linha" type="button" id="ins-real">Instalar de verdade neste aparelho</button>' : ''}`; $('#ins-fim', c).onclick = () => fecharCamada(); const r = $('#ins-real', c); if (r) r.onclick = () => { promptInstalar.prompt(); }; log('config', 'Instalação do app (simulação)'); salvar(); } }, 700 * (i + 1)));
+      };
+    });
+  }
+
+  // ---------- relatórios diário, semanal e mensal ----------
+  let periodo = 'semanal';
+  function janela(p, deslocar = 0) {
+    const hoje = new Date(hojeISO() + 'T12:00:00');
+    const fim = new Date(hoje), ini = new Date(hoje);
+    if (p === 'diario') { fim.setDate(fim.getDate() - deslocar); ini.setDate(ini.getDate() - deslocar); }
+    if (p === 'semanal') { fim.setDate(fim.getDate() - 7 * deslocar); ini.setDate(fim.getDate() - 6); }
+    if (p === 'mensal') { fim.setMonth(fim.getMonth() - deslocar); ini.setTime(fim.getTime()); ini.setDate(1); if (deslocar) { fim.setDate(1); fim.setMonth(fim.getMonth() + 1); fim.setDate(0); } }
+    return [ini.toISOString().slice(0, 10), fim.toISOString().slice(0, 10)];
+  }
+  function metricas([ini, fim]) {
+    const dentro = (d) => d && d >= ini && d <= fim;
+    const vend = A.trocas.filter((t) => t.vendido && dentro(t.saida)), entr = A.trocas.filter((t) => dentro(t.entrada));
+    const venda = vend.reduce((s, t) => s + t.vendido, 0), res = vend.reduce((s, t) => s + C.resultado(t), 0);
+    const acima = entr.reduce((s, t) => { const r = rec(t); return s + (r && t.pago > r.teto ? t.pago - r.teto : 0); }, 0);
+    const garRec = (A.garantias || []).filter((g) => dentro(g.data) && g.pago > 0).reduce((s, g) => s + g.pago, 0);
+    const atv = estado.atividades.filter((a) => dentro(a.quando.slice(0, 10)));
+    return { vend, entr, venda, res, margem: venda ? res / venda : NaN, acima, garRec, atv, aval: estado.avaliacoes.filter((a) => dentro(a.data)).length, comprado: entr.reduce((s, t) => s + t.pago, 0), dias: vend.length ? vend.reduce((s, t) => s + (t.diasPatio || 0), 0) / vend.length : NaN };
+  }
+  function telaRelatorios() {
+    const atual = janela(periodo), ant = janela(periodo, 1), m = metricas(atual), p = metricas(ant);
+    const nomeP = { diario: 'Diário', semanal: 'Semanal', mensal: 'Mensal' }[periodo];
+    const delta = (a, b, inverso) => { if (!isFinite(a) || !isFinite(b) || b === 0) return '<span class="sub">sem comparação</span>'; const d = (a - b) / Math.abs(b); const bom = inverso ? d < 0 : d > 0; return `<span class="${bom ? 'pos' : 'neg'}">${d > 0 ? '▲' : '▼'} ${pct(Math.abs(d), 0)}</span> <span class="sub">vs período anterior</span>`; };
+    const itens = C.patio().map(infoPatio), al = listaAlertas().filter((a) => !estado.resolvidos[a.id]).slice(0, 6);
+    const porV = {}; m.vend.forEach((t) => { const v = t.vendedor || '—'; porV[v] = porV[v] || { n: 0, res: 0 }; porV[v].n++; porV[v].res += C.resultado(t); });
+    log('relatorio', `Relatório ${nomeP.toLowerCase()} aberto`); salvar();
+    tela.innerHTML = `
+      <div class="titulo"><div><h1>Relatórios</h1><p>${nomeP}: ${data(atual[0])}${atual[0] !== atual[1] ? ' a ' + data(atual[1]) : ''}, comparado com ${data(ant[0])}${ant[0] !== ant[1] ? ' a ' + data(ant[1]) : ''}.</p></div>
+        <div class="acoes"><button class="btn btn-linha" type="button" id="r-csv">Exportar CSV</button><button class="btn btn-linha" type="button" onclick="print()">Imprimir ou PDF</button>${botaoAdicionar([{ nome: 'Anotação no relatório', desc: 'Fica no histórico de atividades do período', acao: () => formulario('Adicionar anotação', [{ k: 'texto', r: 'Anotação', obr: true, inteiro: true }], {}, (v) => { log('anotacao', v.texto); salvar(); fecharCamada(true); toast('Anotação registrada.'); rota(); }) }])}</div></div>
+      <div class="abas-modo" role="group" aria-label="Período">${[['diario', 'Diário'], ['semanal', 'Semanal'], ['mensal', 'Mensal']].map(([k, n]) => `<button type="button" data-per="${k}" aria-pressed="${periodo === k}">${n}</button>`).join('')}</div>
+      <article class="relatorio" style="max-width:none">
+        <img class="logo-img" src="logo/anshur-logo.png?v=5" alt="Anshur" width="190" height="48"><p class="sub" style="margin-top:6px">${esc(A.revenda.nome)} · relatório ${nomeP.toLowerCase()} · emitido em ${new Date().toLocaleString('pt-BR')} por ${esc(eu().nome)}</p>
+        <div class="kpis" style="margin-top:18px">
+          <div class="kpi k-marfim"><span class="rot">${ICO.barras}Usados vendidos</span><span class="val">${m.vend.length}</span><span class="exp">${delta(m.vend.length, p.vend.length)}</span></div>
+          <div class="kpi k-salvia"><span class="rot">${ICO.moedas}Resultado bruto</span><span class="val">${mil(m.res)}</span><span class="exp">${delta(m.res, p.res)}</span></div>
+          <div class="kpi k-marfim"><span class="rot">${ICO.pct}Margem realizada</span><span class="val">${isFinite(m.margem) ? pct(m.margem) : '—'}</span><span class="exp">${delta(m.margem, p.margem)}</span></div>
+          <div class="kpi k-risco"><span class="rot">${ICO.alerta}Pago acima do recomendado</span><span class="val">${mil(m.acima)}</span><span class="exp">${delta(m.acima, p.acima, true)}</span></div>
+        </div>
+        <div class="numeros"><div><span>Trocas que entraram</span><b>${m.entr.length} · ${mil(m.comprado)}</b></div><div><span>Faturamento com usados</span><b>${mil(m.venda)}</b></div><div><span>Tempo médio até vender</span><b>${isFinite(m.dias) ? Math.round(m.dias) + ' dias' : '—'}</b></div>
+          <div><span>Avaliações feitas</span><b>${m.aval}</b></div><div><span>Garantias recebidas</span><b>${mil(m.garRec)}</b></div><div><span>Capital imobilizado hoje</span><b>${mil(C.capitalImobilizado())}</b></div></div>
+        ${!m.vend.length && !m.entr.length ? `<p class="conta">Sem trocas nem vendas neste período. ${periodo === 'diario' ? 'Veja o relatório semanal ou mensal para ter números.' : ''}</p>` : ''}
+        <h2>Prioridades</h2><ul>${al.map((a) => `<li><b>${esc(a.titulo)}</b>: ${esc(a.txt)}.</li>`).join('') || '<li>Nenhum ponto crítico.</li>'}</ul>
+        ${Object.keys(porV).length ? `<h2>Vendedores no período</h2><ul>${Object.entries(porV).sort((a, b) => b[1].res - a[1].res).map(([v, x]) => `<li><b>${esc(v)}</b>: ${x.n} ${x.n === 1 ? 'venda' : 'vendas'}, resultado ${mil(x.res)}.</li>`).join('')}</ul>` : ''}
+        <h2>Máquinas que mais pesam hoje</h2><ul>${itens.sort((a, b) => b.risco - a.risco).slice(0, 5).map((i) => `<li>${esc(i.t.marca + ' ' + i.t.modelo)}: ${i.dias} dias, ${mil(i.t.pago)} parados, margem estimada ${pct(i.margem)}. ${esc(i.acao)}.</li>`).join('')}</ul>
+        <h2>O que aconteceu no sistema</h2><ul>${m.atv.slice(0, 10).map((a) => `<li>${new Date(a.quando).toLocaleString('pt-BR')} · ${esc(a.usuario)}: ${esc(a.texto)}</li>`).join('') || '<li>Nenhuma atividade registrada no período.</li>'}</ul>
+        <p class="nota-rodape">Cada número vem dos registros do sistema. Valores estimados são estimativas. ${OP ? '' : 'Revenda e dados fictícios.'}</p></article>`;
+    $$('[data-per]', tela).forEach((b) => b.onclick = () => { periodo = b.dataset.per; telaRelatorios(); });
+    $('#r-csv').onclick = () => baixarCSV(`anshur-relatorio-${periodo}-${hojeISO()}.csv`, [['Indicador', 'Período atual', 'Período anterior'], ['Usados vendidos', m.vend.length, p.vend.length], ['Resultado bruto', Math.round(m.res), Math.round(p.res)], ['Margem realizada', isFinite(m.margem) ? (m.margem * 100).toFixed(1) + '%' : '', isFinite(p.margem) ? (p.margem * 100).toFixed(1) + '%' : ''], ['Pago acima do recomendado', Math.round(m.acima), Math.round(p.acima)], ['Trocas que entraram', m.entr.length, p.entr.length], ['Faturamento com usados', Math.round(m.venda), Math.round(p.venda)], ['Garantias recebidas', Math.round(m.garRec), Math.round(p.garRec)]]);
+  }
+
+  // ---------- auditoria ----------
+  function telaAtividades() {
+    const l = estado.atividades;
+    tela.innerHTML = `<div class="titulo"><div><h1>Atividades</h1><p>Tudo o que foi feito no sistema, por quem e quando.</p></div>${botaoAdicionar([{ nome: 'Anotação', desc: 'Registro manual (visita, ligação, combinado)', acao: () => formulario('Adicionar anotação', [{ k: 'texto', r: 'O que aconteceu', obr: true, inteiro: true }], {}, (v) => { log('anotacao', v.texto); salvar(); fecharCamada(true); toast('Anotação registrada.'); rota(); }) }])}</div>
+      <section class="painel">${l.length ? `<ul class="linha-tempo grande">${l.slice(0, 200).map((a) => `<li><b>${esc(a.texto)}</b><span>${new Date(a.quando).toLocaleString('pt-BR')} · ${esc(a.usuario)} (${K.PERFIS[a.perfil] || ''})</span></li>`).join('')}</ul>` : '<p class="vazio">Nenhuma atividade ainda. Avaliações, trocas, vendas, documentos e mudanças de regra aparecem aqui.</p>'}
+      <p class="nota-rodape">Nesta versão o registro fica neste navegador. Na versão com servidor, ele é gravado de forma que não pode ser alterado.</p></section>`;
+  }
+
+  // ---------- busca global (Ctrl+K) ----------
+  function abrirBusca() {
+    const acoes = [['Nova avaliação', '#avaliar'], ['Ver pátio', '#patio'], ['Relatório semanal', '#relatorio'], ['Central de documentos', '#documentos'], ['Configurações', '#config'], ['Usuários', '#usuarios'], ['Garantias a receber', '#garantias'], ['Estoque financiado', '#financiamento'], ['Teste às cegas', '#teste'], ['Atividades', '#atividades']].filter(([, h]) => pode(h.slice(1)));
+    abrirCamada('modal busca-modal', `<input class="busca-in" id="busca" placeholder="Buscar máquina, chassi, OS, vendedor, página…" autocomplete="off" aria-label="Buscar"><div id="busca-res" class="busca-res"></div><p class="nota-rodape">Setas para navegar, Enter para abrir, Esc para fechar.</p>`, (c) => {
+      const inp = $('#busca', c), res = $('#busca-res', c); let sel = 0, itens = [];
+      const desenha = () => {
+        const q = inp.value.trim().toLowerCase();
+        const maq = A.trocas.filter((t) => !q || [t.marca, t.modelo, t.id, t.chassi, t.vendedor, t.origem].join(' ').toLowerCase().includes(q)).slice(0, 6).map((t) => ({ g: t.vendido ? 'Vendidas' : 'No pátio', n: `${t.marca} ${t.modelo} · ${t.ano}`, d: t.vendido ? `vendida ${data(t.saida)} por ${mil(t.vendido)}` : `${diasDesde(t.entrada)} dias no pátio`, ir: () => { location.hash = t.vendido ? '#trocas' : '#patio'; setTimeout(() => !t.vendido && detalheMaquina(t.id), 300); } }));
+        const gar = (A.garantias || []).filter((g) => q && [g.os, g.servico, g.cliente, g.marca].join(' ').toLowerCase().includes(q)).slice(0, 4).map((g) => ({ g: 'Garantias', n: `${g.os} · ${g.servico}`, d: `${g.marca} · ${real(g.valor)}`, ir: () => { location.hash = '#garantias'; } }));
+        const fin = (A.financiadas || []).filter((f) => q && [f.chassi, f.modelo, f.marca].join(' ').toLowerCase().includes(q)).slice(0, 4).map((f) => ({ g: 'Financiadas', n: `${f.marca} ${f.modelo}`, d: f.chassi, ir: () => { location.hash = '#financiamento'; } }));
+        const pag = acoes.filter(([n]) => !q || n.toLowerCase().includes(q)).slice(0, 5).map(([n, h]) => ({ g: 'Ir para', n, d: '', ir: () => { location.hash = h; } }));
+        itens = [...pag, ...maq, ...gar, ...fin]; sel = Math.min(sel, Math.max(0, itens.length - 1));
+        let g = ''; res.innerHTML = itens.map((x, i) => `${x.g !== g ? `<div class="busca-g">${(g = x.g)}</div>` : ''}<button type="button" class="busca-it ${i === sel ? 'sel' : ''}" data-i="${i}"><b>${esc(x.n)}</b><span>${esc(x.d)}</span></button>`).join('') || '<p class="vazio">Nada encontrado.</p>';
+        $$('.busca-it', res).forEach((b) => b.onclick = () => { fecharCamada(true); itens[+b.dataset.i].ir(); });
+      };
+      inp.oninput = () => { sel = 0; desenha(); };
+      inp.onkeydown = (e) => { if (e.key === 'ArrowDown') { sel = Math.min(itens.length - 1, sel + 1); desenha(); e.preventDefault(); } if (e.key === 'ArrowUp') { sel = Math.max(0, sel - 1); desenha(); e.preventDefault(); } if (e.key === 'Enter' && itens[sel]) { fecharCamada(true); itens[sel].ir(); } };
+      desenha(); setTimeout(() => inp.focus(), 80);
+    });
+  }
+  document.addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); abrirBusca(); } });
+
+  // ---------- comparação de máquinas ----------
+  const comparar = new Set();
+  function abrirComparacao() {
+    const l = [...comparar].map((id) => A.trocas.find((t) => t.id === id)).filter(Boolean).map(infoPatio);
+    if (l.length < 2) { toast('Marque 2 ou 3 máquinas para comparar.', true); return; }
+    const linhas = [['Foto', (i) => `<img src="${F.de(i.t).propria ? F.de(i.t).u : F.mini(F.de(i.t).u)}" alt="" style="width:100%;max-width:220px;border-radius:10px;aspect-ratio:4/3;object-fit:cover">`], ['Ano · horas', (i) => `${i.t.ano} · ${i.t.horas.toLocaleString('pt-BR')} h`], ['Aquisição', (i) => real(i.t.pago)], ['Preparação', (i) => real(i.t.preparo)], ['Custo financeiro', (i) => real(i.juros)], ['Dias no pátio', (i) => `<span class="dias ${i.faixa}">${i.dias} dias</span>`], ['Venda estimada', (i) => real(i.venda)], ['Margem esperada', (i) => `<b class="${i.margem < 0.06 ? 'neg' : 'pos'}">${pct(i.margem)}</b>`], ['Risco de oficina', (i) => { const h = historicoModelo(i.t.modelo); return h.reserva ? real(h.reserva) + ' em média' : 'sem histórico'; }], ['Época de venda', (i) => esc((SAFRA[i.t.tipo] || {}).janela || '—')], ['Recomendação', (i) => esc(i.acao)]];
+    abrirCamada('gaveta larga', `<h2 style="font-size:24px">Comparar máquinas</h2><div class="tabela-wrap" style="margin-top:14px"><table class="tabela grande comparar"><thead><tr><th></th>${l.map((i) => `<th>${esc(i.t.marca + ' ' + i.t.modelo)}</th>`).join('')}</tr></thead><tbody>${linhas.map(([n, f]) => `<tr><td><b>${n}</b></td>${l.map((i) => `<td>${f(i)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`);
+  }
+
+  // ---------- notificações com categoria e "resolvido" ----------
+  function abrirNotificacoes() {
+    const l = listaAlertas(); let filtro = 'abertos';
+    const desenha = (c) => {
+      const v = l.filter((a) => (filtro === 'abertos' ? !estado.resolvidos[a.id] : !!estado.resolvidos[a.id]));
+      $('#notif', c).innerHTML = v.map((a) => `<li class="${a.nivel}">${a.nivel === 'alto' ? ICO.alto : ICO.medio}<div><span class="cat">${esc(a.cat)}</span><b>${esc(a.titulo)}</b><span>${esc(a.txt)}</span><span class="acoes" style="margin-top:8px;display:flex"><a class="btn btn-linha" href="${a.ir}" data-ir>Abrir</a>${filtro === 'abertos' ? `<button class="btn btn-linha" type="button" data-res="${a.id}">Marcar como resolvido</button>` : `<button class="btn btn-linha" type="button" data-reab="${a.id}">Reabrir</button>`}</span></div></li>`).join('') || `<li class="info">${ICO.baixo}<div><b>${filtro === 'abertos' ? 'Tudo em ordem' : 'Nada resolvido ainda'}</b></div></li>`;
+      $$('[data-ir]', c).forEach((x) => x.onclick = () => fecharCamada(true));
+      $$('[data-res]', c).forEach((x) => x.onclick = () => { estado.resolvidos[x.dataset.res] = { por: eu().nome, quando: new Date().toISOString() }; log('alerta', 'Alerta resolvido: ' + l.find((a) => a.id === x.dataset.res).titulo); salvar(); desenha(c); atualizarSino(); toast('Marcado como resolvido.'); });
+      $$('[data-reab]', c).forEach((x) => x.onclick = () => { delete estado.resolvidos[x.dataset.reab]; salvar(); desenha(c); atualizarSino(); });
+    };
+    abrirCamada('gaveta', `<h2 style="font-size:24px">Notificações</h2><div class="abas-modo" style="margin-top:12px"><button type="button" data-f="abertos" aria-pressed="true">Abertas</button><button type="button" data-f="resolvidos" aria-pressed="false">Resolvidas</button></div><ul class="alertas" id="notif"></ul>`, (c) => {
+      $$('[data-f]', c).forEach((b) => b.onclick = () => { filtro = b.dataset.f; $$('[data-f]', c).forEach((x) => x.setAttribute('aria-pressed', x === b)); desenha(c); });
+      desenha(c);
+    });
+  }
+  function atualizarSino() { const n = listaAlertas().filter((a) => !estado.resolvidos[a.id]).length; const b = $('#sino-n'); b.hidden = !n; b.textContent = n; }
+
   // ---------- rotas com transição ----------
-  const TELAS = { visao: telaVisao, avaliar: telaAvaliar, patio: telaPatio, trocas: telaTrocas, teste: telaTeste, passaportes: telaPassaportes, vendedores: telaVendedores, garantias: telaGarantias, financiamento: telaFinanciamento, relatorio: telaRelatorio };
+  const TELAS = { visao: telaVisao, avaliar: telaAvaliar, patio: telaPatio, trocas: telaTrocas, teste: telaTeste, passaportes: telaPassaportes, vendedores: telaVendedores, garantias: telaGarantias, financiamento: telaFinanciamento, relatorio: telaRelatorios, mensal: telaRelatorio, documentos: telaDocumentos, usuarios: telaUsuarios, config: telaConfig, atividades: telaAtividades };
   function moverIndicador() {
     const ativo = $('.menu a[aria-current="page"]'), ind = $('.menu-indicador');
     if (!ativo || !ind) return;
@@ -1022,7 +1445,8 @@
   let primeira = true;
   function rota() {
     const nome = (location.hash || '#visao').slice(1);
-    const ativa = TELAS[nome] ? nome : 'visao';
+    let ativa = TELAS[nome] ? nome : 'visao';
+    if (!pode(ativa)) { ativa = (PERM[eu().perfil] || [])[0] || 'visao'; }
     $$('.menu a').forEach((a) => { if (a.dataset.aba === ativa) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
     moverIndicador();
     fecharCamada(true);
@@ -1031,9 +1455,12 @@
     tela.classList.add('saindo');
     setTimeout(() => { desenhar(); window.scrollTo(0, 0); }, 120);
   }
-  $('#sino').onclick = abrirAlertas;
+  $('#sino').onclick = abrirNotificacoes;
+  $('#busca-btn').onclick = abrirBusca; $('#instalar-btn').onclick = simularInstalacao;
+  $('#perfil').textContent = eu().nome.split(' ').map((x) => x[0]).slice(0, 2).join('').toUpperCase();
+  $$('.menu a').forEach((a) => { if (!pode(a.dataset.aba)) a.hidden = true; });
   if (OP) sincronizar(false).then((r) => { if (r === 'novas') { toast(`Sincronizado com o seu sistema: ${estado.ultimaSync.novas} trocas novas.`); setTimeout(() => location.reload(), 1200); } else if (r === 'permissao') toast('Toque em Teste às cegas › Importar planilha › Sincronizar agora para atualizar com o seu sistema.'); }).catch(() => {});
-  const nAl = listaAlertas().length; if (nAl) { $('#sino-n').hidden = false; $('#sino-n').textContent = nAl; }
+  atualizarSino();
   window.addEventListener('hashchange', rota);
   window.addEventListener('resize', moverIndicador);
   rota();

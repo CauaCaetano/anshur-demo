@@ -29,7 +29,7 @@
   if (ambiente === 'op') {
     A.revenda = { nome: estado.nomeRevenda || 'Minha revenda', cidade: estado.cidadeRevenda || 'dados reais', aviso: 'Dados da sua revenda, guardados só neste navegador' };
     A.trocas = (estado.historico || []).map((t) => ({ ...t })).concat(estado.fechadas.map((t) => ({ ...t })));
-    A.garantias = estado.garantias || []; A.financiadas = estado.financiadas || []; // nada fictício no ambiente real
+    A.garantias = []; A.financiadas = []; // nada fictício no ambiente real (o que for cadastrado entra por estado.extras)
     // modelos que vieram na planilha e não estão no catálogo entram com a referência (Fipe) informada
     (estado.historico || []).forEach((t) => {
       if (!A.modelos.some((m) => m.modelo === t.modelo) && t.referencia) A.modelos.push({ tipo: t.tipo, marca: t.marca || '—', modelo: t.modelo, base: t.referencia, hAno: { trator: 750, colhedora: 2600, pulverizador: 820, plantadeira: 270 }[t.tipo] || 800, importado: true });
@@ -37,6 +37,28 @@
   } else {
     estado.fechadas.forEach((t) => { if (!A.trocas.some((x) => x.id === t.id)) A.trocas.push({ ...t }); });
   }
+  // garantias e máquinas financiadas cadastradas à mão ou por documento
+  estado.extras = Object.assign({ garantias: [], financiadas: [] }, estado.extras);
+  A.garantias = (A.garantias || []).concat(estado.extras.garantias);
+  A.financiadas = (A.financiadas || []).concat(estado.extras.financiadas);
+  // usuários, perfis e trilha de atividades
+  const PERFIS = { dono: 'Dono', gerente: 'Gerente', vendedor: 'Vendedor', oficina: 'Oficina', financeiro: 'Financeiro' };
+  if (!estado.usuarios || !estado.usuarios.length) {
+    estado.usuarios = ambiente === 'op' ? [{ id: 'u1', nome: 'Proprietário', perfil: 'dono', email: '' }] : [
+      { id: 'u1', nome: 'Seu Antônio', perfil: 'dono', email: 'antonio@mogiana.demo' }, { id: 'u2', nome: 'Carlos', perfil: 'gerente', email: 'carlos@mogiana.demo' },
+      { id: 'u3', nome: 'Rodrigo', perfil: 'vendedor', email: '' }, { id: 'u4', nome: 'Marcos', perfil: 'vendedor', email: '' }, { id: 'u5', nome: 'Tiago', perfil: 'vendedor', email: '' },
+      { id: 'u6', nome: 'Fernanda', perfil: 'vendedor', email: '' }, { id: 'u7', nome: 'Zé da Oficina', perfil: 'oficina', email: '' }, { id: 'u8', nome: 'Lúcia', perfil: 'financeiro', email: '' }];
+  }
+  estado.atividades = estado.atividades || [];
+  estado.resolvidos = estado.resolvidos || {};
+  estado.documentos = estado.documentos || [];
+  const usuarioAtual = () => estado.usuarios.find((u) => u.id === estado.usuarioAtual) || estado.usuarios[0];
+  function registrar(tipo, texto, extra = {}) {
+    estado.atividades.unshift({ id: 'a' + Date.now() + Math.random().toString(36).slice(2, 6), quando: new Date().toISOString(), usuario: usuarioAtual().nome, perfil: usuarioAtual().perfil, tipo, texto, ...extra });
+    if (estado.atividades.length > 600) estado.atividades.length = 600;
+  }
+
+  (estado.modelosExtra || []).forEach((m) => { if (!A.modelos.some((x) => x.modelo === m.modelo)) A.modelos.push({ ...m, hAno: { trator: 750, colhedora: 2600, pulverizador: 820, plantadeira: 270 }[m.tipo] || 800, importado: true }); });
   aplicarMovimentos(A.trocas, estado);
 
   function aplicarMovimentos(trocas, est) {
@@ -100,7 +122,7 @@
   function registrarPreparo(est, id, valor, dataReg) { est.preparos[id] = { valor: Math.round(valor), data: dataReg }; }
   function registrarVenda(est, id, valor, dataVenda) { est.vendas[id] = { valor: Math.round(valor), data: dataVenda }; }
 
-  raiz.COMUM = { A, ambiente, repo, estado, cfg, PADRAO, real, mil, pct, hojeISO, diasEntre, diasDesde, data, esc, NOMES, FICHA, logo, C,
+  raiz.COMUM = { A, ambiente, repo, estado, cfg, PADRAO, PERFIS, usuarioAtual, registrar, real, mil, pct, hojeISO, diasEntre, diasDesde, data, esc, NOMES, FICHA, logo, C,
     fecharTroca, registrarPreparo, registrarVenda, aplicarMovimentos,
     gravar: (d) => repo.gravar(d), ler: () => repo.ler(), restaurar: () => { repo.apagar('demo'); delItem('anshur-demo-v1'); } };
 })(typeof window !== 'undefined' ? window : globalThis);
