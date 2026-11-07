@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="estilo.css?v=12">
+<link rel="stylesheet" href="estilo.css?v=13">
 </head>
 <body>
 <a class="pular" href="#tela">Ir para o conteúdo</a>
@@ -52,6 +52,7 @@
     <header class="cabecalho">
       <a class="marca marca-movel" href="#visao" id="marca-movel" aria-label="Anshur, visão geral"></a>
       <div class="cab-info"><b id="revenda"></b><span id="refdata"></span></div>
+      <select class="loja-sel" id="loja-sel" aria-label="Loja"></select>
       <span class="selo-demo">Dados demonstrativos</span>
       <button class="sino busca-btn" type="button" id="busca-btn" aria-label="Buscar (Ctrl+K)"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-4-4"/></svg><span class="kbd">Ctrl K</span></button>
       <button class="sino" type="button" id="instalar-btn" aria-label="Instalar o app"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg></button>
@@ -70,13 +71,13 @@
 </div>
 <div id="camada"></div>
 <div class="toasts" id="toasts" aria-live="polite"></div>
-<script src="dados.js?v=12"></script>
-<script src="fotos.js?v=12"></script>
-<script src="comum.js?v=12"></script>
-<script src="importar.js?v=12"></script>
-<script src="motor.js?v=12"></script>
-<script src="graficos.js?v=12"></script>
-<script src="app.js?v=12"></script>
+<script src="dados.js?v=13"></script>
+<script src="fotos.js?v=13"></script>
+<script src="comum.js?v=13"></script>
+<script src="importar.js?v=13"></script>
+<script src="motor.js?v=13"></script>
+<script src="graficos.js?v=13"></script>
+<script src="app.js?v=13"></script>
 <script>if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then((r) => r.update()).catch(() => {}); let novo = false; navigator.serviceWorker.addEventListener('controllerchange', () => { if (!novo) { novo = true; location.reload(); } }); }</script>
 </body>
 </html>

@@ -489,7 +489,7 @@
   function telaPatio() {
     const todos = C.patio().map(infoPatio);
     const q = (fp.busca || '').toLowerCase();
-    let itens = todos.filter((i) => (!q || [i.t.marca, i.t.modelo, i.t.chassi, i.t.vendedor].join(' ').toLowerCase().includes(q)) && (!fp.tipo || i.t.tipo === fp.tipo) && (!fp.marca || i.t.marca === fp.marca) && (!fp.idade || i.faixa === fp.idade));
+    let itens = todos.filter((i) => (!q || [i.t.marca, i.t.modelo, i.t.chassi, i.t.vendedor, i.t.loja].join(' ').toLowerCase().includes(q)) && (!fp.tipo || i.t.tipo === fp.tipo) && (!fp.marca || i.t.marca === fp.marca) && (!fp.idade || i.faixa === fp.idade));
     const ord = { risco: (a, b) => b.risco - a.risco, capital: (a, b) => b.t.pago - a.t.pago, dias: (a, b) => b.dias - a.dias, margem: (a, b) => a.margem - b.margem };
     itens.sort(ord[fp.ordem]);
     const cap = itens.reduce((s, i) => s + i.t.pago, 0), velhos = itens.filter((i) => i.dias > 90);
@@ -545,6 +545,7 @@
       ${t.previsto ? `<p class="conta">Previsto no dia da troca (${data(t.previsto.data)}): valor máximo ${real(t.previsto.teto)}, venda ${real(t.previsto.venda)}, preparo ${real(t.previsto.preparo)}, ${t.previsto.dias || '—'} dias de pátio, qualidade ${t.previsto.confianca}. Pago: ${real(t.pago)}.</p>` : ''}
       <p class="conta">${esc(janelaVenda(t.tipo))}</p>
       ${t.aprovacao ? `<p class="conta">Troca acima do recomendado em ${real(t.aprovacao.excesso)}, aprovada por ${esc(t.aprovacao.por)}: ${esc(t.aprovacao.motivo)}.</p>` : ''}
+      ${manterOuVender(i)}
       <section class="painel" style="margin-top:6px"><h2>Ordem de preparo na oficina</h2>
         <p class="sub" style="margin:4px 0 12px">Peças e horas de mão de obra (R$ ${K.cfg.valorHora}/h). O total vira o preparo real e é comparado com o previsto${t.preparoEst ? ` (${real(t.preparoEst)})` : ''}.</p>
         <div id="itens-prep" style="display:grid;gap:8px">${((estado.preparos[t.id] && estado.preparos[t.id].itens) || []).map((it) => linhaItem(it)).join('') || linhaItem({})}</div>
@@ -571,9 +572,9 @@
       <section style="margin-top:12px"><h2 style="font-size:18px;margin-bottom:8px">Compradores interessados</h2>${(() => { const cs = compradoresPara(t); return cs.length ? cs.slice(0, 5).map((c) => `<span class="tag comprovado" style="margin:0 6px 6px 0">${esc(c.nome)} · ${esc(c.cidade || '')} · até ${mil(c.precoMax)}</span>`).join('') : '<p class="sub">Ninguém cadastrado procura esta máquina. <a class="link" href="#compradores">Cadastrar comprador</a></p>'; })()}</section>
       ${checaHorimetro(t).length ? `<p class="conta neg">${checaHorimetro(t).map(esc).join(' ')}</p>` : ''}
       <section style="margin-top:12px"><h2 style="font-size:18px;margin-bottom:8px">Documentos</h2>${(t.docs || []).length ? `<ul class="lista-motivos">${t.docs.map((d) => { const doc = estado.documentos.find((x) => x.id === d); return `<li><span>${esc(doc ? doc.nome : d)}</span><b>${doc ? esc(doc.tipo) : ''}</b></li>`; }).join('')}</ul>` : '<p class="sub">Nenhum documento anexado.</p>'}<a class="btn btn-linha" href="#documentos" style="margin-top:8px">Anexar documento</a></section>
-      <div class="acoes"><a class="btn btn-ouro" href="passaporte.html?id=${t.id}">Abrir passaporte</a><button class="btn btn-linha" type="button" id="exp-dms">Exportar para o sistema</button>${t.retrato ? '<button class="btn btn-linha" type="button" id="ver-rt">Retrato da avaliação</button>' : ''}</div>`, (c) => {
+      <div class="acoes"><a class="btn btn-ouro" href="passaporte.html?id=${t.id}">Abrir passaporte</a><button class="btn btn-linha" type="button" id="gerar-an">Gerar anúncio</button><button class="btn btn-linha" type="button" id="exp-dms">Exportar para o sistema</button>${t.retrato ? '<button class="btn btn-linha" type="button" id="ver-rt">Retrato da avaliação</button>' : ''}</div>`, (c) => {
       if ($('#ver-rt', c)) $('#ver-rt', c).onclick = () => verRetrato(t.retrato);
-      $('#exp-dms', c).onclick = () => exportarParaDMS(t);
+      $('#exp-dms', c).onclick = () => exportarParaDMS(t); $('#gerar-an', c).onclick = () => gerarAnuncio(t);
       const s = $('#sim', c), res = $('#sim-res', c), ap = $('#aplicar', c);
       const atual = () => {
         const p = +s.value / 100, novo = Math.round(t.anuncio * (1 - p) / 1000) * 1000;
@@ -1057,7 +1058,8 @@
     gerente: ['visao', 'avaliar', 'patio', 'trocas', 'teste', 'passaportes', 'vendedores', 'garantias', 'financiamento', 'relatorio', 'documentos', 'atividades', 'compradores', 'mercado', 'aprovacoes'],
     vendedor: ['visao', 'avaliar', 'patio', 'passaportes', 'documentos', 'compradores', 'mercado', 'aprovacoes'],
     oficina: ['patio', 'passaportes', 'garantias', 'documentos'],
-    financeiro: ['visao', 'patio', 'trocas', 'garantias', 'financiamento', 'relatorio', 'documentos', 'atividades']
+    financeiro: ['visao', 'patio', 'trocas', 'garantias', 'financiamento', 'relatorio', 'documentos', 'atividades'],
+    auditor: ['visao', 'patio', 'trocas', 'vendedores', 'garantias', 'financiamento', 'relatorio', 'atividades', 'aprovacoes']
   };
   const pode = (aba) => aba === 'perfil' || (PERM[eu().perfil] || PERM.dono).includes(aba);
   const podeAprovar = () => ['dono', 'gerente'].includes(eu().perfil);
@@ -1065,6 +1067,7 @@
 
   // ---------- botão Adicionar (manual ou puxando de documento) ----------
   function botaoAdicionar(opcoes) {
+    if (eu().perfil === 'auditor') return '<span class="tag declarado">Só leitura</span>';
     const id = 'add' + Math.random().toString(36).slice(2, 7);
     setTimeout(() => {
       const b = document.getElementById(id); if (!b) return;
@@ -1308,6 +1311,7 @@
             <div><span>Desconto por troca acima</span><b>${pct(K.cfg.descontoAcima, 0)}</b></div><div><span>Hora da oficina</span><b>${real(K.cfg.valorHora)}</b></div><div><span>Base do custo</span><b>${K.cfg.baseJuros === 'total' ? 'Pago + preparo' : 'Valor pago'}</b></div></div>
           <div class="acoes"><button class="btn btn-linha" type="button" id="c-prem">Alterar regras</button></div></section>
       </div>
+      ${blocoLojas()}${blocoLGPD()}
       <section class="painel bloco"><h2>${ICO.alvo}Alçadas de aprovação por tipo de máquina</h2><p class="sub" style="margin:6px 0 12px">Quanto acima do valor máximo cada um pode liberar. Acima da alçada do gerente, só o dono libera. Zero = qualquer valor acima precisa de aprovação.</p>
         <div class="tabela-wrap"><table class="tabela grande"><thead><tr><th>Tipo</th><th class="n">Vendedor libera até (R$)</th><th class="n">Gerente libera até (R$)</th><th>Acima disso</th></tr></thead><tbody>
         ${Object.entries(alcadas()).map(([k, a]) => `<tr><td><b>${NOMES[k]}</b></td><td class="n"><input class="campo-in" style="max-width:150px;text-align:right" data-alc="${k}|vendedor" inputmode="numeric" value="${a.vendedor.toLocaleString('pt-BR')}"></td><td class="n"><input class="campo-in" style="max-width:150px;text-align:right" data-alc="${k}|gerente" inputmode="numeric" value="${a.gerente.toLocaleString('pt-BR')}"></td><td>Só o dono</td></tr>`).join('')}</tbody></table></div>
@@ -1321,7 +1325,7 @@
           <div class="acoes"><a class="btn btn-linha" href="#teste">Sincronizar com o sistema</a><button class="btn btn-linha" type="button" id="c-backup">Baixar cópia de segurança</button><label class="btn btn-linha" style="cursor:pointer">Restaurar cópia<input type="file" accept=".json" id="c-restaura" class="sr"></label><button class="btn btn-linha" type="button" id="c-instalar">Instalar o app</button></div></section>
       </div>`;
     $('#c-salvar').onclick = () => { estado.nomeRevenda = $('#c-nome').value.trim(); estado.cnpj = $('#c-cnpj').value.trim(); estado.cidadeRevenda = $('#c-cid').value.trim(); estado.marcasRevenda = $('#c-marcas').value.trim(); salvar(); log('config', 'Dados da revenda atualizados'); toast('Dados da revenda salvos.'); setTimeout(() => location.reload(), 600); };
-    $('#c-prem').onclick = abrirPremissas;
+    $('#c-prem').onclick = abrirPremissas; ligarLGPD(); ligarLojas();
     $('#c-alc').onclick = () => { const n = {}; $$('[data-alc]', tela).forEach((i) => { const [k, q] = i.dataset.alc.split('|'); n[k] = n[k] || {}; n[k][q] = Math.max(0, num(i.value) || 0); }); Object.values(n).forEach((a) => { if (a.gerente < a.vendedor) a.gerente = a.vendedor; }); estado.alcadas = n; log('config', 'Alçadas de aprovação alteradas'); salvar(); toast('Alçadas salvas.'); rota(); };
     $('#c-modelo').onclick = () => formulario('Adicionar modelo ao catálogo', [{ k: 'tipo', r: 'Categoria', tipo: 'select', ops: Object.entries(NOMES) }, { k: 'marca', r: 'Fabricante', lista: 'dl-marca', obr: true }, { k: 'modelo', r: 'Modelo', lista: 'dl-modelo', obr: true }, { k: 'base', r: 'Referência de preço seminovo (R$)', num: true, obr: true }], { tipo: 'trator' }, (v) => {
       A.modelos.push({ tipo: v.tipo, marca: v.marca, modelo: v.modelo, base: v.base, hAno: { trator: 750, colhedora: 2600, pulverizador: 820, plantadeira: 270 }[v.tipo], importado: true });
@@ -1498,7 +1502,7 @@
         ${patio.map((t) => { const cs = compradoresPara(t); return cs.length ? `<div class="casa">${fotoMini(t)}<div><b>${esc(t.marca + ' ' + t.modelo)} · ${t.ano}</b><span>${diasDesde(t.entrada)} dias no pátio · anunciado ${mil(t.anuncio)}</span></div><div class="casa-c">${cs.slice(0, 3).map((c) => `<span class="tag comprovado">${esc(c.nome)} · até ${mil(c.precoMax)}</span>`).join('')}${cs.length > 3 ? `<span class="sub">+${cs.length - 3}</span>` : ''}</div></div>` : ''; }).join('') || '<p class="vazio">Nenhum casamento ainda.</p>'}
       </section>
       <section class="painel bloco"><div class="tabela-wrap"><table class="tabela"><thead><tr><th>Comprador</th><th>Procura</th><th class="n">Ano mínimo</th><th class="n">Paga até</th><th>Desde</th><th>Combina com</th></tr></thead><tbody>
-        ${l.map((c) => { const m = patio.filter((t) => compradoresPara(t).includes(c)); return `<tr><td><b>${esc(c.nome)}</b><br><span class="sub">${esc([c.fazenda, c.cidade].filter(Boolean).join(' · '))}</span></td><td>${NOMES[c.tipo]}${c.marcas ? ' ' + esc(c.marcas) : ''}<br><span class="sub">${esc(c.obs || '')}</span></td><td class="n">${c.anoMin || '—'}</td><td class="n">${mil(+c.precoMax || 0)}</td><td>${data(c.desde)}</td><td>${m.length ? m.map((t) => esc(t.modelo)).join(', ') : '<span class="sub">nada no pátio</span>'}</td></tr>`; }).join('') || '<tr><td colspan="6" class="vazio">Nenhum comprador cadastrado.</td></tr>'}</tbody></table></div></section>`;
+        ${l.map((c) => { const m = patio.filter((t) => compradoresPara(t).includes(c)); return `<tr><td><b>${esc(c.nome)}</b><br><span class="sub">${esc([c.fazenda, c.cidade, mascarar(c.telefone)].filter(Boolean).join(' · '))}</span></td><td>${NOMES[c.tipo]}${c.marcas ? ' ' + esc(c.marcas) : ''}<br><span class="sub">${esc(c.obs || '')}</span></td><td class="n">${c.anoMin || '—'}</td><td class="n">${mil(+c.precoMax || 0)}</td><td>${data(c.desde)}</td><td>${m.length ? m.map((t) => esc(t.modelo)).join(', ') : '<span class="sub">nada no pátio</span>'}</td></tr>`; }).join('') || '<tr><td colspan="6" class="vazio">Nenhum comprador cadastrado.</td></tr>'}</tbody></table></div></section>`;
     contar();
   }
 
@@ -1737,6 +1741,71 @@
     });
   }
 
+  // =====================================================================================
+  // V8: várias lojas, auditor, privacidade (LGPD), manter ou vender, anúncio para portais
+  // =====================================================================================
+  function seletorLoja() {
+    const s = $('#loja-sel'); if (!s) return;
+    if (!estado.lojas.length) { s.hidden = true; return; }
+    s.innerHTML = `<option value="">Todas as lojas</option>` + estado.lojas.map((l) => `<option ${estado.lojaAtual === l ? 'selected' : ''}>${esc(l)}</option>`).join('');
+    s.onchange = () => { estado.lojaAtual = s.value; salvar(); log('loja', s.value ? `Vendo a loja ${s.value}` : 'Vendo todas as lojas'); salvar(); location.reload(); };
+  }
+  const somenteLeitura = () => eu().perfil === 'auditor';
+  // privacidade: contatos mascarados para quem não precisa ver
+  const mascarar = (txt) => (estado.lgpd && estado.lgpd.mascarar && ['vendedor', 'oficina', 'auditor'].includes(eu().perfil) && txt ? String(txt).replace(/\d(?=\d{2})/g, '•') : txt);
+  function blocoLGPD() {
+    const g = estado.lgpd || { mascarar: true, retencao: 60 };
+    return `<section class="painel bloco"><h2>${ICO.alvo}Privacidade e LGPD</h2>
+      <div class="campos" style="margin-top:12px"><label class="check"><input type="checkbox" id="lg-masc" ${g.mascarar ? 'checked' : ''}> Esconder telefone e documentos de clientes para vendedor, oficina e auditor</label>
+      <div class="campo"><label for="lg-ret">Guardar dados de clientes por (meses)</label><input id="lg-ret" inputmode="numeric" value="${g.retencao}"></div></div>
+      <div class="campos" style="margin-top:12px"><div class="campo"><label for="lg-tit">Pedido de um titular (nome do cliente ou comprador)</label><input id="lg-tit" list="dl-titulares">${lista('dl-titulares', (A.compradores || []).map((c) => c.nome).concat(A.trocas.map((t) => t.origem)))}</div></div>
+      <div class="acoes"><button class="btn btn-linha" type="button" id="lg-salvar">Salvar regras</button><button class="btn btn-linha" type="button" id="lg-exp">Exportar dados do titular</button><button class="btn btn-perigo" type="button" id="lg-anon">Anonimizar titular</button></div>
+      <p class="nota-rodape">Atende os pedidos de acesso e de eliminação previstos na LGPD. A anonimização troca nome e contato por "Titular anonimizado" e fica registrada nas atividades.</p></section>`;
+  }
+  function ligarLGPD() {
+    const b = $('#lg-salvar'); if (!b) return;
+    b.onclick = () => { estado.lgpd = { mascarar: $('#lg-masc').checked, retencao: Math.max(1, num($('#lg-ret').value) || 60) }; log('lgpd', 'Regras de privacidade alteradas'); salvar(); toast('Regras de privacidade salvas.'); };
+    const achar = () => { const n = $('#lg-tit').value.trim().toLowerCase(); if (!n) { toast('Informe o nome do titular.', true); return null; } return { n, comp: (A.compradores || []).filter((c) => c.nome.toLowerCase().includes(n)), trocas: A.todasTrocas.filter((t) => String(t.origem).toLowerCase().includes(n)) }; };
+    $('#lg-exp').onclick = () => { const r = achar(); if (!r) return; const url = URL.createObjectURL(new Blob([JSON.stringify({ titular: r.n, compradores: r.comp, maquinas: r.trocas.map((t) => ({ id: t.id, origem: t.origem, entrada: t.entrada, modelo: t.modelo })) }, null, 1)], { type: 'application/json' })); const a = document.createElement('a'); a.href = url; a.download = 'dados-do-titular.json'; a.click(); log('lgpd', `Dados exportados a pedido do titular "${r.n}"`); salvar(); toast(`${r.comp.length + r.trocas.length} registros exportados.`); };
+    $('#lg-anon').onclick = () => { const r = achar(); if (!r) return; confirmar('Anonimizar este titular?', `${r.comp.length + r.trocas.length} registros terão nome e contato apagados. Não dá para desfazer.`, 'Anonimizar', () => {
+      r.comp.forEach((c) => { Object.assign(c, { nome: 'Titular anonimizado', telefone: '', fazenda: '', obs: '' }); const x = estado.extras.compradores.find((y) => y.id === c.id); if (x) Object.assign(x, c); });
+      r.trocas.forEach((t) => { t.origem = 'Titular anonimizado'; [...estado.fechadas, ...(estado.historico || [])].filter((y) => y.id === t.id).forEach((y) => { y.origem = t.origem; }); });
+      log('lgpd', `Titular anonimizado (${r.comp.length + r.trocas.length} registros)`); salvar(); toast('Titular anonimizado.'); rota(); }); };
+  }
+  function blocoLojas() {
+    return `<section class="painel bloco"><h2>${ICO.camadas}Lojas e unidades</h2><p class="sub" style="margin:6px 0 10px">Cada máquina pertence a uma loja. O dono vê tudo junto ou uma loja por vez; o motor de avaliação aprende com todas.</p>
+      <div class="cartoes-lojas">${estado.lojas.map((l) => { const ts = A.todasTrocas.filter((t) => t.loja === l); const p = ts.filter((t) => !t.vendido); return `<div class="loja-c"><b>${esc(l)}</b><span>${p.length} no pátio · ${mil(p.reduce((s, t) => s + t.pago, 0))} parados</span><span>${ts.filter((t) => t.vendido).length} vendidas</span></div>`; }).join('') || '<p class="vazio">Nenhuma loja cadastrada.</p>'}</div>
+      <div class="acoes"><button class="btn btn-linha" type="button" id="lj-add">Adicionar loja</button></div></section>`;
+  }
+  function ligarLojas() { const b = $('#lj-add'); if (b) b.onclick = () => formulario('Adicionar loja', [{ k: 'nome', r: 'Nome da loja (cidade ou unidade)', lista: 'dl-cidade', obr: true }], {}, (v) => { if (estado.lojas.includes(v.nome)) { toast('Essa loja já existe.', true); return; } estado.lojas.push(v.nome); log('loja', `Loja ${v.nome} adicionada`); salvar(); fecharCamada(true); toast('Loja adicionada.'); location.reload(); }); }
+
+  // manter ou vender agora (custo de ficar mais 6 ou 12 meses)
+  function manterOuVender(i) {
+    const t = i.t, h = historicoModelo(t.modelo);
+    const cenario = (meses) => { const juros = C.custoFinanceiro(t, meses * 30), deprec = i.venda * (1 - Math.pow(0.9, meses / 12)), oficina = (h.reserva || t.preparo * 0.15) * meses / 12; return { meses, juros, deprec, oficina, total: juros + deprec + oficina }; };
+    const c6 = cenario(6), c12 = cenario(12);
+    return `<section class="painel" style="margin-top:6px"><h2>Manter ou vender agora?</h2><p class="sub" style="margin:4px 0 10px">Quanto custa segurar esta máquina, além do que já foi gasto.</p>
+      <div class="tabela-wrap"><table class="tabela"><thead><tr><th></th><th class="n">Mais 6 meses</th><th class="n">Mais 12 meses</th></tr></thead><tbody>
+      <tr><td>Custo do dinheiro</td><td class="n">${real(c6.juros)}</td><td class="n">${real(c12.juros)}</td></tr><tr><td>Perda de valor (≈10% ao ano)</td><td class="n">${real(c6.deprec)}</td><td class="n">${real(c12.deprec)}</td></tr>
+      <tr><td>Oficina provável do modelo</td><td class="n">${real(c6.oficina)}</td><td class="n">${real(c12.oficina)}</td></tr><tr><td><b>Total de segurar</b></td><td class="n neg forte">${real(c6.total)}</td><td class="n neg forte">${real(c12.total)}</td></tr></tbody></table></div>
+      <p class="conta">Vender hoje com desconto de até <b>${real(c6.total)}</b> ainda sai mais barato do que segurar 6 meses.</p></section>`;
+  }
+  // anúncio pronto para os portais
+  function gerarAnuncio(t) {
+    const i = infoPatio(t), f = [0, 1, 2].map((k) => F.de(t, k)), link = new URL('passaporte.html?id=' + t.id, location.href).href;
+    const titulo = `${NOMES[t.tipo]} ${t.marca} ${t.modelo} ${t.ano} · ${t.horas.toLocaleString('pt-BR')} h`;
+    const texto = `${titulo}\n\n${t.marca} ${t.modelo}, ano ${t.ano}, ${t.horas.toLocaleString('pt-BR')} horas. Inspeção da revenda: ${t.cond}/100.\n${(t.manutencoes || []).filter((m) => m.comNota).length} manutenções com nota fiscal.\nPreço: ${real(t.anuncio)}.\n\nFicha completa, fotos e histórico: ${link}\n${A.revenda.nome} · ${t.loja || A.revenda.cidade}`;
+    abrirCamada('modal', `<h2>Anúncio pronto</h2><p class="sub">Copie e cole no Agrofy, Mercado Máquinas, Facebook ou WhatsApp. O link leva ao passaporte com QR Code.</p>
+      <div class="campo" style="margin-top:12px"><label for="an-tit">Título</label><input id="an-tit" value="${esc(titulo)}"></div>
+      <div class="campo" style="margin-top:10px"><label for="an-txt">Descrição</label><textarea id="an-txt" rows="9">${esc(texto)}</textarea></div>
+      <div class="galeria-mini">${f.map((x) => `<img src="${x.propria ? x.u : F.mini(x.u)}" alt="">`).join('')}</div>
+      <div class="acoes"><button class="btn btn-ouro" type="button" id="an-cp">Copiar anúncio</button><button class="btn btn-linha" type="button" id="an-csv">Baixar planilha para importar no portal</button></div>
+      <p class="nota-rodape">Publicação automática nos portais depende de cada portal liberar integração.</p>`, (c) => {
+      $('#an-cp', c).onclick = async () => { try { await navigator.clipboard.writeText($('#an-tit', c).value + '\n\n' + $('#an-txt', c).value); toast('Anúncio copiado.'); log('anuncio', `Anúncio gerado: ${titulo}`, { ref: t.id }); salvar(); } catch (e) { toast('Selecione o texto e copie.', true); } };
+      $('#an-csv', c).onclick = () => baixarCSV(`anuncio-${t.id}.csv`, [['titulo', 'categoria', 'marca', 'modelo', 'ano', 'horas', 'preco', 'cidade', 'descricao', 'link'], [titulo, NOMES[t.tipo], t.marca, t.modelo, t.ano, t.horas, t.anuncio, t.loja || A.revenda.cidade, $('#an-txt', c).value, link]]);
+    });
+  }
+
   // ---------- rotas com transição ----------
   const TELAS = { visao: telaVisao, avaliar: telaAvaliar, patio: telaPatio, trocas: telaTrocas, teste: telaTeste, passaportes: telaPassaportes, vendedores: telaVendedores, garantias: telaGarantias, financiamento: telaFinanciamento, relatorio: telaRelatorios, mensal: telaRelatorio, documentos: telaDocumentos, usuarios: telaUsuarios, config: telaConfig, atividades: telaAtividades, compradores: telaCompradores, mercado: telaMercado, aprovacoes: telaAprovacoes, perfil: telaPerfil };
   function moverIndicador() {
@@ -1758,7 +1827,7 @@
     tela.classList.add('saindo');
     setTimeout(() => { desenhar(); window.scrollTo(0, 0); }, 120);
   }
-  $('#sino').onclick = abrirNotificacoes;
+  $('#sino').onclick = abrirNotificacoes; seletorLoja(); if (somenteLeitura()) document.body.classList.add('so-leitura');
   $('#busca-btn').onclick = abrirBusca; $('#instalar-btn').onclick = simularInstalacao;
   atualizarAvatar(); eu().ultimoAcesso = new Date().toISOString(); salvar();
   $$('.menu a').forEach((a) => { if (!pode(a.dataset.aba)) a.hidden = true; });

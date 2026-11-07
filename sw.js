@@ -1,6 +1,6 @@
 // Funciona sem internet no pátio e sempre busca a versão nova quando há sinal.
-const CACHE = 'anshur-v12';
-const ARQUIVOS = ['./', 'index.html', 'passaporte.html', 'estilo.css?v=12', 'passaporte.css?v=12', 'dados.js?v=12', 'comum.js?v=12', 'importar.js?v=12', 'fotos.js?v=12', 'motor.js?v=12', 'graficos.js?v=12', 'app.js?v=12', 'passaporte.js?v=12', 'icone-192.png', 'manifest.webmanifest', 'logo/anshur-logo.png?v=5'];
+const CACHE = 'anshur-v13';
+const ARQUIVOS = ['./', 'index.html', 'passaporte.html', 'estilo.css?v=13', 'passaporte.css?v=13', 'dados.js?v=13', 'comum.js?v=13', 'importar.js?v=13', 'fotos.js?v=13', 'motor.js?v=13', 'graficos.js?v=13', 'app.js?v=13', 'passaporte.js?v=13', 'icone-192.png', 'manifest.webmanifest', 'logo/anshur-logo.png?v=5'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ARQUIVOS.map((u) => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting())); });
 self.addEventListener('activate', (e) => { e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener('fetch', (e) => {

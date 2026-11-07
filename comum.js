@@ -46,13 +46,14 @@
   A.garantias = (A.garantias || []).concat(estado.extras.garantias);
   A.financiadas = (A.financiadas || []).concat(estado.extras.financiadas);
   // usuários, perfis e trilha de atividades
-  const PERFIS = { dono: 'Dono', gerente: 'Gerente', vendedor: 'Vendedor', oficina: 'Oficina', financeiro: 'Financeiro' };
+  const PERFIS = { dono: 'Dono', gerente: 'Gerente', vendedor: 'Vendedor', oficina: 'Oficina', financeiro: 'Financeiro', auditor: 'Auditor (só leitura)' };
   if (!estado.usuarios || !estado.usuarios.length) {
     estado.usuarios = ambiente === 'op' ? [{ id: 'u1', nome: 'Proprietário', perfil: 'dono', email: '' }] : [
       { id: 'u1', nome: 'Seu Antônio', perfil: 'dono', email: 'antonio@mogiana.demo' }, { id: 'u2', nome: 'Carlos', perfil: 'gerente', email: 'carlos@mogiana.demo' },
       { id: 'u3', nome: 'Rodrigo', perfil: 'vendedor', email: '' }, { id: 'u4', nome: 'Marcos', perfil: 'vendedor', email: '' }, { id: 'u5', nome: 'Tiago', perfil: 'vendedor', email: '' },
       { id: 'u6', nome: 'Fernanda', perfil: 'vendedor', email: '' }, { id: 'u7', nome: 'Zé da Oficina', perfil: 'oficina', email: '' }, { id: 'u8', nome: 'Lúcia', perfil: 'financeiro', email: '' }];
   }
+  if (ambiente !== 'op' && !estado.usuarios.some((u) => u.perfil === 'auditor')) estado.usuarios.push({ id: 'u9', nome: 'Auditoria Externa', perfil: 'auditor', email: 'auditoria@mogiana.demo' });
   estado.atividades = estado.atividades || [];
   estado.resolvidos = estado.resolvidos || {};
   estado.documentos = estado.documentos || [];
@@ -64,6 +65,12 @@
 
   (estado.modelosExtra || []).forEach((m) => { if (!A.modelos.some((x) => x.modelo === m.modelo)) A.modelos.push({ ...m, hAno: { trator: 750, colhedora: 2600, pulverizador: 820, plantadeira: 270 }[m.tipo] || 800, importado: true }); });
   aplicarMovimentos(A.trocas, estado);
+  // várias lojas: cada máquina pertence a uma unidade; o motor aprende com todas, as telas mostram a loja escolhida
+  estado.lojas = estado.lojas && estado.lojas.length ? estado.lojas : (ambiente === 'op' ? [] : ['Orlândia', 'Sertãozinho', 'Bebedouro']);
+  const hashL = (s) => [...String(s)].reduce((h, c) => (h * 33 + c.charCodeAt(0)) >>> 0, 5);
+  A.trocas.forEach((t) => { if (!t.loja && estado.lojas.length) t.loja = estado.lojas[hashL(t.id) % estado.lojas.length]; });
+  A.todasTrocas = A.trocas;
+  if (estado.lojaAtual && estado.lojas.includes(estado.lojaAtual)) A.trocas = A.trocas.filter((t) => t.loja === estado.lojaAtual);
 
   function aplicarMovimentos(trocas, est) {
     Object.entries(est.precos || {}).forEach(([id, lista]) => { const t = trocas.find((x) => x.id === id); if (!t) return; t.precos = (t.precos || []).concat(lista); t.anuncio = t.precos[t.precos.length - 1].valor; });

@@ -56,7 +56,7 @@
   // opts.ate: só usa vendas concluídas antes desta data (validação temporal, sem vazamento)
   // opts.margem: margem-alvo
   function avaliar(maq, opts = {}) {
-    const hist = (opts.historico || A.trocas).filter((t) => t.vendido && t.id !== opts.excluir && refDe(t) && (!opts.ate || (t.saida && t.saida < opts.ate)));
+    const hist = (opts.historico || A.todasTrocas || A.trocas).filter((t) => t.vendido && t.id !== opts.excluir && refDe(t) && (!opts.ate || (t.saida && t.saida < opts.ate)));
     const doTipo = hist.filter((t) => t.tipo === maq.tipo);
     const base = doTipo.length >= 8 ? doTipo : hist;
     if (base.length < QUALIDADE.minimoTreino || !refDe(maq)) return null;
@@ -78,7 +78,7 @@
     const mesmoModelo = usados.filter((t) => t.modelo === maq.modelo).length;
 
     // qualidade: erro medido em previsões passadas que o motor não conhecia
-    const qualidade = opts.semValidacao ? null : validar(opts.historico || A.trocas).porTipo[maq.tipo] || null;
+    const qualidade = opts.semValidacao ? null : validar(opts.historico || A.todasTrocas || A.trocas).porTipo[maq.tipo] || null;
     let confianca = 'baixa';
     if (qualidade && qualidade.n >= QUALIDADE.minimoValidacao) {
       if (doTipo.length >= QUALIDADE.alta.amostras && qualidade.mape <= QUALIDADE.alta.mape) confianca = 'alta';
@@ -102,7 +102,7 @@
 
   // validação temporal (walk-forward): para cada venda, o motor só conhece o que tinha sido vendido antes da troca
   const cacheVal = new Map();
-  function validar(historico = A.trocas) {
+  function validar(historico = A.todasTrocas || A.trocas) {
     const vend = historico.filter((t) => t.vendido && t.entrada && t.saida);
     const chave = vend.length + '|' + vend.map((t) => t.id + t.vendido).join(',').length + '|' + A.margemAlvo;
     if (cacheVal.has(chave)) return cacheVal.get(chave);

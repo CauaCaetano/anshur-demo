@@ -597,3 +597,14 @@ img.foto-perfil { background: none; }
 .rosca-leg li span { white-space: nowrap; }
 .rosca-leg li { grid-template-columns: 16px 1fr auto auto; }
 @media (max-width: 959px) { .menu { width: 100%; max-width: 100vw; box-sizing: border-box; } html, body { overflow-x: hidden; } .passos-on li { grid-template-columns: 28px 1fr; } .passos-on li .btn { grid-column: 2; justify-self: start; } }
+
+/* v8 */
+.loja-sel { min-height: 46px; border-radius: 12px; border: 1px solid var(--borda); background: #fff; padding: 0 12px; font-size: 15.5px; font-weight: 600; color: var(--grafite); max-width: 220px; }
+@media (max-width: 760px) { .loja-sel { max-width: 150px; font-size: 13px; padding: 0 6px; } }
+.cartoes-lojas { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.loja-c { display: grid; gap: 2px; padding: 14px; border-radius: 12px; border: 1px solid var(--borda); background: #FDFBF6; }
+.loja-c b { font-size: 18px; } .loja-c span { color: var(--cinza); font-size: 14.5px; }
+.galeria-mini { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 10px; }
+.galeria-mini img { width: 100%; aspect-ratio: 4/3; object-fit: cover; border-radius: 8px; }
+body.so-leitura .gaveta .campos, body.so-leitura #g-prep-ok, body.so-leitura #g-vender, body.so-leitura #add-item, body.so-leitura #aplicar, body.so-leitura .cab-nova { display: none !important; }
+body.so-leitura .aprov .acoes, body.so-leitura .aprov button { display: none !important; }
