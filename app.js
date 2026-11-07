@@ -296,6 +296,7 @@
         <div class="campo"><label for="f-ano">Ano</label><select id="f-ano">${anos.map((a) => `<option ${a === av.ano ? 'selected' : ''}>${a}</option>`).join('')}</select></div>
         <div class="campo"><label for="f-horas">Horas trabalhadas</label><input id="f-horas" type="number" inputmode="numeric" min="0" step="10" value="${av.horas || ''}" required aria-describedby="e-horas"><span class="erro-campo" id="e-horas"></span></div>
         <div class="campo"><label for="f-local">Localização da máquina</label><input id="f-local" value="${esc(av.local)}" autocomplete="off"></div>
+        <div class="campo"><label for="f-nova">Máquina nova desta negociação</label><select id="f-nova"><option value="">Nenhuma / não financiada</option>${(A.financiadas || []).filter((f) => !f.venda).map((f) => `<option value="${f.chassi}" ${av.nova === f.chassi ? 'selected' : ''}>${esc(f.marca + ' ' + f.modelo)} · ${f.chassi}</option>`).join('')}</select></div>
         <div class="campo inteiro"><label for="f-obs">Informações adicionais</label><textarea id="f-obs" rows="2" placeholder="Ex.: piloto automático, pneus novos há 1 safra">${esc(av.obs)}</textarea></div>
       </div>${navPasso()}</section>`;
     if (av.passo === 2) { const c = condDe(av.ficha); h = `<section class="painel passo"><div class="painel-cab"><h2>Inspeção</h2><p>Nota de 1 (ruim) a 5 (ótimo)</p></div>
@@ -324,6 +325,7 @@
       $('#f-ano').onchange = (e) => { av.ano = +e.target.value; };
       $('#f-horas').oninput = (e) => { av.horas = Math.max(0, +e.target.value || 0); $('#e-horas').textContent = av.horas > 0 ? '' : 'Informe as horas do horímetro.'; };
       $('#f-local').oninput = (e) => { av.local = e.target.value; };
+      $('#f-nova').onchange = (e) => { av.nova = e.target.value; };
       $('#f-obs').oninput = (e) => { av.obs = e.target.value; };
     }
     if (av.passo === 2) $$('.notas button', caixa).forEach((b) => b.onclick = () => {
@@ -356,6 +358,9 @@
     const maq = maqAv(), r = M.avaliar(maq), caixa = $('#resultado');
     if (!r) { caixa.innerHTML = `<section class="painel vazio">Histórico insuficiente para avaliar esta máquina: são precisas pelo menos ${M.QUALIDADE.minimoTreino} vendas com referência de preço.${OP ? ' <a class="link" href="#teste">Importar histórico</a>' : ''}</section>`; return; }
     const fipe = num(av.fipe), anuncios = av.anuncios.map(num).filter((v) => v > 0);
+    const hist = historicoModelo(maq.modelo);
+    if (av.reserva && hist.reserva > 0) { r.teto = Math.floor((r.teto - hist.reserva) / 1000) * 1000; r.resultado = r.venda - r.teto - r.preparo; r.margemSobreVenda = r.resultado / r.venda; r.faixa = [Math.min(r.faixa[0], r.teto), r.teto]; }
+    const nova = (A.financiadas || []).find((f) => f.chassi === av.nova), jn = nova ? jurosFin(nova) : null;
     const mediaAn = anuncios.length ? anuncios.reduce((s, v) => s + v, 0) / anuncios.length : 0;
     caixa.innerHTML = `
       <div class="grade-2">
@@ -367,6 +372,12 @@
             <span class="conf ${r.confianca}">Qualidade da estimativa: ${r.confianca}</span>
             ${r.confianca === 'baixa' ? '<p class="sub" style="margin-top:8px">Dados insuficientes para uma recomendação confiável. Use como referência e decida com o gerente.</p>' : ''}
           </section>
+          ${nova ? `<section class="painel bloco" style="border-color:#F0CFCB;background:#FBEDEB"><h2 style="color:#8E2F2B">${ICO.alerta}Juro do floor plan nesta negociação</h2>
+            <p style="font-size:18px;margin-top:8px">${esc(nova.marca + ' ' + nova.modelo)} (${nova.chassi}) está no estoque desde ${data(nova.entrada)}. ${jn.emCarencia ? `Ainda em carência até ${data(jn.inicio)}.` : `Já custou <b class="neg">${real(jn.total)}</b> de juros e soma <b class="neg">${real(nova.valor * nova.taxaMes / 30)} por dia</b>.`}</p>
+            <p class="sub" style="margin-top:6px">Cada dia sem fechar esta venda é juro pago ao banco. Use isso na negociação do usado.</p></section>` : ''}
+          ${hist.n ? `<section class="painel bloco"><h2>${ICO.etiqueta}Histórico de oficina deste modelo</h2>
+            <ul class="lista-motivos" style="margin-top:8px">${hist.defeitos.slice(0, 4).map((d) => `<li><span>${esc(d.servico)} <span class="sub">· ${d.n} ${d.n === 1 ? 'vez' : 'vezes'}</span></span><b>${real(d.media)}</b></li>`).join('') || '<li><span>Nenhum defeito recorrente registrado.</span></li>'}</ul>
+            <p class="conta">Nas ${hist.trocas} trocas deste modelo, o preparo passou do previsto em média ${real(hist.reserva)} por máquina.${hist.reserva > 0 ? ` <label class="check" style="margin-top:8px"><input type="checkbox" id="reserva" ${av.reserva ? 'checked' : ''}> Descontar essa reserva de risco do valor máximo</label>` : ''}</p></section>` : ''}
           <section class="painel bloco"><h2>Qualidade dos dados</h2>
             <div class="numeros">
               <div><span>Vendas usadas no cálculo</span><b>${r.base}</b></div>
@@ -408,6 +419,7 @@
       <div class="acoes"><button class="btn btn-linha" type="button" data-ir="-1">Voltar</button><button class="btn btn-linha" type="button" id="registrar">Registrar avaliação</button><button class="btn btn-linha" type="button" id="premissas">Ajustar premissas</button><button class="btn btn-ouro" type="button" id="fechar-troca">Fechar troca</button></div>
       <p class="nota-rodape">O valor máximo é uma recomendação. Quem decide o valor pago é o gerente.</p>`;
     $('[data-ir]', caixa).onclick = () => irPasso(3);
+    const res_ = $('#reserva', caixa); if (res_) res_.onchange = () => { av.reserva = res_.checked; desenharResultado(); toast(av.reserva ? 'Reserva de risco descontada do valor máximo.' : 'Reserva de risco retirada.'); };
     $('#registrar').onclick = (e) => {
       const b = e.currentTarget; b.classList.add('carregando');
       // a avaliação congela os números e as premissas do dia: não é recalculada quando o modelo muda
@@ -439,7 +451,7 @@
         if (acima && (!aprov || !mot)) { (aprov ? $('#t-mot', c) : $('#t-aprov', c)).focus(); toast('Acima do recomendado: informe quem aprovou e o motivo.', true); return; }
         const b = e.currentTarget; b.classList.add('carregando');
         setTimeout(() => {
-          const t = K.fecharTroca(estado, maq, r, v, dt, { vendedor: $('#t-vend', c).value, aprovacao: acima ? { por: aprov, motivo: mot, excesso: v - r.teto, data: hojeISO() } : null, origem: av.local || 'Troca registrada',
+          const t = K.fecharTroca(estado, maq, r, v, dt, { vendedor: $('#t-vend', c).value, negociacao: av.nova || null, aprovacao: acima ? { por: aprov, motivo: mot, excesso: v - r.teto, data: hojeISO() } : null, origem: av.local || 'Troca registrada',
             manutencoes: av.declarado ? [{ servico: av.declarado, horas: av.horas, comNota: av.verif.notas }] : [], fotos: av.fotos.filter(Boolean), verif: { ...av.verif } });
           const id = t.id;
           A.trocas.push({ ...t }); salvar(); cacheLimpa();
@@ -683,7 +695,8 @@
       <p class="ajuda">Colunas (com ou sem cabeçalho, nesta ordem se não houver): <b>categoria; fabricante; modelo; ano; horas; estado (1 a 5); valor pago na troca; valor vendido; dias no pátio; Fipe (opcional); data da troca; data da venda</b>. Valores podem vir como "R$ 210.000,00". Com as datas, o teste usa só as vendas anteriores a cada troca.</p>
       <div class="campo" style="margin-top:12px"><label for="cola">Trocas</label><textarea class="cola" id="cola" placeholder="Categoria;Fabricante;Modelo;Ano;Horas;Estado;Valor pago;Valor vendido;Dias;Fipe;Data da troca;Data da venda">${esc(tc.texto)}</textarea></div>
       <div class="acoes"><button class="btn btn-ouro" type="button" id="conferir">Conferir planilha</button><label class="btn btn-linha" style="cursor:pointer">Abrir arquivo CSV<input type="file" accept=".csv,.txt,text/csv" id="arquivo" class="sr"></label><button class="btn btn-linha" type="button" id="modelo">Baixar planilha modelo</button></div>
-      <div id="previa"></div></section><div id="revelacao"></div>`;
+      <div id="previa"></div></section>${blocoSync()}<div id="revelacao"></div>`;
+    ligarBotoesSync(corpo);
     $('#cola').oninput = (e) => { tc.texto = e.target.value; tc.previa = null; $('#previa').innerHTML = ''; };
     $('#modelo').onclick = () => baixarCSV('anshur-modelo-trocas.csv', [['Categoria', 'Fabricante', 'Modelo', 'Ano', 'Horas', 'Estado (1 a 5)', 'Valor pago na troca', 'Valor vendido', 'Dias no pátio', 'Fipe (opcional)', 'Data da troca', 'Data da venda'], ['Trator', 'Massey Ferguson', 'MF 4709', '2019', '5200', '3', 'R$ 210.000,00', 'R$ 265.000,00', '48', '', '10/03/2025', '27/04/2025']]);
     $('#arquivo').onchange = (e) => { const f = e.target.files[0]; if (!f) return; const rd = new FileReader(); rd.onload = () => { tc.texto = String(rd.result); $('#cola').value = tc.texto; conferir(); }; rd.onerror = () => toast('Não foi possível ler o arquivo.', true); rd.readAsText(f, 'utf-8'); };
@@ -774,6 +787,16 @@
       const url = new URL('passaporte.html?id=' + b.dataset.copiar, location.href).href;
       try { await navigator.clipboard.writeText(url); toast('Link do passaporte copiado.'); } catch (e) { toast('Não foi possível copiar. Link: ' + url, true); }
     });
+  }
+
+  // histórico de oficina por modelo: defeitos em garantia e quanto o preparo passou do previsto nas trocas
+  function historicoModelo(modelo) {
+    const gar = (A.garantias || []).filter((g) => g.modelo === modelo);
+    const grupos = {}; gar.forEach((g) => { const x = (grupos[g.servico] = grupos[g.servico] || { servico: g.servico, n: 0, soma: 0 }); x.n++; x.soma += g.valor; });
+    const defeitos = Object.values(grupos).map((d) => ({ ...d, media: d.soma / d.n })).sort((a, b) => b.n - a.n || b.media - a.media);
+    const trocas = A.trocas.filter((t) => t.modelo === modelo && t.preparoEst);
+    const reserva = trocas.length ? Math.round(trocas.reduce((s, t) => s + Math.max(0, t.preparo - t.preparoEst), 0) / trocas.length / 100) * 100 : 0;
+    return { n: gar.length + trocas.length, defeitos, trocas: trocas.length, reserva };
   }
 
   // ---------- VENDEDORES ----------
@@ -870,8 +893,8 @@
         <div class="kpi k-salvia"><span class="rot">${ICO.barras}Juros totais do período</span><span class="val">${conta(lista.reduce((s, x) => s + x.j.total, 0), 'mil')}</span><span class="exp">Taxa de ${pct(lista[0].f.taxaMes)} ao mês após ${lista[0].f.carencia} dias de carência</span></div>
       </div>
       <section class="painel"><div class="painel-cab"><h2>${ICO.etiqueta}Máquinas financiadas</h2><p>Ordenado pelo juro pago depois da venda</p></div>
-        <div class="tabela-wrap"><table class="tabela"><thead><tr><th>Máquina</th><th class="n">Valor</th><th>Entrada</th><th>Venda</th><th>Quitação</th><th class="n">Juros após venda</th><th>Situação</th></tr></thead><tbody>
-        ${lista.map(({ f, j }) => { const sit = !f.venda ? (j.emCarencia ? ['baixo', 'Em carência'] : ['medio', 'No pátio, pagando juros']) : !f.quitacao ? ['alto', 'Vendida, quitar já'] : j.aposVenda > 0 ? ['medio', 'Quitada com atraso'] : ['baixo', 'Quitada no prazo']; return `<tr><td class="maq"><span class="maq-ico">${ICO[f.tipo]}</span><span><b>${esc(f.marca + ' ' + f.modelo)}</b><span>${f.chassi} · ${esc(f.banco)}</span></span></td><td class="n">${mil(f.valor)}</td><td>${data(f.entrada)}</td><td>${data(f.venda)}</td><td>${data(f.quitacao)}</td><td class="n ${j.aposVenda > 0 ? 'neg forte' : ''}">${real(j.aposVenda)}</td><td><span class="risco ${sit[0]}">${sit[1]}</span></td></tr>`; }).join('')}</tbody></table></div>
+        <div class="tabela-wrap"><table class="tabela"><thead><tr><th>Máquina</th><th class="n">Valor</th><th>Entrada</th><th>Venda</th><th>Quitação</th><th class="n">Juros até hoje</th><th class="n">Por dia</th><th class="n">Juros após venda</th><th>Situação</th></tr></thead><tbody>
+        ${lista.map(({ f, j }) => { const sit = !f.venda ? (j.emCarencia ? ['baixo', 'Em carência'] : ['medio', 'No pátio, pagando juros']) : !f.quitacao ? ['alto', 'Vendida, quitar já'] : j.aposVenda > 0 ? ['medio', 'Quitada com atraso'] : ['baixo', 'Quitada no prazo']; return `<tr><td class="maq"><span class="maq-ico">${ICO[f.tipo]}</span><span><b>${esc(f.marca + ' ' + f.modelo)}</b><span>${f.chassi} · ${esc(f.banco)}</span></span></td><td class="n">${mil(f.valor)}</td><td>${data(f.entrada)}</td><td>${data(f.venda)}</td><td>${data(f.quitacao)}</td><td class="n">${real(j.total)}</td><td class="n ${!f.quitacao && !j.emCarencia ? 'neg forte' : ''}">${!f.quitacao && !j.emCarencia ? real(f.valor * f.taxaMes / 30) : '—'}</td><td class="n ${j.aposVenda > 0 ? 'neg forte' : ''}">${real(j.aposVenda)}</td><td><span class="risco ${sit[0]}">${sit[1]}</span></td></tr>`; }).join('')}</tbody></table></div>
         <p class="nota-rodape">Na implantação, o Anshur cruza o extrato do floor plan com as notas de venda e avisa no mesmo dia em que uma máquina financiada é vendida.</p></section>`;
     contar();
   }
@@ -930,6 +953,64 @@
       </article>`;
   }
 
+  // ---------- SINCRONIZAÇÃO AUTOMÁTICA COM A PASTA DO SISTEMA ----------
+  // O sistema da revenda (DMS) exporta um relatório de trocas para uma pasta todo dia; o Anshur lê o arquivo
+  // mais novo sempre que abre. Funciona no Chrome e no Edge do computador (File System Access API).
+  const idb = (modo, fn) => new Promise((ok, erro) => {
+    const req = indexedDB.open('anshur', 1);
+    req.onupgradeneeded = () => req.result.createObjectStore('kv');
+    req.onerror = () => erro(req.error);
+    req.onsuccess = () => { const tx = req.result.transaction('kv', modo), st = tx.objectStore('kv'); const r = fn(st); tx.oncomplete = () => ok(r && r.result); tx.onerror = () => erro(tx.error); };
+  });
+  const temPasta = () => 'showDirectoryPicker' in window;
+  async function sincronizar(pedir) {
+    if (!OP || !temPasta()) return 'indisponivel';
+    let h; try { h = await idb('readonly', (st) => st.get('pasta')); } catch (e) { return 'erro'; }
+    if (!h) return 'sem-pasta';
+    let perm = await h.queryPermission({ mode: 'read' });
+    if (perm !== 'granted' && pedir) perm = await h.requestPermission({ mode: 'read' });
+    if (perm !== 'granted') return 'permissao';
+    let maisNovo = null;
+    for await (const ent of h.values()) {
+      if (ent.kind !== 'file' || !/\.(csv|txt)$/i.test(ent.name)) continue;
+      const f = await ent.getFile(); if (!maisNovo || f.lastModified > maisNovo.lastModified) maisNovo = f;
+    }
+    if (!maisNovo) return 'vazia';
+    const lido = window.IMPORTAR.ler(await maisNovo.text(), { refDe: M.refDe, anoMax: anoAtual });
+    const chave = (t) => [t.tipo, t.modelo, t.ano, t.horas, t.pago, t.vendido].join('|');
+    const ja = new Set((estado.historico || []).map(chave));
+    const novas = lido.aceitas.filter((t) => t.entrada && t.saida && !ja.has(chave(t))).map((t, i) => ({ ...t, id: 'H' + ((estado.historico || []).length + i + 1), ficha: { motor: t.cond / 20, transmissao: t.cond / 20, hidraulico: t.cond / 20, pneus: t.cond / 20, cabine: t.cond / 20, lataria: t.cond / 20 }, manutencoes: [] }));
+    estado.historico = (estado.historico || []).concat(novas);
+    estado.ultimaSync = { arquivo: maisNovo.name, data: new Date().toISOString(), novas: novas.length, rejeitadas: lido.rejeitadas.length };
+    salvar();
+    return novas.length ? 'novas' : 'em-dia';
+  }
+  async function ligarPasta() {
+    try {
+      const h = await window.showDirectoryPicker({ mode: 'read' });
+      await idb('readwrite', (st) => st.put(h, 'pasta'));
+      const r = await sincronizar(true);
+      toast(r === 'novas' ? `Pasta ligada: ${estado.ultimaSync.novas} trocas novas importadas.` : r === 'vazia' ? 'Pasta ligada, mas ainda não há CSV nela.' : 'Pasta ligada.');
+      if (r === 'novas') setTimeout(() => location.reload(), 900); else rota();
+    } catch (e) { if (e.name !== 'AbortError') toast('Não foi possível ligar a pasta.', true); }
+  }
+  function blocoSync() {
+    if (!OP) return `<section class="painel bloco"><h2>${ICO.linha}Atualização automática com o seu sistema</h2>
+      <p class="sub" style="margin:6px 0 12px">No ambiente com os dados da sua revenda, o Anshur pode ler sozinho a planilha que o seu sistema exporta todo dia numa pasta do computador. Ninguém precisa subir arquivo.</p>
+      <button class="btn btn-linha" type="button" id="ir-op">Usar com os dados da minha revenda</button></section>`;
+    const u = estado.ultimaSync;
+    return `<section class="painel bloco"><h2>${ICO.linha}Atualização automática com o seu sistema</h2>
+      <p class="sub" style="margin:6px 0 12px">Programe o seu sistema (DMS) para exportar o relatório de trocas todo dia numa pasta. O Anshur lê o arquivo mais novo dessa pasta sempre que é aberto e importa só as trocas novas. Funciona no Chrome e no Edge do computador; nada sai do computador.</p>
+      ${u ? `<p class="conta">Última sincronização: ${new Date(u.data).toLocaleString('pt-BR')} · arquivo ${esc(u.arquivo)} · ${u.novas} trocas novas${u.rejeitadas ? ` · ${u.rejeitadas} linhas com erro` : ''}.</p>` : ''}
+      ${temPasta() ? '<div class="acoes"><button class="btn btn-ouro" type="button" id="ligar-pasta">Escolher pasta de exportação</button><button class="btn btn-linha" type="button" id="sinc-agora">Sincronizar agora</button></div>' : '<p class="conta">Este navegador não permite ler pastas. Use o Chrome ou o Edge no computador.</p>'}</section>`;
+  }
+  function ligarBotoesSync(raiz) {
+    const a = $('#ligar-pasta', raiz), b = $('#sinc-agora', raiz), c = $('#ir-op', raiz);
+    if (a) a.onclick = ligarPasta;
+    if (b) b.onclick = async () => { const r = await sincronizar(true); toast({ novas: `${estado.ultimaSync.novas} trocas novas importadas.`, 'em-dia': 'Tudo em dia: nenhuma troca nova.', 'sem-pasta': 'Escolha a pasta primeiro.', vazia: 'A pasta não tem CSV.', permissao: 'O navegador não liberou a leitura da pasta.' }[r] || 'Não foi possível sincronizar.', !['novas', 'em-dia'].includes(r)); if (r === 'novas') setTimeout(() => location.reload(), 900); };
+    if (c) c.onclick = () => { K.repo.trocarAmbiente('op'); location.hash = '#teste'; location.reload(); };
+  }
+
   // ---------- rotas com transição ----------
   const TELAS = { visao: telaVisao, avaliar: telaAvaliar, patio: telaPatio, trocas: telaTrocas, teste: telaTeste, passaportes: telaPassaportes, vendedores: telaVendedores, garantias: telaGarantias, financiamento: telaFinanciamento, relatorio: telaRelatorio };
   function moverIndicador() {
@@ -951,6 +1032,7 @@
     setTimeout(() => { desenhar(); window.scrollTo(0, 0); }, 120);
   }
   $('#sino').onclick = abrirAlertas;
+  if (OP) sincronizar(false).then((r) => { if (r === 'novas') { toast(`Sincronizado com o seu sistema: ${estado.ultimaSync.novas} trocas novas.`); setTimeout(() => location.reload(), 1200); } else if (r === 'permissao') toast('Toque em Teste às cegas › Importar planilha › Sincronizar agora para atualizar com o seu sistema.'); }).catch(() => {});
   const nAl = listaAlertas().length; if (nAl) { $('#sino-n').hidden = false; $('#sino-n').textContent = nAl; }
   window.addEventListener('hashchange', rota);
   window.addEventListener('resize', moverIndicador);

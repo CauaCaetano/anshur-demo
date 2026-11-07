@@ -83,14 +83,14 @@
   // ---- garantias: serviços feitos na oficina em garantia e o que o fabricante pagou ----
   const GARANTIAS = [];
   const SERV_GAR = ['Troca de bomba hidráulica', 'Reparo do câmbio', 'Sensor do motor', 'Módulo eletrônico', 'Reparo do picador', 'Troca de turbina', 'Vazamento no cabeçote', 'Bicos e barra do pulverizador', 'Atuador do piloto automático', 'Embreagem da tomada de força'];
-  const MARCAS_GAR = ['John Deere', 'Case IH', 'New Holland', 'Massey Ferguson', 'Valtra', 'Jacto', 'Stara'];
   for (let i = 0; i < 26; i++) {
     const valor = Math.round(entre(4500, 68000) / 100) * 100;
     const dias = Math.round(entre(5, 330));
     const s = rnd();
     const status = dias < 45 ? 'aguardando' : s < 0.55 ? 'pago' : s < 0.8 ? 'parcial' : s < 0.9 ? 'negado' : 'aguardando';
     const pago = status === 'pago' ? valor : status === 'parcial' ? Math.round(valor * entre(0.45, 0.85) / 100) * 100 : 0;
-    GARANTIAS.push({ os: 'OS-' + (4210 + i * 7), data: diasAtras(dias), marca: escolhe(MARCAS_GAR), servico: escolhe(SERV_GAR), cliente: 'Faz. ' + escolhe(FAZENDAS), valor, pago, status, motivo: status === 'negado' ? escolhe(['Prazo de envio vencido', 'Falta foto da peça', 'Horímetro sem registro']) : status === 'parcial' ? escolhe(['Mão de obra paga abaixo da tabela', 'Peça glosada', 'Deslocamento não pago']) : '' });
+    const mg = escolhe(MODELOS.filter((x) => x.tipo !== 'plantadeira'));
+    GARANTIAS.push({ os: 'OS-' + (4210 + i * 7), data: diasAtras(dias), marca: mg.marca, modelo: mg.modelo, servico: escolhe(SERV_GAR), cliente: 'Faz. ' + escolhe(FAZENDAS), valor, pago, status, motivo: status === 'negado' ? escolhe(['Prazo de envio vencido', 'Falta foto da peça', 'Horímetro sem registro']) : status === 'parcial' ? escolhe(['Mão de obra paga abaixo da tabela', 'Peça glosada', 'Deslocamento não pago']) : '' });
   }
 
   // ---- estoque novo financiado (floor plan): juros correm até a revenda quitar com o banco ----
