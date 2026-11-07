@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Anshur · avaliação de usados</title>
+<meta name="description" content="Anshur: avaliação do usado na troca, passaporte da máquina e controle do pátio para revendas de máquinas agrícolas. Demonstração com dados fictícios.">
+<meta name="theme-color" content="#1d2220">
+<link rel="icon" href="icone.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="estilo.css?v=1">
+</head>
+<body>
+<a class="pular" href="#tela">Ir para o conteúdo</a>
+<header class="topo">
+  <div class="marca">
+    <span class="palavra">ANSHUR</span>
+    <span class="revenda" id="revenda"></span>
+  </div>
+  <nav class="abas" aria-label="Seções">
+    <a href="#avaliar" data-aba="avaliar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h16M6 15l4-4 3 3 5-6"/></svg>Avaliar</a>
+    <a href="#patio" data-aba="patio"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20V9l9-5 9 5v11M7 20v-6h10v6"/></svg>Pátio</a>
+    <a href="#historico" data-aba="historico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5zM9 9h6M9 13h6M9 17h3"/></svg>Trocas</a>
+    <a href="#teste" data-aba="teste"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M5 8l7-5 7 5M4 14h6l-3 5zM14 14h6l-3 5z"/></svg>Teste às cegas</a>
+  </nav>
+</header>
+<p class="aviso" id="aviso"></p>
+<main id="tela" tabindex="-1"></main>
+<script src="dados.js?v=1"></script>
+<script src="comum.js?v=1"></script>
+<script src="motor.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>

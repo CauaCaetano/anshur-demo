@@ -1,0 +1,81 @@
+// Dados FICTÍCIOS da demonstração: uma revenda inventada, com trocas inventadas.
+// Gerados com semente fixa para que a demonstração mostre sempre os mesmos números.
+(function () {
+  let s = 20261107;
+  const rnd = () => ((s = (s * 1664525 + 1013904223) % 4294967296) / 4294967296);
+  const entre = (a, b) => a + (b - a) * rnd();
+  const escolhe = (l) => l[Math.floor(rnd() * l.length)];
+  const normal = () => { let u = 0; for (let i = 0; i < 6; i++) u += rnd(); return (u - 3) / 1.2; };
+
+  // base = referência do modelo seminovo (1 ano); na versão real vem da Tabela Fipe de máquinas.
+  const MODELOS = [
+    { tipo: 'trator', marca: 'John Deere', modelo: '6125J', base: 610000, hAno: 750 },
+    { tipo: 'trator', marca: 'Massey Ferguson', modelo: 'MF 4709', base: 425000, hAno: 700 },
+    { tipo: 'trator', marca: 'New Holland', modelo: 'T7.245', base: 960000, hAno: 900 },
+    { tipo: 'trator', marca: 'Valtra', modelo: 'A134', base: 470000, hAno: 700 },
+    { tipo: 'trator', marca: 'Case IH', modelo: 'Farmall 130A', base: 515000, hAno: 720 },
+    { tipo: 'colhedora', marca: 'John Deere', modelo: 'CH570', base: 2850000, hAno: 2600 },
+    { tipo: 'colhedora', marca: 'Case IH', modelo: 'Austoft 8810', base: 2950000, hAno: 2700 },
+    { tipo: 'pulverizador', marca: 'Jacto', modelo: 'Uniport 3030', base: 1380000, hAno: 850 },
+    { tipo: 'pulverizador', marca: 'Stara', modelo: 'Imperador 3.0', base: 1290000, hAno: 800 },
+    { tipo: 'plantadeira', marca: 'Jumil', modelo: 'JM3090 Exacta', base: 410000, hAno: 260 },
+    { tipo: 'plantadeira', marca: 'Stara', modelo: 'Absoluta 34', base: 640000, hAno: 280 }
+  ];
+
+  const CIDADES = ['Orlândia', 'Sertãozinho', 'Morro Agudo', 'Guaíra', 'Bebedouro', 'Jaboticabal', 'Ituverava', 'São Joaquim da Barra', 'Batatais', 'Franca', 'Nuporanga', 'Pontal'];
+  const FAZENDAS = ['Santa Helena', 'Boa Vista', 'São Bento', 'Três Irmãos', 'Água Limpa', 'Santa Rita', 'Bela Aliança', 'Recreio', 'São José', 'Palmital', 'Cachoeira', 'Monte Alegre', 'Primavera', 'Santa Luzia'];
+  const VENDEDORES = ['Rodrigo', 'Marcos', 'Tiago', 'Fernanda'];
+  const SERVICOS = ['Troca de óleo e filtros', 'Revisão de 500 h', 'Troca de embreagem', 'Reforma de bomba injetora', 'Troca de pneus traseiros', 'Revisão do sistema hidráulico', 'Troca de correias', 'Revisão do ar-condicionado', 'Reforma do picador', 'Troca de facas do corte de base', 'Calibração de bicos', 'Troca de discos de corte'];
+
+  // condição: nota de 0 a 100 tirada da ficha de inspeção
+  function ficha(cond) {
+    const nota = (peso) => Math.max(0, Math.min(5, Math.round((cond / 20) + normal() * 0.8 * peso)));
+    return { motor: nota(1), transmissao: nota(1), hidraulico: nota(1), pneus: nota(1.3), cabine: nota(1.2), lataria: nota(1.4) };
+  }
+
+  const hoje = new Date();
+  const diasAtras = (d) => { const x = new Date(hoje); x.setDate(x.getDate() - Math.round(d)); return x.toISOString().slice(0, 10); };
+
+  function valorMercado(m, idade, horas, cond) {
+    return m.base * Math.pow(0.9, idade - 1) * (1 - Math.min(0.45, (horas / (m.hAno * 12)) * 0.35)) * (0.72 + 0.4 * cond / 100);
+  }
+
+  const TROCAS = [];
+  let n = 1;
+  function nova(vendida) {
+    const m = escolhe(MODELOS);
+    const idade = Math.round(entre(2, 11));
+    const ano = hoje.getFullYear() - idade;
+    const horas = Math.round(m.hAno * idade * entre(0.65, 1.35) / 10) * 10;
+    const cond = Math.round(Math.max(30, Math.min(97, 72 + normal() * 13)));
+    const mercado = valorMercado(m, idade, horas, cond) * (1 + normal() * 0.05);
+    // ~1 em cada 5 trocas a revenda pagou caro demais (avaliação no "olho")
+    const caro = rnd() < 0.22;
+    const fator = caro ? entre(0.93, 1.03) : entre(0.78, 0.88);
+    const pago = Math.round(mercado * fator / 1000) * 1000;
+    const preparo = Math.round((100 - cond) * m.base * 0.0004 / 100) * 100;
+    const diasPatio = Math.round((m.tipo === 'colhedora' ? 70 : 35) + entre(0, 70) + (caro ? entre(20, 90) : 0));
+    const entrada = vendida ? entre(diasPatio + 20, 1000) : entre(8, 160);
+    const vendido = vendida ? Math.round(mercado * entre(0.97, 1.03) / 1000) * 1000 : null;
+    const idTroca = 'T' + String(n++).padStart(3, '0');
+    const mans = [];
+    const qtd = Math.round(entre(1, 4));
+    for (let i = 0; i < qtd; i++) mans.push({ servico: escolhe(SERVICOS), horas: Math.round(horas * entre(0.3, 0.98) / 10) * 10, comNota: rnd() < 0.6 });
+    TROCAS.push({
+      id: idTroca, tipo: m.tipo, marca: m.marca, modelo: m.modelo, ano, horas, cond, ficha: ficha(cond),
+      pago, preparo, vendido, entrada: diasAtras(entrada), saida: vendida ? diasAtras(entrada - diasPatio) : null,
+      diasPatio: vendida ? diasPatio : null, anuncio: vendida ? null : Math.round(mercado * 1.06 / 1000) * 1000,
+      vendedor: escolhe(VENDEDORES), origem: 'Faz. ' + escolhe(FAZENDAS) + ', ' + escolhe(CIDADES),
+      idAgro: rnd() < 0.55, manutencoes: mans.sort((a, b) => a.horas - b.horas)
+    });
+  }
+  for (let i = 0; i < 52; i++) nova(true);
+  for (let i = 0; i < 9; i++) nova(false);
+
+  window.ANSHUR = {
+    revenda: { nome: 'Mogiana Máquinas', cidade: 'Orlândia, SP', aviso: 'Revenda e dados fictícios, só para demonstração' },
+    modelos: MODELOS,
+    trocas: TROCAS,
+    margemAlvo: 0.14
+  };
+})();

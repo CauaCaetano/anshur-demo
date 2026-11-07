@@ -1,0 +1,10 @@
+{
+  "name": "Anshur",
+  "short_name": "Anshur",
+  "description": "Avaliação do usado na troca, passaporte da máquina e pátio para revendas de máquinas agrícolas.",
+  "start_url": "./#avaliar",
+  "display": "standalone",
+  "background_color": "#e9ece8",
+  "theme_color": "#1d2220",
+  "icons": [{ "src": "icone.svg", "sizes": "any", "type": "image/svg+xml" }]
+}
