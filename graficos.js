@@ -12,7 +12,8 @@
     const grade = [0, 0.5, 1].map((f) => { const v = min + (max - min) * f; return `<line x1="${pe}" x2="${L - pd}" y1="${y(v)}" y2="${y(v)}" class="g-grade"/><text x="${pe - 6}" y="${y(v) + 4}" class="g-eixo" text-anchor="end">${esc(formato(v)).replace('R$ ', '')}</text>`; }).join('');
     return `<svg viewBox="0 0 ${L} ${H}" class="grafico" role="img" aria-label="${esc(pontos.map((p) => p.r + ': ' + formato(p.v)).join('; '))}">
       ${grade}<path d="${area}" class="g-area"/><path d="${d}" class="g-linha" pathLength="1"/>
-      ${pontos.map((p, i) => `<circle cx="${x(i)}" cy="${y(p.v)}" r="4" class="g-ponto" style="animation-delay:${0.5 + i * 0.06}s"><title>${esc(p.r)}: ${esc(formato(p.v))}</title></circle><text x="${x(i)}" y="${H - 8}" class="g-eixo" text-anchor="middle">${esc(p.r)}</text>`).join('')}
+      ${pontos.map((p, i) => `<circle cx="${x(i)}" cy="${y(p.v)}" r="${i === pontos.length - 1 ? 6 : 4}" class="g-ponto${i === pontos.length - 1 ? ' g-ultimo' : ''}" style="animation-delay:${0.5 + i * 0.06}s"><title>${esc(p.r)}: ${esc(formato(p.v))}</title></circle><text x="${x(i)}" y="${H - 8}" class="g-eixo" text-anchor="middle">${esc(p.r)}</text>`).join('')}
+      ${pontos.length ? (() => { const i = pontos.length - 1, tx = esc(formato(pontos[i].v)), w = tx.length * 7.4 + 18, cx = Math.min(x(i), L - pd - w / 2), cy = Math.max(ps + 2, y(pontos[i].v) - 34); return `<g class="g-balao"><rect x="${cx - w / 2}" y="${cy}" width="${w}" height="24" rx="6"/><text x="${cx}" y="${cy + 16.5}" text-anchor="middle">${tx}</text></g>`; })() : ''}
     </svg>`;
   }
 
@@ -39,5 +40,18 @@
       <div class="hb"><span class="hb-r">${esc(i.r)}</span><span class="hb-trilho"><i class="${i.cls || ''}" style="width:${(Math.abs(i.v) / max * 100).toFixed(1)}%;animation-delay:${0.08 * k}s"></i></span><b>${esc(formato(i.v))}</b>${i.extra ? `<small>${esc(i.extra)}</small>` : ''}</div>`).join('')}</div>`;
   }
 
-  window.GRAFICOS = { linha, barrasDuplas, horizontais };
+  // rosca: [{r, v, cor}] com total no meio
+  function rosca(itens, { formato = mil, rotuloTotal = 'total' } = {}) {
+    const total = itens.reduce((s, i) => s + i.v, 0) || 1, R = 70, r = 46, C = 2 * Math.PI * ((R + r) / 2), esp = R - r;
+    let acum = 0;
+    const arcos = itens.map((i, k) => {
+      const frac = i.v / total, comp = frac * C, d = `<circle cx="90" cy="90" r="${(R + r) / 2}" fill="none" stroke="${i.cor}" stroke-width="${esp}" stroke-dasharray="${comp} ${C - comp}" stroke-dashoffset="${-acum}" transform="rotate(-90 90 90)" class="g-arco" style="animation-delay:${0.1 + k * 0.12}s"><title>${esc(i.r)}: ${esc(formato(i.v))}</title></circle>`;
+      acum += comp; return d;
+    }).join('');
+    return `<div class="rosca"><svg viewBox="0 0 180 180" class="rosca-svg" role="img" aria-label="${esc(itens.map((i) => i.r + ': ' + formato(i.v)).join('; '))}">${arcos}
+      <text x="90" y="88" text-anchor="middle" class="rosca-total">${esc(formato(total))}</text><text x="90" y="108" text-anchor="middle" class="rosca-rot">${esc(rotuloTotal)}</text></svg>
+      <ul class="rosca-leg">${itens.map((i) => `<li><i style="background:${i.cor}"></i><span>${esc(i.r)}</span><b>${pct(i.v / total, 0)}</b><b>${esc(formato(i.v))}</b></li>`).join('')}</ul></div>`;
+  }
+
+  window.GRAFICOS = { linha, barrasDuplas, horizontais, rosca };
 })();

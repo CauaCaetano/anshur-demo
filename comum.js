@@ -28,6 +28,7 @@
   if (ambiente === 'op') {
     A.revenda = { nome: estado.nomeRevenda || 'Minha revenda', cidade: estado.cidadeRevenda || 'dados reais', aviso: 'Dados da sua revenda, guardados só neste navegador' };
     A.trocas = (estado.historico || []).map((t) => ({ ...t })).concat(estado.fechadas.map((t) => ({ ...t })));
+    A.garantias = estado.garantias || []; A.financiadas = estado.financiadas || []; // nada fictício no ambiente real
     // modelos que vieram na planilha e não estão no catálogo entram com a referência (Fipe) informada
     (estado.historico || []).forEach((t) => {
       if (!A.modelos.some((m) => m.modelo === t.modelo) && t.referencia) A.modelos.push({ tipo: t.tipo, marca: t.marca || '—', modelo: t.modelo, base: t.referencia, hAno: { trator: 750, colhedora: 2600, pulverizador: 820, plantadeira: 270 }[t.tipo] || 800, importado: true });

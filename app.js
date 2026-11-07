@@ -6,10 +6,10 @@
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 
   // ---------- cabeçalho ----------
-  const marcaHTML = `${K.logo(30)}<span class="nome">ANSHUR</span>`;
-  $('#marca').innerHTML = marcaHTML; $('#marca-movel').innerHTML = K.logo(28);
-  $('#revenda').textContent = A.revenda.nome + ' · ' + A.revenda.cidade;
-  $('#refdata').textContent = 'Posição de ' + new Date().toLocaleDateString('pt-BR');
+  $('#marca').innerHTML = '<img class="logo-img" src="logo/anshur-logo.png?v=5" alt="Anshur" width="216" height="54">';
+  $('#marca-movel').innerHTML = '<img class="logo-img" src="logo/anshur-logo.png?v=5" alt="Anshur" width="132" height="33">';
+  $('#revenda').innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20V9l9-5 9 5v11M7 20v-6h10v6"/></svg>${esc(A.revenda.nome)}`;
+  $('#refdata').innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v14H4zM4 10h16M8 3v4M16 3v4"/></svg>${new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).replace('.', '')}`;
   const btnPerfil = $('#perfil'), menuPerfil = $('#perfil-menu');
   btnPerfil.onclick = (e) => { e.stopPropagation(); const ab = menuPerfil.hidden; menuPerfil.hidden = !ab; btnPerfil.setAttribute('aria-expanded', ab); };
   document.addEventListener('click', (e) => { if (!menuPerfil.hidden && !menuPerfil.contains(e.target)) { menuPerfil.hidden = true; btnPerfil.setAttribute('aria-expanded', 'false'); } });
@@ -135,6 +135,28 @@
   }
 
   // ---------- VISÃO GERAL ----------
+  // ícones de traço (mesma espessura em todo o sistema)
+  const ic = (d, cls = 'ico') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
+  const ICO = {
+    moedas: ic('<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/>'),
+    pct: ic('<circle cx="12" cy="12" r="9"/><path d="M8.5 15.5l7-7"/><circle cx="9" cy="9" r="1.2"/><circle cx="15" cy="15" r="1.2"/>'),
+    barras: ic('<path d="M4 20h16M7 16v-5M11 16V7M15 16v-7M19 16V5"/>'),
+    alerta: ic('<path d="M12 3 2 20h20L12 3zM12 10v4M12 17v.5"/>'),
+    linha: ic('<path d="M3 17l6-6 4 4 8-8M15 7h6v6"/>'),
+    camadas: ic('<path d="M12 3 2 8l10 5 10-5-10-5zM2 13l10 5 10-5"/>'),
+    alvo: ic('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/>'),
+    etiqueta: ic('<path d="M3 12V4h8l10 10-8 8L3 12z"/><circle cx="7.5" cy="7.5" r="1.4"/>'),
+    alto: ic('<circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16v.5"/>'),
+    medio: ic('<path d="M12 3 2 20h20L12 3zM12 10v4M12 17v.5"/>'),
+    baixo: ic('<circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9.5"/>'),
+    trator: ic('<path d="M5 17V9h7l2 4h4v4"/><path d="M8 9V6"/><circle cx="8" cy="17" r="3"/><circle cx="18" cy="18" r="2"/>', 'ico maq-svg'),
+    colhedora: ic('<path d="M2 16h14V9H9l-2 3H2z"/><path d="M16 11l5-5M19 6h3"/><circle cx="6" cy="17.5" r="2.5"/><circle cx="13" cy="17.5" r="2.5"/>', 'ico maq-svg'),
+    pulverizador: ic('<path d="M4 15V8h6l2 3h6v4z"/><path d="M1 13h22M3 13v2M21 13v2"/><circle cx="7" cy="17" r="2.5"/><circle cx="16" cy="17" r="2.5"/>', 'ico maq-svg'),
+    plantadeira: ic('<path d="M2 9h20M3 9l2-3h14l2 3M5 9v6M10 9v6M15 9v6M20 9v6"/><circle cx="5" cy="17" r="1.6"/><circle cx="10" cy="17" r="1.6"/><circle cx="15" cy="17" r="1.6"/><circle cx="20" cy="17" r="1.6"/>', 'ico maq-svg')
+  };
+  // risco em 3 níveis, com cor + ícone + texto
+  const nivelRisco = (i) => (i.dias > 90 || i.margem < 0.06 ? { nome: 'Alto', cls: 'alto', ico: ICO.alto } : i.dias > 60 || i.margem < 0.10 ? { nome: 'Médio', cls: 'medio', ico: ICO.medio } : { nome: 'Baixo', cls: 'baixo', ico: ICO.baixo });
+
   function semDados() {
     tela.innerHTML = `<div class="titulo"><div><h1>Bem-vindo ao Anshur</h1><p>Este é o ambiente com os dados reais da sua revenda. Ele começa vazio e não se mistura com a demonstração.</p></div></div>
       <section class="painel"><h2>Comece pelo histórico de trocas</h2><p class="sub" style="margin:6px 0 14px">Importe de 10 a 200 trocas já vendidas (planilha do Excel ou CSV do seu sistema). O Anshur aprende com elas, mede o próprio erro e passa a avaliar as próximas trocas. Os dados ficam só neste navegador.</p>
@@ -177,31 +199,34 @@
     const idade = faixas.map((f) => { const g = itens.filter((i) => i.faixa === f); return { r: nomesF[f], v: g.reduce((s, i) => s + i.t.pago, 0), cls: f, extra: `${g.length} ${g.length === 1 ? 'máquina' : 'máquinas'}` }; });
     const agir = itens.slice().sort((a, b) => b.risco - a.risco).slice(0, 6);
 
+    const coresIdade = { normal: '#3E6B57', atencao: '#71877B', alerta: '#E2D6BF', critico: '#C1A36A' };
+    const nomesRosca = { normal: 'Até 30 dias', atencao: '31 a 60 dias', alerta: '61 a 90 dias', critico: 'Acima de 90 dias' };
     tela.innerHTML = `
-      <div class="titulo"><div><h1>Visão geral</h1><p>Inteligência financeira da sua operação de usados.</p></div>
-        <div class="acoes"><a class="btn btn-ouro" href="#avaliar">Nova avaliação</a><a class="btn btn-linha" href="#patio">Ver pátio completo</a><button class="btn btn-linha" type="button" id="premissas-v">Premissas</button></div></div>
+      <div class="titulo"><div><h1>Visão geral da revenda</h1><p>Onde está o seu dinheiro e o que fazer hoje.</p></div>
+        <div class="acoes"><a class="btn btn-linha" href="#patio">Ver pátio completo</a><button class="btn btn-linha" type="button" id="premissas-v">Premissas</button></div></div>
       <div class="kpis escalonado">
-        <div class="kpi"><span class="rot">Capital imobilizado</span><span class="val">${conta(capital, 'mil')}</span><span class="exp">Valor pago nas ${itens.length} máquinas ainda não vendidas.</span></div>
-        <div class="kpi"><span class="rot">Margem média realizada</span><span class="val">${conta(margemReal, 'pct')}</span><span class="exp">Margem bruta das ${vendidas.length} trocas já vendidas, depois do preparo.</span></div>
-        <div class="kpi"><span class="rot">Resultado bruto do estoque</span><span class="val">${conta(resultadoEst, 'mil')}</span><span class="exp">Venda estimada menos custo total. Estimativa, não lucro garantido.</span></div>
-        <div class="kpi risco"><span class="rot">Estoque acima de 90 dias</span><span class="val">${velhos.length} · ${conta(capVelho, 'mil')}</span><span class="exp">${pct(capVelho / Math.max(1, capital), 0)} do capital imobilizado está nessas máquinas.</span></div>
+        <a class="kpi k-marfim" href="#patio"><span class="rot">${ICO.moedas}Capital imobilizado</span><span class="val">${conta(capital, 'mil')}</span><span class="exp">Pago nas ${itens.length} máquinas do pátio</span></a>
+        <a class="kpi k-salvia" href="#trocas"><span class="rot">${ICO.pct}Margem média realizada</span><span class="val">${conta(margemReal, 'pct')}</span><span class="exp">Nas ${vendidas.length} trocas vendidas</span></a>
+        <a class="kpi k-marfim" href="#trocas"><span class="rot">${ICO.barras}Resultado bruto do estoque</span><span class="val">${conta(resultadoEst, 'mil')}</span><span class="exp">Estimativa, não lucro garantido</span></a>
+        <a class="kpi k-risco" href="#patio" id="kpi-90"><span class="rot">${ICO.alerta}Acima de 90 dias</span><span class="val">${conta(velhos.length, 'int')} ${velhos.length === 1 ? 'máquina' : 'máquinas'}</span><span class="pilula">${mil(capVelho)}</span></a>
       </div>
       <p class="conta" style="margin:-4px 0 16px">Custo financeiro estimado do estoque: <b>${mil(custoCap)}</b> até hoje (${pct(K.cfg.jurosMes)} ao mês sobre ${K.cfg.baseJuros === 'total' ? 'valor pago + preparação' : 'o valor pago'}, proporcional aos dias de cada máquina). É custo de oportunidade, não prejuízo realizado. <button class="link" type="button" id="premissas-v2">Alterar premissa</button></p>
       <div class="grade-2">
-        <section class="painel"><div class="painel-cab"><h2>Capital imobilizado nos últimos 6 meses</h2><p>Valor pago nas máquinas em estoque no fim de cada mês</p></div>${G.linha(meses)}</section>
-        <section class="painel"><div class="painel-cab"><h2>Idade do estoque</h2><p>Capital por tempo de pátio</p></div>${G.horizontais(idade)}</section>
+        <section class="painel"><div class="painel-cab"><h2>${ICO.linha}Capital imobilizado nos últimos 6 meses</h2></div>${G.linha(meses)}</section>
+        <section class="painel"><div class="painel-cab"><h2>${ICO.camadas}Idade do estoque <small>(por valor)</small></h2></div>${G.rosca(idade.map((x) => ({ r: nomesRosca[x.cls], v: x.v, cor: coresIdade[x.cls] })))}</section>
       </div>
       <section class="painel bloco"><div class="painel-cab"><h2>Margem prevista x realizada</h2><p>Por mês de venda (nº de vendas)</p></div>
         ${ult.length ? G.barrasDuplas(ult, ['Prevista', 'Realizada'], { largura: innerWidth >= 960 ? 1100 : 560, altura: 200 }) : '<p class="vazio">Ainda não há vendas com previsão feita antes da troca.</p>'}
         <div class="legenda"><span><i style="background:#B9C2BC"></i>Prevista pelo Anshur na entrada</span><span><i style="background:var(--ouro)"></i>Realizada na venda</span></div>
       </section>
-      <section class="painel bloco"><div class="painel-cab"><h2>Onde você precisa agir</h2><p>Ordenado por risco financeiro, não só por dias</p></div>
-        <div class="tabela-wrap"><table class="tabela"><thead><tr><th>Máquina</th><th class="n">Dias</th><th class="n">Capital preso</th><th class="n">Margem estimada</th><th>Risco</th><th>Recomendação</th></tr></thead>
-        <tbody>${agir.map((i) => `<tr class="clicavel" tabindex="0" data-id="${i.t.id}"><td class="maq"><b>${esc(i.t.marca + ' ' + i.t.modelo)}</b><span>${NOMES[i.t.tipo]} · ${i.t.ano}</span></td>
-          <td class="n">${i.dias}</td><td class="n">${mil(i.t.pago)}</td><td class="n ${i.margem < 0.06 ? 'neg' : ''}">${pct(i.margem)}</td><td><span class="tag ${i.faixa}">${C.NOMES_IDADE[i.faixa]}</span></td><td>${esc(i.acao)}</td></tr>`).join('')}</tbody></table></div>
+      <section class="painel bloco agir"><div class="painel-cab"><div><h2>${ICO.alvo}Onde você precisa agir</h2><p>${agir.length} máquinas que mais pesam no seu capital hoje</p></div></div>
+        <div class="tabela-wrap"><table class="tabela grande"><thead><tr><th>Máquina</th><th>Idade (dias)</th><th class="n">Capital preso</th><th class="n">Margem estimada</th><th>Risco</th><th>Recomendação</th></tr></thead>
+        <tbody>${agir.map((i) => { const nv = nivelRisco(i); return `<tr class="clicavel" tabindex="0" data-id="${i.t.id}"><td class="maq"><span class="maq-ico">${ICO[i.t.tipo]}</span><span><b>${esc(NOMES[i.t.tipo].split(' ')[0] + ' ' + i.t.marca + ' ' + i.t.modelo)}</b><span>${i.t.ano} · ${i.t.horas.toLocaleString('pt-BR')} h</span></span></td>
+          <td><span class="dias ${i.faixa}">${i.dias} dias</span></td><td class="n forte">${mil(i.t.pago)}</td><td class="n ${i.margem < 0.06 ? 'neg' : ''}">${pct(i.margem)}</td><td><span class="risco ${nv.cls}">${nv.ico}${nv.nome}</span></td><td><span class="reco">${ICO.etiqueta}${esc(i.acao)}</span></td></tr>`; }).join('')}</tbody></table></div>
       </section>`;
     $$('tr.clicavel', tela).forEach((tr) => { const abre = () => detalheMaquina(tr.dataset.id); tr.onclick = abre; tr.onkeydown = (e) => { if (e.key === 'Enter') abre(); }; });
     $('#premissas-v').onclick = abrirPremissas; $('#premissas-v2').onclick = abrirPremissas;
+    $('#kpi-90').onclick = () => { fp.idade = 'critico'; };
     contar();
   }
 
@@ -701,8 +726,158 @@
     });
   }
 
+  // ---------- VENDEDORES ----------
+  function porVendedor() {
+    const g = {};
+    C.vendidas().forEach((t) => {
+      const v = t.vendedor || 'Sem vendedor'; const r = rec(t);
+      const x = (g[v] = g[v] || { nome: v, trocas: 0, resultado: 0, venda: 0, acima: 0, nAcima: 0, dias: 0, prej: 0 });
+      x.trocas++; x.resultado += C.resultado(t); x.venda += t.vendido; x.dias += t.diasPatio || 0;
+      if (C.resultado(t) < 0) x.prej++;
+      if (r && t.pago > r.teto) { x.acima += t.pago - r.teto; x.nAcima++; }
+    });
+    return Object.values(g).map((x) => ({ ...x, margem: x.resultado / x.venda, diasMedio: x.dias / x.trocas })).sort((a, b) => b.resultado - a.resultado);
+  }
+  function telaVendedores() {
+    const vs = porVendedor();
+    if (!vs.length) { tela.innerHTML = '<div class="titulo"><div><h1>Vendedores</h1><p>Sem trocas vendidas ainda.</p></div></div>'; return; }
+    const melhorMargem = vs.slice().sort((a, b) => b.margem - a.margem)[0];
+    const maisAcima = vs.slice().sort((a, b) => b.acima - a.acima)[0];
+    tela.innerHTML = `
+      <div class="titulo"><div><h1>Vendedores</h1><p>Quem traz resultado nas trocas e quem paga caro demais no usado.</p></div></div>
+      <div class="kpis escalonado">
+        <div class="kpi k-marfim"><span class="rot">${ICO.moedas}Melhor resultado</span><span class="val">${esc(vs[0].nome)}</span><span class="exp">${mil(vs[0].resultado)} em ${vs[0].trocas} trocas</span></div>
+        <div class="kpi k-salvia"><span class="rot">${ICO.pct}Melhor margem</span><span class="val">${pct(melhorMargem.margem)}</span><span class="exp">${esc(melhorMargem.nome)}</span></div>
+        <div class="kpi k-risco"><span class="rot">${ICO.alerta}Mais pago acima</span><span class="val">${mil(maisAcima.acima)}</span><span class="exp">${esc(maisAcima.nome)} · ${maisAcima.nAcima} trocas acima do recomendado</span></div>
+        <div class="kpi k-marfim"><span class="rot">${ICO.barras}Equipe</span><span class="val">${vs.length}</span><span class="exp">${vs.reduce((s, x) => s + x.trocas, 0)} trocas vendidas</span></div>
+      </div>
+      <section class="painel"><div class="painel-cab"><h2>${ICO.alvo}Ranking por resultado bruto</h2><p>Venda menos aquisição e preparo</p></div>
+        <div class="ranking escalonado">${vs.map((x, i) => `<div class="rank ${i === 0 ? 'ouro' : ''}"><span class="pos">${i + 1}º</span><div><b>${esc(x.nome)}</b><span>${x.trocas} trocas · margem ${pct(x.margem)} · ${Math.round(x.diasMedio)} dias de pátio em média · ${x.prej} com prejuízo</span></div>
+          <div class="num"><b>${mil(x.resultado)}</b><span class="${x.acima > 0 ? 'neg' : ''}">${mil(x.acima)} pago acima</span></div></div>`).join('')}</div>
+        <p class="nota-rodape">"Pago acima" compara o valor pago na troca com o máximo que o Anshur indicaria na data, usando só as vendas anteriores. É um ponto para conversar com o vendedor, não uma acusação.</p></section>`;
+    contar();
+  }
+
+  // ---------- GARANTIAS ----------
+  const fg = { status: '' };
+  function telaGarantias() {
+    const lista = (A.garantias || []).slice().sort((a, b) => b.data.localeCompare(a.data));
+    if (!lista.length) { tela.innerHTML = '<div class="titulo"><div><h1>Garantias a receber</h1><p>Nenhuma ordem de serviço em garantia cadastrada. Na implantação importamos as OS do seu sistema.</p></div></div>'; return; }
+    const aReceber = lista.filter((g) => g.status === 'aguardando');
+    const glosa = lista.reduce((s, g) => s + (g.status === 'parcial' || g.status === 'negado' ? g.valor - g.pago : 0), 0);
+    const vencidas = aReceber.filter((g) => diasDesde(g.data) > 60);
+    const filtrada = lista.filter((g) => !fg.status || g.status === fg.status);
+    const NOME = { pago: 'Pago', parcial: 'Pago a menos', negado: 'Negado', aguardando: 'Aguardando' };
+    const CLS = { pago: 'baixo', parcial: 'medio', negado: 'alto', aguardando: 'medio' };
+    const porMarca = {}; lista.forEach((g) => { if (g.status !== 'pago') porMarca[g.marca] = (porMarca[g.marca] || 0) + g.valor - g.pago; });
+    tela.innerHTML = `
+      <div class="titulo"><div><h1>Garantias a receber</h1><p>Serviços que a oficina fez em garantia e o que o fabricante ainda não pagou ou pagou a menos.</p></div>
+        <div class="acoes"><button class="btn btn-linha" type="button" id="exp-gar">Exportar cobrança</button></div></div>
+      <div class="kpis escalonado">
+        <div class="kpi k-marfim"><span class="rot">${ICO.moedas}A receber do fabricante</span><span class="val">${conta(aReceber.reduce((s, g) => s + g.valor, 0), 'mil')}</span><span class="exp">${aReceber.length} ordens aguardando pagamento</span></div>
+        <div class="kpi k-risco"><span class="rot">${ICO.alerta}Glosado ou negado</span><span class="val">${conta(glosa, 'mil')}</span><span class="exp">Diferença entre o serviço feito e o que foi pago</span></div>
+        <div class="kpi k-risco"><span class="rot">${ICO.alto}Paradas há +60 dias</span><span class="val">${vencidas.length}</span><span class="exp">${mil(vencidas.reduce((s, g) => s + g.valor, 0))} esperando há mais de 2 meses</span></div>
+        <div class="kpi k-salvia"><span class="rot">${ICO.baixo}Recebido no ano</span><span class="val">${conta(lista.reduce((s, g) => s + g.pago, 0), 'mil')}</span><span class="exp">${lista.filter((g) => g.status === 'pago').length} ordens pagas integralmente</span></div>
+      </div>
+      <div class="grade-2 larga">
+        <section class="painel"><div class="painel-cab"><h2>${ICO.etiqueta}Ordens de serviço em garantia</h2></div>
+          <div class="filtros"><div class="campo"><label for="g-st">Situação</label><select id="g-st"><option value="">Todas</option>${Object.keys(NOME).map((k) => `<option value="${k}" ${fg.status === k ? 'selected' : ''}>${NOME[k]}</option>`).join('')}</select></div></div>
+          <div class="tabela-wrap"><table class="tabela"><thead><tr><th>OS</th><th>Serviço</th><th class="n">Valor</th><th class="n">Pago</th><th>Situação</th></tr></thead><tbody>
+          ${filtrada.map((g) => `<tr><td><b>${g.os}</b><br><span class="sub">${data(g.data)} · ${diasDesde(g.data)} dias</span></td><td><b>${esc(g.servico)}</b><br><span class="sub">${esc(g.marca)} · ${esc(g.cliente)}${g.motivo ? ' · ' + esc(g.motivo) : ''}</span></td><td class="n">${real(g.valor)}</td><td class="n">${real(g.pago)}</td><td><span class="risco ${CLS[g.status]}">${NOME[g.status]}</span></td></tr>`).join('')}</tbody></table></div></section>
+        <section class="painel"><div class="painel-cab"><h2>${ICO.barras}Pendente por fabricante</h2></div>${G.horizontais(Object.entries(porMarca).sort((a, b) => b[1] - a[1]).map(([m, v]) => ({ r: m, v, cls: 'alerta' })))}
+          <p class="nota-rodape">Na implantação, o Anshur lê as OS e os extratos de garantia que a revenda já recebe e cruza os dois todo mês.</p></section>
+      </div>`;
+    $('#g-st').onchange = (e) => { fg.status = e.target.value; telaGarantias(); };
+    $('#exp-gar').onclick = () => baixarCSV('anshur-garantias.csv', [['OS', 'Data', 'Fabricante', 'Serviço', 'Cliente', 'Valor', 'Pago', 'Diferença', 'Situação', 'Motivo']].concat(lista.filter((g) => g.status !== 'pago').map((g) => [g.os, data(g.data), g.marca, g.servico, g.cliente, g.valor, g.pago, g.valor - g.pago, NOME[g.status], g.motivo])));
+    contar();
+  }
+
+  // ---------- ESTOQUE FINANCIADO ----------
+  function jurosFin(f) {
+    const hoje = hojeISO(), inicio = (() => { const d = new Date(f.entrada + 'T12:00:00'); d.setDate(d.getDate() + f.carencia); return d.toISOString().slice(0, 10); })();
+    const fim = f.quitacao || hoje;
+    const total = fim > inicio ? f.valor * f.taxaMes * diasEntre(inicio, fim) / 30 : 0;
+    // juros depois da venda: do maior entre venda e fim da carência até a quitação (ou hoje)
+    const iniPos = f.venda ? (f.venda > inicio ? f.venda : inicio) : null;
+    const aposVenda = iniPos && fim > iniPos ? f.valor * f.taxaMes * diasEntre(iniPos, fim) / 30 : 0;
+    return { total, aposVenda, inicio, emCarencia: hoje < inicio };
+  }
+  function telaFinanciamento() {
+    const lista = (A.financiadas || []).map((f) => ({ f, j: jurosFin(f) })).sort((a, b) => b.j.aposVenda - a.j.aposVenda);
+    if (!lista.length) { tela.innerHTML = '<div class="titulo"><div><h1>Estoque financiado</h1><p>Nenhuma máquina financiada cadastrada.</p></div></div>'; return; }
+    const vendidasAbertas = lista.filter((x) => x.f.venda && !x.f.quitacao);
+    const perdido = lista.reduce((s, x) => s + x.j.aposVenda, 0);
+    tela.innerHTML = `
+      <div class="titulo"><div><h1>Estoque financiado</h1><p>Máquinas novas no floor plan: juros que continuam correndo depois que a máquina já foi vendida.</p></div></div>
+      <div class="kpis escalonado">
+        <div class="kpi k-marfim"><span class="rot">${ICO.moedas}Financiado em estoque</span><span class="val">${conta(lista.filter((x) => !x.f.venda).reduce((s, x) => s + x.f.valor, 0), 'mil')}</span><span class="exp">${lista.filter((x) => !x.f.venda).length} máquinas novas no pátio</span></div>
+        <div class="kpi k-risco"><span class="rot">${ICO.alerta}Juros pagos após a venda</span><span class="val">${conta(perdido, 'mil')}</span><span class="exp">Dinheiro que dava para ter economizado quitando no dia da venda</span></div>
+        <div class="kpi k-risco"><span class="rot">${ICO.alto}Vendidas e não quitadas</span><span class="val">${vendidasAbertas.length}</span><span class="exp">${mil(vendidasAbertas.reduce((s, x) => s + x.f.valor, 0))} ainda devendo ao banco</span></div>
+        <div class="kpi k-salvia"><span class="rot">${ICO.barras}Juros totais do período</span><span class="val">${conta(lista.reduce((s, x) => s + x.j.total, 0), 'mil')}</span><span class="exp">Taxa de ${pct(lista[0].f.taxaMes)} ao mês após ${lista[0].f.carencia} dias de carência</span></div>
+      </div>
+      <section class="painel"><div class="painel-cab"><h2>${ICO.etiqueta}Máquinas financiadas</h2><p>Ordenado pelo juro pago depois da venda</p></div>
+        <div class="tabela-wrap"><table class="tabela"><thead><tr><th>Máquina</th><th class="n">Valor</th><th>Entrada</th><th>Venda</th><th>Quitação</th><th class="n">Juros após venda</th><th>Situação</th></tr></thead><tbody>
+        ${lista.map(({ f, j }) => { const sit = !f.venda ? (j.emCarencia ? ['baixo', 'Em carência'] : ['medio', 'No pátio, pagando juros']) : !f.quitacao ? ['alto', 'Vendida, quitar já'] : j.aposVenda > 0 ? ['medio', 'Quitada com atraso'] : ['baixo', 'Quitada no prazo']; return `<tr><td class="maq"><span class="maq-ico">${ICO[f.tipo]}</span><span><b>${esc(f.marca + ' ' + f.modelo)}</b><span>${f.chassi} · ${esc(f.banco)}</span></span></td><td class="n">${mil(f.valor)}</td><td>${data(f.entrada)}</td><td>${data(f.venda)}</td><td>${data(f.quitacao)}</td><td class="n ${j.aposVenda > 0 ? 'neg forte' : ''}">${real(j.aposVenda)}</td><td><span class="risco ${sit[0]}">${sit[1]}</span></td></tr>`; }).join('')}</tbody></table></div>
+        <p class="nota-rodape">Na implantação, o Anshur cruza o extrato do floor plan com as notas de venda e avisa no mesmo dia em que uma máquina financiada é vendida.</p></section>`;
+    contar();
+  }
+
+  // ---------- ALERTAS ----------
+  function listaAlertas() {
+    const out = [];
+    C.patio().map(infoPatio).forEach((i) => {
+      if (i.dias > 90) out.push({ nivel: 'alto', titulo: `${i.t.marca} ${i.t.modelo} passou de 90 dias no pátio`, txt: `${mil(i.t.pago)} parados há ${i.dias} dias · ${i.acao}`, ir: '#patio' });
+      else if (i.dias > 60 && i.dias <= 67) out.push({ nivel: 'medio', titulo: `${i.t.marca} ${i.t.modelo} entrou na faixa de alerta`, txt: `${i.dias} dias no pátio`, ir: '#patio' });
+      if (i.margem < 0.06) out.push({ nivel: 'alto', titulo: `Margem baixa: ${i.t.marca} ${i.t.modelo}`, txt: `Margem projetada de ${pct(i.margem)}`, ir: '#patio' });
+    });
+    (A.financiadas || []).forEach((f) => { if (f.venda && !f.quitacao) out.push({ nivel: 'alto', titulo: `Quitar ${f.marca} ${f.modelo} com o banco`, txt: `Vendida em ${data(f.venda)} e o juro continua correndo`, ir: '#financiamento' }); });
+    const gv = (A.garantias || []).filter((g) => g.status === 'aguardando' && diasDesde(g.data) > 60);
+    if (gv.length) out.push({ nivel: 'medio', titulo: `${gv.length} garantias paradas há mais de 60 dias`, txt: `${mil(gv.reduce((s, g) => s + g.valor, 0))} para cobrar do fabricante`, ir: '#garantias' });
+    const ult = estado.fechadas.slice(-3).filter((t) => t.previsto && t.pago > t.previsto.teto);
+    ult.forEach((t) => out.push({ nivel: 'medio', titulo: `Troca acima do recomendado: ${t.marca} ${t.modelo}`, txt: `Pago ${real(t.pago)}, máximo indicado ${real(t.previsto.teto)}`, ir: '#patio' }));
+    return out.sort((a, b) => (a.nivel === 'alto' ? 0 : 1) - (b.nivel === 'alto' ? 0 : 1));
+  }
+  function abrirAlertas() {
+    const l = listaAlertas();
+    abrirCamada('gaveta', `<h2 style="font-size:24px">Alertas de hoje</h2><p class="sub">${l.length} pontos que pedem atenção do dono.</p>
+      <ul class="alertas">${l.map((a) => `<li class="${a.nivel}">${a.nivel === 'alto' ? ICO.alto : ICO.medio}<a href="${a.ir}" class="link-alerta" style="color:inherit;text-decoration:none"><b>${esc(a.titulo)}</b><span>${esc(a.txt)}</span></a></li>`).join('') || '<li class="info">' + ICO.baixo + '<div><b>Tudo em ordem</b><span>Nenhum alerta agora.</span></div></li>'}</ul>`, (c) => { $$('.link-alerta', c).forEach((a) => a.onclick = () => fecharCamada(true)); });
+  }
+
+  // ---------- RELATÓRIO DO MÊS ----------
+  function telaRelatorio() {
+    const hoje = new Date(), mesIni = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1).toISOString().slice(0, 10), mesFim = new Date(hoje.getFullYear(), hoje.getMonth(), 0).toISOString().slice(0, 10);
+    const nomeMes = new Date(mesIni + 'T12:00:00').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+    const vend = C.vendidas().filter((t) => t.saida >= mesIni && t.saida <= mesFim);
+    const entr = A.trocas.filter((t) => t.entrada >= mesIni && t.entrada <= mesFim);
+    const itens = C.patio().map(infoPatio);
+    const res = vend.reduce((s, t) => s + C.resultado(t), 0), venda = vend.reduce((s, t) => s + t.vendido, 0);
+    const acima = vend.concat(entr).filter((t, i, a) => a.indexOf(t) === i).reduce((s, t) => { const r = rec(t); return s + (r && t.pago > r.teto ? t.pago - r.teto : 0); }, 0);
+    const al = listaAlertas().filter((a) => a.nivel === 'alto').slice(0, 5);
+    const gar = (A.garantias || []).filter((g) => g.status === 'aguardando').reduce((s, g) => s + g.valor, 0);
+    const fin = (A.financiadas || []).reduce((s, f) => s + jurosFin(f).aposVenda, 0);
+    tela.innerHTML = `
+      <div class="titulo"><div><h1>Relatório do dono</h1><p>Resumo de ${nomeMes} para ler em 2 minutos ou imprimir.</p></div><div class="acoes"><button class="btn btn-ouro" type="button" onclick="print()">Imprimir ou salvar PDF</button></div></div>
+      <article class="relatorio">
+        <img class="logo-img" src="logo/anshur-logo.png?v=5" alt="Anshur" width="200" height="50">
+        <p class="sub" style="margin-top:8px">${esc(A.revenda.nome)} · ${esc(A.revenda.cidade)} · emitido em ${new Date().toLocaleDateString('pt-BR')}</p>
+        <h2>O mês em números</h2>
+        <div class="numeros"><div><span>Trocas que entraram</span><b>${entr.length}</b></div><div><span>Usados vendidos</span><b>${vend.length}</b></div><div><span>Faturamento com usados</span><b>${mil(venda)}</b></div>
+          <div><span>Resultado bruto</span><b class="${res < 0 ? 'neg' : 'pos'}">${mil(res)}</b></div><div><span>Margem realizada</span><b>${venda ? pct(res / venda) : '—'}</b></div><div><span>Pago acima do recomendado</span><b class="${acima > 0 ? 'neg' : ''}">${mil(acima)}</b></div></div>
+        <h2>Onde está o dinheiro hoje</h2>
+        <ul><li>${mil(C.capitalImobilizado())} parados em ${itens.length} usados no pátio; ${itens.filter((i) => i.dias > 90).length} passaram de 90 dias.</li>
+          <li>Custo financeiro estimado do estoque até hoje: ${mil(itens.reduce((s, i) => s + i.juros, 0))} (premissa ${pct(K.cfg.jurosMes)} ao mês).</li>
+          <li>${mil(gar)} em garantias esperando pagamento do fabricante.</li>
+          <li>${mil(fin)} de juros do estoque financiado pagos depois da venda.</li></ul>
+        <h2>O que fazer esta semana</h2>
+        <ul>${al.length ? al.map((a) => `<li><b>${esc(a.titulo)}</b>: ${esc(a.txt)}.</li>`).join('') : '<li>Nenhum ponto crítico.</li>'}</ul>
+        <h2>Qualidade das avaliações</h2>
+        <p>${(() => { const v = M.validar(); return v.n >= M.QUALIDADE.minimoValidacao ? `Nas ${v.n} vendas conferidas, o Anshur errou o preço de venda em ${pct(v.mape)} em média (${mil(v.mae)} por máquina). Quanto mais trocas a revenda registra, mais preciso ele fica.` : 'Ainda não há vendas suficientes para medir o erro.'; })()}</p>
+        <p class="nota-rodape">Valores estimados são estimativas, não resultados garantidos. ${OP ? '' : 'Revenda e dados fictícios, só para demonstração.'}</p>
+      </article>`;
+  }
+
   // ---------- rotas com transição ----------
-  const TELAS = { visao: telaVisao, avaliar: telaAvaliar, patio: telaPatio, trocas: telaTrocas, teste: telaTeste, passaportes: telaPassaportes };
+  const TELAS = { visao: telaVisao, avaliar: telaAvaliar, patio: telaPatio, trocas: telaTrocas, teste: telaTeste, passaportes: telaPassaportes, vendedores: telaVendedores, garantias: telaGarantias, financiamento: telaFinanciamento, relatorio: telaRelatorio };
   function moverIndicador() {
     const ativo = $('.menu a[aria-current="page"]'), ind = $('.menu-indicador');
     if (!ativo || !ind) return;
@@ -721,6 +896,8 @@
     tela.classList.add('saindo');
     setTimeout(() => { desenhar(); window.scrollTo(0, 0); }, 120);
   }
+  $('#sino').onclick = abrirAlertas;
+  const nAl = listaAlertas().length; if (nAl) { $('#sino-n').hidden = false; $('#sino-n').textContent = nAl; }
   window.addEventListener('hashchange', rota);
   window.addEventListener('resize', moverIndicador);
   rota();
