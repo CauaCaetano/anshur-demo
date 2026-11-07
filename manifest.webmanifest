@@ -4,7 +4,7 @@
   "description": "Inteligência de margem para revendas de máquinas agrícolas: valor máximo na troca, pátio e histórico.",
   "start_url": "./#visao",
   "display": "standalone",
-  "background_color": "#101B2B",
-  "theme_color": "#101B2B",
+  "background_color": "#F4F0E8",
+  "theme_color": "#F4F0E8",
   "icons": [{ "src": "icone.svg", "sizes": "any", "type": "image/svg+xml" }]
 }

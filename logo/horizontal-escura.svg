@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 80" role="img" aria-label="Anshur">
-  <rect width="360" height="80" fill="#101B2B"/>
-  <g transform="translate(16 12) scale(.875)"><path d="M4 56 24 8h9l17 41V8h9v48H47L28.5 13 13 56Z" fill="#F2EEE5"/><path d="M50 8h9v14h-9z" fill="#C4A46A"/></g>
-  <text x="88" y="50" fill="#F2EEE5" font-family="Inter, Arial, sans-serif" font-weight="700" font-size="30" letter-spacing="9">ANSHUR</text>
+  <rect width="360" height="80" fill="#111820"/>
+  <g transform="translate(16 12) scale(.875)"><path d="M4 56 24 8h9l17 41V8h9v48H47L28.5 13 13 56Z" fill="#E9E2D4"/><path d="M50 8h9v14h-9z" fill="#C1A36A"/></g>
+  <text x="88" y="50" fill="#E9E2D4" font-family="Inter, Arial, sans-serif" font-weight="700" font-size="30" letter-spacing="9">ANSHUR</text>
 </svg>

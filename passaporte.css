@@ -1,12 +1,12 @@
-:root { --marinho: #101B2B; --marinho-2: #192A40; --ouro: #C4A46A; --creme: #F2EEE5; --cinza: #6B7584; --linha: #DDD6C8; --verde: #1F7A5F; --ambar: #8A6420; color-scheme: light; }
+:root { --marinho: #111820; --marinho-2: #202D35; --ouro: #C1A36A; --creme: #F4F0E8; --marfim: #E9E2D4; --cinza: #5C676E; --linha: #DDD5C5; --verde: #4A6154; --ambar: #85621F; color-scheme: light; }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--creme); color: var(--marinho); font-family: 'Inter', system-ui, sans-serif; font-size: 15px; line-height: 1.5; font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased; }
 h1, h2, h3 { margin: 0; line-height: 1.2; text-wrap: balance; }
 p { margin: 0; }
 :focus-visible { outline: 2px solid var(--ouro); outline-offset: 2px; }
-.pp-cab { background: var(--marinho); color: var(--creme); display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; }
-.pp-marca { display: flex; align-items: center; gap: 10px; color: var(--creme); text-decoration: none; font-weight: 700; letter-spacing: .3em; font-size: 14px; }
-.pp-demo { font-size: 11px; font-weight: 600; color: var(--ouro); border: 1px solid rgba(196, 164, 106, .45); border-radius: 20px; padding: 3px 9px; }
+.pp-cab { background: #fff; color: var(--marinho); border-bottom: 1px solid var(--linha); display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; }
+.pp-marca { display: flex; align-items: center; gap: 10px; color: var(--marinho); text-decoration: none; font-weight: 700; letter-spacing: .3em; font-size: 14px; }
+.pp-demo { font-size: 11px; font-weight: 600; color: #7A6131; border: 1px solid rgba(196, 164, 106, .45); border-radius: 20px; padding: 3px 9px; }
 main { max-width: 1080px; margin: 0 auto; padding: 20px 16px 48px; animation: entra 320ms cubic-bezier(.2, .7, .2, 1) both; }
 @keyframes entra { from { opacity: 0; transform: translateY(10px); } }
 .capa { display: grid; gap: 16px; }
@@ -17,7 +17,7 @@ main { max-width: 1080px; margin: 0 auto; padding: 20px 16px 48px; animation: en
 .ficha-topo .linha { display: flex; flex-wrap: wrap; gap: 6px 18px; color: #c9ced6; }
 .ficha-topo .preco { font-size: 28px; font-weight: 700; color: var(--ouro); }
 .galeria { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
-.galeria div { aspect-ratio: 4/3; border-radius: 8px; background: #22364F center/cover; display: grid; place-items: center; color: #8993A1; font-size: 13px; text-align: center; padding: 10px; }
+.galeria div { aspect-ratio: 4/3; border-radius: 8px; background: #2B3A43 center/cover; display: grid; place-items: center; color: #8993A1; font-size: 13px; text-align: center; padding: 10px; }
 .qr-caixa { background: #fff; border: 1px solid var(--linha); border-radius: 12px; padding: 18px; display: grid; gap: 12px; align-content: start; }
 .qr-caixa .qr svg { width: 160px; height: 160px; display: block; }
 .btn { display: inline-flex; align-items: center; justify-content: center; min-height: 42px; padding: 10px 16px; border-radius: 6px; border: 1px solid var(--marinho); background: var(--marinho); color: var(--creme); font: inherit; font-weight: 600; font-size: 14px; cursor: pointer; text-decoration: none; transition: transform 120ms, background 200ms, color 200ms; }
@@ -44,9 +44,9 @@ main { max-width: 1080px; margin: 0 auto; padding: 20px 16px 48px; animation: en
 .lista li { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--linha); }
 .lista li:last-child { border-bottom: 0; }
 .tag { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 20px; white-space: nowrap; }
-.tag.comprovado { color: var(--verde); background: #DCEFE7; }
+.tag.comprovado { color: var(--verde); background: #E1E8E3; }
 .tag.comprovado::before { content: '✓'; }
-.tag.declarado { color: var(--ambar); background: #F4E9D2; }
+.tag.declarado { color: var(--ambar); background: #F2E8D3; }
 .tag.declarado::before { content: '!'; font-weight: 800; }
 .tag.pendente { color: #8E3A37; background: #F4DEDC; }
 .legenda { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
