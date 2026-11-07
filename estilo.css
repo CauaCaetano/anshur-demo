@@ -608,3 +608,31 @@ img.foto-perfil { background: none; }
 .galeria-mini img { width: 100%; aspect-ratio: 4/3; object-fit: cover; border-radius: 8px; }
 body.so-leitura .gaveta .campos, body.so-leitura #g-prep-ok, body.so-leitura #g-vender, body.so-leitura #add-item, body.so-leitura #aplicar, body.so-leitura .cab-nova { display: none !important; }
 body.so-leitura .aprov .acoes, body.so-leitura .aprov button { display: none !important; }
+@media (max-width: 560px) { .cabecalho { flex-wrap: wrap; row-gap: 8px; } .cabecalho .loja-sel { order: 9; flex: 1 0 100%; max-width: none; min-height: 40px; font-size: 14px; } }
+@media (max-width: 560px) { .etapas { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; } .etapas button { font-size: 12px; min-width: 0; overflow-wrap: anywhere; padding-left: 0; padding-right: 0; } }
+
+/* celular: 4 atalhos + Mais (folha com todos os módulos) */
+.menu-mais { display: none; }
+@media (max-width: 959px) {
+  .menu { overflow: visible; }
+  .menu a, .menu a[data-aba="passaportes"] { display: none; flex: 1 1 0; min-width: 0; }
+  .menu a[data-aba="visao"], .menu a[data-aba="avaliar"], .menu a[data-aba="patio"], .menu a[data-aba="aprovacoes"] { display: flex; }
+  .menu-indicador { display: none; }
+  .menu a[aria-current="page"] { color: #fff; box-shadow: inset 0 2px 0 var(--ouro); }
+  .menu-mais { display: flex; flex: 1 1 0; flex-direction: column; align-items: center; gap: 3px; padding: 8px 2px 9px; background: none; border: 0; color: #B8B1A3; font: 500 12.5px Inter, sans-serif; cursor: pointer; order: 99; }
+  .menu-mais b { font-weight: 500; }
+  .menu-mais svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
+  .menu-mais.ativo, .menu-mais[aria-expanded="true"] { color: #fff; box-shadow: inset 0 2px 0 var(--ouro); }
+  .menu-fundo { position: fixed; inset: 0; z-index: 24; background: rgba(17, 24, 32, .45); opacity: 0; pointer-events: none; transition: opacity var(--t); }
+  body.menu-aberto .menu-fundo { opacity: 1; pointer-events: auto; }
+  body.menu-aberto .menu { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; max-height: 82dvh; overflow-y: auto; padding: 14px 12px calc(10px + env(safe-area-inset-bottom)); border-radius: 18px 18px 0 0; box-shadow: 0 -12px 40px rgba(0, 0, 0, .3); animation: folha-sobe .28s cubic-bezier(.2, .7, .2, 1); }
+  body.menu-aberto .menu a, body.menu-aberto .menu a[data-aba="passaportes"] { display: flex; padding: 12px 4px; border-radius: 10px; font-size: 12.5px; }
+  body.menu-aberto .menu a::after { text-align: center; }
+  body.menu-aberto .menu a[aria-current="page"] { background: rgba(193, 163, 106, .18); box-shadow: none; }
+  body.menu-aberto .menu-grupo { display: block; grid-column: 1 / -1; margin: 10px 4px 2px; font-size: 13px; font-weight: 700; color: #A39C8D; }
+  body.menu-aberto .menu-grupo:first-of-type { margin-top: 0; }
+  body.menu-aberto .menu-mais { grid-column: 1 / -1; flex-direction: row; justify-content: center; gap: 8px; margin-top: 8px; padding: 12px; border-radius: 10px; background: rgba(233, 226, 212, .08); box-shadow: none; }
+}
+@keyframes folha-sobe { from { transform: translateY(40%); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (max-width: 560px) { .cabecalho { gap: 8px; } .cabecalho #instalar-btn { display: none; } .marca-movel .logo-img { width: 104px; } .cabecalho .sino { width: 40px; height: 40px; } .cabecalho .cab-nova { min-width: 44px; min-height: 40px; padding: 0 10px; } .cabecalho .avatar { width: 40px; height: 40px; } }
+@media (max-width: 959px) { .cabecalho .marca-movel { margin-right: auto; } }

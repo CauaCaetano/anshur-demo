@@ -18,12 +18,14 @@
   $('.lateral-rodape').textContent = OP ? 'Dados reais da sua revenda, guardados só neste navegador.' : 'Dados demonstrativos de uma revenda fictícia.';
   menuPerfil.innerHTML = `<p><b>${esc(K.usuarioAtual().nome)}</b><span>${K.PERFIS[K.usuarioAtual().perfil]} · ${esc(A.revenda.nome)}${OP ? ' · dados reais' : ''}</span></p>
     <button type="button" role="menuitem" id="m-perfil">Meu perfil</button>
+    <button type="button" role="menuitem" id="m-instalar">Instalar o app</button>
     <button type="button" role="menuitem" id="m-premissas">Premissas da revenda</button>
     <button type="button" role="menuitem" id="m-seg">Segurança dos dados</button>
     <button type="button" role="menuitem" id="m-ambiente">${OP ? 'Voltar para a demonstração' : 'Usar com os dados da minha revenda'}</button>
     ${OP ? '<button type="button" role="menuitem" id="m-nome">Nome da revenda</button><button type="button" role="menuitem" id="m-apagar">Apagar dados da minha revenda</button>' : '<button type="button" role="menuitem" id="m-restaurar">Restaurar dados demonstrativos</button>'}`;
   const fechaMenu = () => { menuPerfil.hidden = true; btnPerfil.setAttribute('aria-expanded', 'false'); };
   $('#m-perfil').onclick = () => { fechaMenu(); location.hash = '#perfil'; };
+  $('#m-instalar').onclick = () => { fechaMenu(); $('#instalar-btn').click(); };
   $('#m-premissas').onclick = () => { fechaMenu(); abrirPremissas(); };
   $('#m-seg').onclick = () => { fechaMenu(); abrirCamada('modal', `<h2>Segurança dos dados</h2>
       <p class="sub" style="margin-bottom:12px">O que acontece hoje com os seus números, sem promessa além do que existe.</p>
@@ -1835,6 +1837,18 @@
   if (OP) sincronizar(false).then((r) => { if (r === 'novas') { toast(`Sincronizado com o seu sistema: ${estado.ultimaSync.novas} trocas novas.`); setTimeout(() => location.reload(), 1200); } else if (r === 'permissao') toast('Toque em Teste às cegas › Importar planilha › Sincronizar agora para atualizar com o seu sistema.'); }).catch(() => {});
   atualizarSino();
   window.addEventListener('hashchange', rota);
+  // celular: barra com 4 atalhos + "Mais", que abre todos os módulos por categoria
+  (() => {
+    const menu = $('#menu'); if (!menu || $('#menu-mais')) return;
+    menu.insertAdjacentHTML('beforeend', '<button type="button" id="menu-mais" class="menu-mais" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg><b>Mais</b></button>');
+    document.body.insertAdjacentHTML('beforeend', '<div class="menu-fundo" id="menu-fundo"></div>');
+    const abrir = (sim) => { document.body.classList.toggle('menu-aberto', sim); $('#menu-mais').setAttribute('aria-expanded', sim); $('#menu-mais b').textContent = sim ? 'Fechar' : 'Mais'; };
+    $('#menu-mais').onclick = () => abrir(!document.body.classList.contains('menu-aberto'));
+    $('#menu-fundo').onclick = () => abrir(false);
+    menu.addEventListener('click', (e) => { if (e.target.closest('a')) abrir(false); });
+    const marcar = () => { const a = $('.menu a[aria-current="page"]'); $('#menu-mais').classList.toggle('ativo', !!a && !['visao', 'avaliar', 'patio', 'aprovacoes'].includes(a.dataset.aba)); };
+    window.addEventListener('hashchange', () => setTimeout(marcar, 50)); setTimeout(marcar, 300);
+  })();
   window.addEventListener('resize', moverIndicador);
   rota();
 })();
