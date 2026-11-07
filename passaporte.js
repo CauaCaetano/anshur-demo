@@ -1,7 +1,7 @@
 (function () {
   const A = window.ANSHUR, K = window.COMUM;
   const { real, esc, data, NOMES, FICHA } = K;
-  document.getElementById('marca').innerHTML = K.logo(26) + '<span>ANSHUR</span>';
+  document.getElementById('marca').innerHTML = '<img src="logo/anshur-logo.png?v=5" alt="Anshur" width="150" height="38" style="display:block;height:auto">';
   const tela = document.getElementById('tela');
   const id = new URLSearchParams(location.search).get('id');
   const t = A.trocas.find((x) => x.id === id && !x.vendido) || A.trocas.find((x) => x.id === id) || K.C.patio()[0];
