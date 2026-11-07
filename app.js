@@ -378,6 +378,10 @@
           ${hist.n ? `<section class="painel bloco"><h2>${ICO.etiqueta}Histórico de oficina deste modelo</h2>
             <ul class="lista-motivos" style="margin-top:8px">${hist.defeitos.slice(0, 4).map((d) => `<li><span>${esc(d.servico)} <span class="sub">· ${d.n} ${d.n === 1 ? 'vez' : 'vezes'}</span></span><b>${real(d.media)}</b></li>`).join('') || '<li><span>Nenhum defeito recorrente registrado.</span></li>'}</ul>
             <p class="conta">Nas ${hist.trocas} trocas deste modelo, o preparo passou do previsto em média ${real(hist.reserva)} por máquina.${hist.reserva > 0 ? ` <label class="check" style="margin-top:8px"><input type="checkbox" id="reserva" ${av.reserva ? 'checked' : ''}> Descontar essa reserva de risco do valor máximo</label>` : ''}</p></section>` : ''}
+          ${(() => { const hv = checaHorimetro({ ...maq, manutencoes: [] }); const vm = variacaoMercado(maq.tipo); const cs = compradoresPara({ ...maq, anuncio: Math.round(r.venda * 1.08) }); return (hv.length ? `<section class="painel bloco" style="border-color:#F0CFCB;background:#FBEDEB"><h2 style="color:#8E2F2B">${ICO.alerta}Horímetro: confira antes de fechar</h2><ul class="lista-motivos">${hv.map((x) => `<li><span>${esc(x)}</span></li>`).join('')}</ul></section>` : '')
+            + (vm != null ? `<section class="painel bloco ${vm < -0.05 ? 'aviso-ruim' : ''}"><h2>${ICO.linha}Mercado de ${NOMES[maq.tipo].toLowerCase()}</h2><p style="font-size:17px;margin-top:6px">Anúncios e leilões ${vm < 0 ? 'caíram' : 'subiram'} <b class="${vm < 0 ? 'neg' : 'pos'}">${pct(Math.abs(vm))}</b> nos últimos 2 meses.${vm < -0.05 ? ' O histórico da revenda ainda não reflete essa queda: considere negociar abaixo do valor máximo.' : ''}</p><a class="link" href="#mercado">Ver monitor de mercado</a></section>` : '')
+            + `<section class="painel bloco"><h2>${ICO.alvo}Quem compraria esta máquina</h2>${cs.length ? `<p style="margin:6px 0 8px">${cs.length} ${cs.length === 1 ? 'comprador cadastrado procura' : 'compradores cadastrados procuram'} algo assim:</p>${cs.slice(0, 3).map((c) => `<span class="tag comprovado" style="margin:0 6px 6px 0">${esc(c.nome)} · até ${mil(c.precoMax)}</span>`).join('')}` : '<p class="sub" style="margin-top:6px">Nenhum comprador cadastrado procura esta máquina agora.</p>'}</section>`; })()}
+          ${blocoBarter(r.teto, 'bt-av')}
           <section class="painel bloco"><h2>Qualidade dos dados</h2>
             <div class="numeros">
               <div><span>Vendas usadas no cálculo</span><b>${r.base}</b></div>
@@ -419,6 +423,7 @@
       <div class="acoes"><button class="btn btn-linha" type="button" data-ir="-1">Voltar</button><button class="btn btn-linha" type="button" id="registrar">Registrar avaliação</button><button class="btn btn-linha" type="button" id="premissas">Ajustar premissas</button><button class="btn btn-ouro" type="button" id="fechar-troca">Fechar troca</button></div>
       <p class="nota-rodape">O valor máximo é uma recomendação. Quem decide o valor pago é o gerente.</p>`;
     $('[data-ir]', caixa).onclick = () => irPasso(3);
+    ligarBarter(caixa, r.teto, 'bt-av');
     const res_ = $('#reserva', caixa); if (res_) res_.onchange = () => { av.reserva = res_.checked; desenharResultado(); toast(av.reserva ? 'Reserva de risco descontada do valor máximo.' : 'Reserva de risco retirada.'); };
     $('#registrar').onclick = (e) => {
       const b = e.currentTarget; b.classList.add('carregando');
@@ -449,6 +454,11 @@
         if (!(v > 0)) { inp.focus(); toast('Informe o valor pago na troca.', true); return; }
         const acima = v > r.teto, aprov = $('#t-aprov', c).value.trim(), mot = $('#t-mot', c).value.trim();
         if (acima && (!aprov || !mot)) { (aprov ? $('#t-mot', c) : $('#t-aprov', c)).focus(); toast('Acima do recomendado: informe quem aprovou e o motivo.', true); return; }
+        if (acima && !podeAprovar()) {
+          const ped = { id: 'P' + Date.now(), quando: new Date().toISOString(), por: eu().nome, maq, rec: { teto: r.teto, venda: r.venda, preparo: r.preparo, dias: r.dias, margem: r.margem, margemSobreVenda: r.margemSobreVenda, confianca: r.confianca, doTipo: r.doTipo, qualidade: r.qualidade ? { mape: r.qualidade.mape } : null }, valor: Math.round(v), data: dt, motivo: mot, status: 'pendente', extra: { vendedor: $('#t-vend', c).value, negociacao: av.nova || null, origem: av.local || 'Troca registrada', fotos: av.fotos.filter(Boolean), verif: { ...av.verif } } };
+          estado.pendentes.push(ped); log('aprovacao', `Pedido de aprovação: ${maq.marca} ${maq.modelo} por ${real(v)} (máximo ${real(r.teto)})`); salvar(); atualizarSino();
+          fecharCamada(true); toast('Pedido enviado ao gerente. A troca só entra no pátio depois da aprovação.'); location.hash = '#aprovacoes'; return;
+        }
         const b = e.currentTarget; b.classList.add('carregando');
         setTimeout(() => {
           const t = K.fecharTroca(estado, maq, r, v, dt, { vendedor: $('#t-vend', c).value, negociacao: av.nova || null, aprovacao: acima ? { por: aprov, motivo: mot, excesso: v - r.teto, data: hojeISO() } : null, origem: av.local || 'Troca registrada',
@@ -549,8 +559,11 @@
       </section>
       <section style="margin-top:18px"><h2 style="font-size:18px;margin-bottom:12px">Linha do tempo da máquina</h2>
         <ul class="linha-tempo">${mov.map((m) => `<li>${esc(m.txt)}<span>${data(m.data)}</span></li>`).concat(estado.atividades.filter((a) => a.ref === t.id).map((a) => `<li>${esc(a.texto)}<span>${new Date(a.quando).toLocaleString('pt-BR')} · ${esc(a.usuario)}</span></li>`)).join('')}</ul></section>
+      <section style="margin-top:12px"><h2 style="font-size:18px;margin-bottom:8px">Compradores interessados</h2>${(() => { const cs = compradoresPara(t); return cs.length ? cs.slice(0, 5).map((c) => `<span class="tag comprovado" style="margin:0 6px 6px 0">${esc(c.nome)} · ${esc(c.cidade || '')} · até ${mil(c.precoMax)}</span>`).join('') : '<p class="sub">Ninguém cadastrado procura esta máquina. <a class="link" href="#compradores">Cadastrar comprador</a></p>'; })()}</section>
+      ${checaHorimetro(t).length ? `<p class="conta neg">${checaHorimetro(t).map(esc).join(' ')}</p>` : ''}
       <section style="margin-top:12px"><h2 style="font-size:18px;margin-bottom:8px">Documentos</h2>${(t.docs || []).length ? `<ul class="lista-motivos">${t.docs.map((d) => { const doc = estado.documentos.find((x) => x.id === d); return `<li><span>${esc(doc ? doc.nome : d)}</span><b>${doc ? esc(doc.tipo) : ''}</b></li>`; }).join('')}</ul>` : '<p class="sub">Nenhum documento anexado.</p>'}<a class="btn btn-linha" href="#documentos" style="margin-top:8px">Anexar documento</a></section>
-      <div class="acoes"><a class="btn btn-ouro" href="passaporte.html?id=${t.id}">Abrir passaporte</a></div>`, (c) => {
+      <div class="acoes"><a class="btn btn-ouro" href="passaporte.html?id=${t.id}">Abrir passaporte</a><button class="btn btn-linha" type="button" id="exp-dms">Exportar para o sistema</button></div>`, (c) => {
+      $('#exp-dms', c).onclick = () => exportarParaDMS(t);
       const s = $('#sim', c), res = $('#sim-res', c), ap = $('#aplicar', c);
       const atual = () => {
         const p = +s.value / 100, novo = Math.round(t.anuncio * (1 - p) / 1000) * 1000;
@@ -920,6 +933,9 @@
     const ult = estado.fechadas.slice(-3).filter((t) => t.previsto && t.pago > t.previsto.teto);
     ult.forEach((t) => out.push({ id: 'ac-' + t.id, cat: 'Comercial', nivel: 'medio', titulo: `Troca acima do recomendado: ${t.marca} ${t.modelo}`, txt: `Pago ${real(t.pago)}, máximo indicado ${real(t.previsto.teto)}`, ir: '#patio' }));
     (A.trocas || []).filter((t) => !t.vendido && t.preparoEst && t.preparo > t.preparoEst * 1.4).forEach((t) => out.push({ id: 'of-' + t.id, cat: 'Oficina', nivel: 'medio', titulo: `Preparo acima do previsto: ${t.marca} ${t.modelo}`, txt: `${real(t.preparo)} contra ${real(t.preparoEst)} previstos`, ir: '#patio' }));
+    (estado.pendentes || []).filter((p) => p.status === 'pendente').forEach((p) => out.push({ id: 'ap-' + p.id, cat: 'Comercial', nivel: 'alto', titulo: `Aprovação pedida: ${p.maq.marca} ${p.maq.modelo}`, txt: `${p.por} quer pagar ${real(p.valor)}, ${real(p.valor - p.rec.teto)} acima do máximo`, ir: '#aprovacoes' }));
+    C.patio().forEach((t) => { const cs = compradoresPara(t); if (cs.length) out.push({ id: 'cp-' + t.id + '-' + cs.length, cat: 'Comercial', nivel: 'medio', titulo: `${cs.length} ${cs.length === 1 ? 'comprador procura' : 'compradores procuram'} ${t.marca} ${t.modelo}`, txt: cs.slice(0, 2).map((c) => c.nome).join(', ') + (cs.length > 2 ? ' e outros' : ''), ir: '#compradores' }); });
+    Object.keys(NOMES).forEach((k) => { const v = variacaoMercado(k); if (v != null && v < -0.05) out.push({ id: 'mk-' + k + '-' + Math.round(v * 100), cat: 'Mercado', nivel: 'alto', titulo: `Mercado de ${NOMES[k].toLowerCase()} caiu ${pct(-v)}`, txt: 'Anúncios e leilões dos últimos 2 meses: cuidado ao pagar na troca', ir: '#mercado' }); });
     return out.sort((a, b) => (a.nivel === 'alto' ? 0 : 1) - (b.nivel === 'alto' ? 0 : 1));
   }
   function abrirAlertas() {
@@ -1027,9 +1043,9 @@
   const fotoMini = (t, cls = 'maq-foto') => { const f = F.de(t); const src = f.propria ? f.u : F.mini(f.u); return `<img class="${cls}" src="${src}" alt="" loading="lazy" onerror="this.outerHTML='<span class=&quot;maq-ico&quot;>${ICO[t.tipo] ? '' : ''}</span>'">`; };
   const eu = () => K.usuarioAtual();
   const PERM = {
-    dono: ['visao', 'avaliar', 'patio', 'trocas', 'teste', 'passaportes', 'vendedores', 'garantias', 'financiamento', 'relatorio', 'documentos', 'atividades', 'usuarios', 'config'],
-    gerente: ['visao', 'avaliar', 'patio', 'trocas', 'teste', 'passaportes', 'vendedores', 'garantias', 'financiamento', 'relatorio', 'documentos', 'atividades'],
-    vendedor: ['visao', 'avaliar', 'patio', 'passaportes', 'documentos'],
+    dono: ['visao', 'avaliar', 'patio', 'trocas', 'teste', 'passaportes', 'vendedores', 'garantias', 'financiamento', 'relatorio', 'documentos', 'atividades', 'usuarios', 'config', 'compradores', 'mercado', 'aprovacoes'],
+    gerente: ['visao', 'avaliar', 'patio', 'trocas', 'teste', 'passaportes', 'vendedores', 'garantias', 'financiamento', 'relatorio', 'documentos', 'atividades', 'compradores', 'mercado', 'aprovacoes'],
+    vendedor: ['visao', 'avaliar', 'patio', 'passaportes', 'documentos', 'compradores', 'mercado', 'aprovacoes'],
     oficina: ['patio', 'passaportes', 'garantias', 'documentos'],
     financeiro: ['visao', 'patio', 'trocas', 'garantias', 'financiamento', 'relatorio', 'documentos', 'atividades']
   };
@@ -1434,8 +1450,141 @@
   }
   function atualizarSino() { const n = listaAlertas().filter((a) => !estado.resolvidos[a.id]).length; const b = $('#sino-n'); b.hidden = !n; b.textContent = n; }
 
+  // =====================================================================================
+  // V6: compradores e casamento com o pátio, monitor de mercado, aprovações, horímetro suspeito,
+  // troca em grãos (barter) e exportação para o sistema da revenda
+  // =====================================================================================
+  // ---------- compradores ----------
+  function compradoresPara(t) {
+    return (A.compradores || []).filter((c) => c.tipo === t.tipo && (!c.marcas || c.marcas === t.marca) && t.ano >= (+c.anoMin || 0) && (!c.precoMax || (t.anuncio || t.pago * 1.15) <= c.precoMax * 1.08))
+      .map((c) => ({ c, folga: c.precoMax ? c.precoMax - (t.anuncio || 0) : 0 })).sort((a, b) => b.folga - a.folga).map((x) => x.c);
+  }
+  function addComprador(pre = {}) {
+    formulario('Adicionar comprador interessado', [{ k: 'nome', r: 'Nome', obr: true }, { k: 'fazenda', r: 'Fazenda / empresa' }, { k: 'cidade', r: 'Cidade', lista: 'dl-cidade' }, { k: 'telefone', r: 'Telefone' },
+      { k: 'tipo', r: 'Procura', tipo: 'select', ops: Object.entries(NOMES) }, { k: 'marcas', r: 'Marca preferida (opcional)', lista: 'dl-marca' }, { k: 'anoMin', r: 'Ano mínimo', num: true }, { k: 'precoMax', r: 'Paga até (R$)', num: true, obr: true }, { k: 'obs', r: 'Observação', inteiro: true }],
+    { tipo: 'trator', ...pre }, (v) => {
+      const c = { id: 'C' + Date.now(), ...v, desde: hojeISO() }; estado.extras.compradores.push(c); A.compradores.push(c); salvar();
+      const m = C.patio().filter((t) => compradoresPara(t).includes(c)); log('comprador', `Comprador ${c.nome} cadastrado procurando ${NOMES[c.tipo].toLowerCase()}`);
+      fecharCamada(true); toast(m.length ? `${c.nome} combina com ${m.length} ${m.length === 1 ? 'máquina' : 'máquinas'} do pátio.` : 'Comprador cadastrado. Avisaremos quando entrar uma máquina que combine.'); rota();
+    });
+  }
+  function telaCompradores() {
+    const l = A.compradores || [];
+    const patio = C.patio();
+    tela.innerHTML = `
+      <div class="titulo"><div><h1>Compradores</h1><p>Quem está procurando máquina. Quando entra um usado que combina, o Anshur avisa na hora.</p></div>${botaoAdicionar([{ nome: 'Comprador à mão', desc: 'Nome, o que procura e quanto paga', acao: () => addComprador() }, { nome: 'Importar lista', desc: 'Planilha de contatos', acao: () => { location.hash = '#documentos'; } }])}</div>
+      <div class="kpis escalonado">
+        <div class="kpi k-marfim"><span class="rot">${ICO.alvo}Compradores ativos</span><span class="val">${l.length}</span></div>
+        <div class="kpi k-salvia"><span class="rot">${ICO.baixo}Máquinas com comprador</span><span class="val">${patio.filter((t) => compradoresPara(t).length).length} de ${patio.length}</span></div>
+        <div class="kpi k-marfim"><span class="rot">${ICO.moedas}Dinheiro procurando máquina</span><span class="val">${mil(l.reduce((s, c) => s + (+c.precoMax || 0), 0))}</span></div>
+        <div class="kpi k-risco"><span class="rot">${ICO.alerta}Pátio sem comprador</span><span class="val">${patio.filter((t) => !compradoresPara(t).length).length}</span><span class="exp">Máquinas que precisam de divulgação</span></div>
+      </div>
+      <section class="painel"><div class="painel-cab"><h2>${ICO.etiqueta}Casamentos do pátio</h2><p>Máquina parada e quem procura</p></div>
+        ${patio.map((t) => { const cs = compradoresPara(t); return cs.length ? `<div class="casa">${fotoMini(t)}<div><b>${esc(t.marca + ' ' + t.modelo)} · ${t.ano}</b><span>${diasDesde(t.entrada)} dias no pátio · anunciado ${mil(t.anuncio)}</span></div><div class="casa-c">${cs.slice(0, 3).map((c) => `<span class="tag comprovado">${esc(c.nome)} · até ${mil(c.precoMax)}</span>`).join('')}${cs.length > 3 ? `<span class="sub">+${cs.length - 3}</span>` : ''}</div></div>` : ''; }).join('') || '<p class="vazio">Nenhum casamento ainda.</p>'}
+      </section>
+      <section class="painel bloco"><div class="tabela-wrap"><table class="tabela"><thead><tr><th>Comprador</th><th>Procura</th><th class="n">Ano mínimo</th><th class="n">Paga até</th><th>Desde</th><th>Combina com</th></tr></thead><tbody>
+        ${l.map((c) => { const m = patio.filter((t) => compradoresPara(t).includes(c)); return `<tr><td><b>${esc(c.nome)}</b><br><span class="sub">${esc([c.fazenda, c.cidade].filter(Boolean).join(' · '))}</span></td><td>${NOMES[c.tipo]}${c.marcas ? ' ' + esc(c.marcas) : ''}<br><span class="sub">${esc(c.obs || '')}</span></td><td class="n">${c.anoMin || '—'}</td><td class="n">${mil(+c.precoMax || 0)}</td><td>${data(c.desde)}</td><td>${m.length ? m.map((t) => esc(t.modelo)).join(', ') : '<span class="sub">nada no pátio</span>'}</td></tr>`; }).join('') || '<tr><td colspan="6" class="vazio">Nenhum comprador cadastrado.</td></tr>'}</tbody></table></div></section>`;
+    contar();
+  }
+
+  // ---------- monitor de mercado (anúncios e leilões observados) ----------
+  function indiceMercado(tipo) {
+    // preço observado / referência do modelo ajustada por idade, agrupado por mês
+    const meses = {};
+    (A.anuncios || []).filter((a) => a.tipo === tipo).forEach((a) => {
+      const ref = M.refDe(a); if (!ref) return;
+      const esperado = ref * Math.pow(0.9, Math.max(0, new Date(a.data).getFullYear() - a.ano - 1));
+      const k = a.data.slice(0, 7); (meses[k] = meses[k] || []).push(a.preco / esperado);
+    });
+    return Object.keys(meses).sort().map((k) => ({ r: new Date(k + '-15T12:00:00').toLocaleDateString('pt-BR', { month: 'short' }).replace('.', ''), k, v: meses[k].reduce((s, x) => s + x, 0) / meses[k].length * 100, n: meses[k].length }));
+  }
+  function variacaoMercado(tipo) {
+    const ix = indiceMercado(tipo); if (ix.length < 3) return null;
+    const rec = ix.slice(-2), ant = ix.slice(-5, -2);
+    const m = (l) => l.reduce((s, x) => s + x.v, 0) / l.length;
+    return ant.length ? m(rec) / m(ant) - 1 : null;
+  }
+  function addAnuncio() {
+    formulario('Registrar anúncio ou leilão', [{ k: 'fonte', r: 'Onde viu', tipo: 'select', ops: [['Agrofy', 'Agrofy'], ['Mercado Máquinas', 'Mercado Máquinas'], ['Leilão', 'Leilão'], ['Revenda concorrente', 'Revenda concorrente'], ['Outro', 'Outro']] }, { k: 'data', r: 'Data', tipo: 'data', obr: true },
+      { k: 'tipo', r: 'Categoria', tipo: 'select', ops: Object.entries(NOMES) }, { k: 'marca', r: 'Fabricante', lista: 'dl-marca', obr: true }, { k: 'modelo', r: 'Modelo', lista: 'dl-modelo', obr: true }, { k: 'ano', r: 'Ano', num: true, obr: true }, { k: 'horas', r: 'Horas', num: true }, { k: 'preco', r: 'Preço (R$)', num: true, obr: true }, { k: 'cidade', r: 'Cidade', lista: 'dl-cidade' }],
+    { data: hojeISO(), fonte: 'Agrofy', tipo: 'trator' }, (v) => { const a = { id: 'AN' + Date.now(), ...v }; estado.extras.anuncios.push(a); A.anuncios.push(a); salvar(); log('mercado', `Anúncio registrado: ${a.marca} ${a.modelo} ${a.ano} por ${real(a.preco)} (${a.fonte})`); fecharCamada(true); toast('Anúncio registrado no monitor.'); rota(); });
+  }
+  function telaMercado() {
+    const tipos = Object.keys(NOMES);
+    const cores = { trator: '#3E6B57', colhedora: '#C1A36A', pulverizador: '#71877B', plantadeira: '#202D35' };
+    const anunciosRec = (A.anuncios || []).slice().sort((a, b) => b.data.localeCompare(a.data));
+    tela.innerHTML = `
+      <div class="titulo"><div><h1>Monitor de mercado</h1><p>Anúncios e leilões de fora da revenda: se o mercado de um tipo de máquina cai, o Anshur avisa antes de você pagar caro na troca.</p></div>${botaoAdicionar([{ nome: 'Anúncio ou leilão à mão', desc: 'Preço, ano, horas e onde viu', acao: addAnuncio }, { nome: 'Importar lista de anúncios', desc: 'Planilha exportada ou copiada do portal', acao: () => { location.hash = '#documentos'; } }])}</div>
+      <div class="kpis escalonado">${tipos.map((k) => { const v = variacaoMercado(k); return `<div class="kpi ${v != null && v < -0.05 ? 'k-risco' : v != null && v > 0.03 ? 'k-salvia' : 'k-marfim'}"><span class="rot">${ICO[k]}${NOMES[k]}</span><span class="val">${v == null ? '—' : (v > 0 ? '▲ ' : '▼ ') + pct(Math.abs(v))}</span><span class="exp">${v == null ? 'Poucos anúncios ainda' : 'Últimos 2 meses contra os 3 anteriores'}</span></div>`; }).join('')}</div>
+      <section class="painel"><div class="painel-cab"><h2>${ICO.linha}Índice de preço observado</h2><p>100 = preço esperado pela referência do modelo</p></div>
+        ${tipos.map((k) => { const ix = indiceMercado(k); return ix.length > 1 ? `<div style="margin:10px 0 2px"><b style="color:${cores[k]}">${NOMES[k]}</b> <span class="sub">${ix.reduce((s, x) => s + x.n, 0)} anúncios</span></div>${G.linha(ix.slice(-7), { formato: (v) => Math.round(v) + '', altura: 130, largura: innerWidth >= 960 ? 1100 : 560 })}` : ''; }).join('') || '<p class="vazio">Registre anúncios para formar o índice.</p>'}</section>
+      <section class="painel bloco"><div class="painel-cab"><h2>${ICO.etiqueta}Anúncios e leilões registrados</h2><p>${anunciosRec.length}</p></div>
+        <div class="tabela-wrap"><table class="tabela"><thead><tr><th>Data</th><th>Máquina</th><th class="n">Horas</th><th class="n">Preço</th><th>Onde</th></tr></thead><tbody>
+        ${anunciosRec.slice(0, 40).map((a) => `<tr><td>${data(a.data)}</td><td><b>${esc(a.marca + ' ' + a.modelo)}</b> · ${a.ano}<br><span class="sub">${esc(a.cidade || '')}</span></td><td class="n">${(+a.horas || 0).toLocaleString('pt-BR')}</td><td class="n forte">${real(a.preco)}</td><td>${esc(a.fonte)}</td></tr>`).join('')}</tbody></table></div>
+        <p class="nota-rodape">${OP ? '' : 'Anúncios fictícios para a demonstração. '}Na revenda, a equipe registra o que vê nos portais e leilões, ou importa a lista; o Anshur não copia dados de sites de terceiros.</p></section>`;
+    contar();
+  }
+
+  // ---------- horímetro suspeito ----------
+  function checaHorimetro(maq) {
+    const avisos = [];
+    const hAno = (M.catalogo(maq) || {}).hAno || { trator: 750, colhedora: 2600, pulverizador: 820, plantadeira: 270 }[maq.tipo] || 800;
+    const idade = Math.max(1, anoAtual - maq.ano), esperado = hAno * idade;
+    if (maq.horas > 0 && maq.horas < esperado * 0.35) avisos.push(`Horas muito abaixo do normal: ${maq.horas.toLocaleString('pt-BR')} h para ${idade} anos de uso (o comum seria perto de ${Math.round(esperado / 100) * 100} h). Confira o painel e o histórico de revisões.`);
+    if (maq.horas > esperado * 2) avisos.push(`Horas muito acima do normal para a idade: ${maq.horas.toLocaleString('pt-BR')} h. Revise o estado do motor e da transmissão.`);
+    const mans = (maq.manutencoes || []).filter((m) => +m.horas > maq.horas);
+    if (mans.length) avisos.push(`Há revisão registrada com ${(+mans[0].horas).toLocaleString('pt-BR')} h, mais do que o horímetro mostra hoje: possível troca ou adulteração do horímetro.`);
+    return avisos;
+  }
+
+  // ---------- aprovações (trava sem furo) ----------
+  function telaAprovacoes() {
+    const l = estado.pendentes.slice().reverse();
+    tela.innerHTML = `<div class="titulo"><div><h1>Aprovações</h1><p>Trocas que o vendedor quer fechar acima do valor máximo. Só entram no pátio depois que um gerente ou o dono aprovar.</p></div></div>
+      <section class="painel">${l.length ? l.map((p) => `<div class="aprov ${p.status}"><div><b>${esc(p.maq.marca + ' ' + p.maq.modelo)} · ${p.maq.ano} · ${p.maq.horas.toLocaleString('pt-BR')} h</b>
+        <span>Pedido por ${esc(p.por)} em ${new Date(p.quando).toLocaleString('pt-BR')} · quer pagar <b class="neg">${real(p.valor)}</b>, máximo recomendado ${real(p.rec.teto)} (<b class="neg">+${real(p.valor - p.rec.teto)}</b>)</span>
+        <span>Motivo: ${esc(p.motivo || '—')}</span>${p.status !== 'pendente' ? `<span>${p.status === 'aprovada' ? 'Aprovada' : 'Recusada'} por ${esc(p.decisao.por)} em ${new Date(p.decisao.quando).toLocaleString('pt-BR')}</span>` : ''}</div>
+        ${p.status === 'pendente' ? (podeAprovar() ? `<div class="acoes" style="margin:0"><button class="btn btn-ouro" type="button" data-apr="${p.id}">Aprovar</button><button class="btn btn-perigo" type="button" data-rec="${p.id}">Recusar</button></div>` : '<span class="tag declarado">Aguardando gerente</span>') : `<span class="tag ${p.status === 'aprovada' ? 'comprovado' : 'declarado'}">${p.status === 'aprovada' ? 'Aprovada' : 'Recusada'}</span>`}</div>`).join('') : '<p class="vazio">Nenhuma troca esperando aprovação.</p>'}</section>`;
+    $$('[data-apr]', tela).forEach((b) => b.onclick = () => decidir(b.dataset.apr, true));
+    $$('[data-rec]', tela).forEach((b) => b.onclick = () => decidir(b.dataset.rec, false));
+  }
+  function decidir(id, aprova) {
+    const p = estado.pendentes.find((x) => x.id === id); if (!p || !podeAprovar()) return;
+    p.status = aprova ? 'aprovada' : 'recusada'; p.decisao = { por: eu().nome, quando: new Date().toISOString() };
+    if (aprova) {
+      const t = K.fecharTroca(estado, p.maq, p.rec, p.valor, p.data, { ...p.extra, aprovacao: { por: eu().nome, motivo: p.motivo, excesso: p.valor - p.rec.teto, data: hojeISO() } });
+      A.trocas.push({ ...t }); log('aprovacao', `Troca acima do teto aprovada: ${t.marca} ${t.modelo} por ${real(t.pago)} (pedido de ${p.por})`, { ref: t.id });
+    } else log('aprovacao', `Troca acima do teto recusada: ${p.maq.marca} ${p.maq.modelo} (pedido de ${p.por})`);
+    salvar(); cacheLimpa(); atualizarSino(); toast(aprova ? 'Aprovada: a máquina entrou no pátio.' : 'Recusada. O vendedor vê a decisão.'); rota();
+  }
+
+  // ---------- troca em grãos (barter) ----------
+  const GRAOS = { soja: { nome: 'Soja (saca 60 kg)', preco: 128 }, milho: { nome: 'Milho (saca 60 kg)', preco: 62 }, cana: { nome: 'Cana (tonelada)', preco: 155 } };
+  function blocoBarter(valor, id) {
+    const b = estado.barter || { grao: 'soja', preco: GRAOS.soja.preco };
+    return `<section class="painel bloco" id="${id}"><h2>${ICO.moedas}Troca paga em grãos (barter)</h2>
+      <div class="campos" style="margin-top:10px"><div class="campo"><label for="${id}-g">Produto</label><select id="${id}-g">${Object.entries(GRAOS).map(([k, g]) => `<option value="${k}" ${b.grao === k ? 'selected' : ''}>${g.nome}</option>`).join('')}</select></div>
+      <div class="campo"><label for="${id}-p">Preço de hoje (R$ por unidade)</label><input id="${id}-p" inputmode="decimal" value="${String(b.preco).replace('.', ',')}"></div></div>
+      <div class="numeros" id="${id}-r"></div><p class="nota-rodape">O preço do grão é informado pela revenda (bolsa, trading ou cooperativa do dia). Simulação de queda mostra quanto a troca passa a valer.</p></section>`;
+  }
+  function ligarBarter(raiz, valor, id) {
+    const g = $('#' + id + '-g', raiz), p = $('#' + id + '-p', raiz), r = $('#' + id + '-r', raiz); if (!g) return;
+    const calc = () => {
+      const preco = num(p.value) || GRAOS[g.value].preco; estado.barter = { grao: g.value, preco }; salvar();
+      const un = g.value === 'cana' ? 'toneladas' : 'sacas', q = valor / preco;
+      r.innerHTML = `<div><span>Valor máximo em ${un}</span><b>${Math.round(q).toLocaleString('pt-BR')}</b></div><div><span>Se o grão cair 10%, a troca vale</span><b class="neg">${real(q * preco * 0.9)}</b></div><div><span>Se o grão subir 10%, a troca vale</span><b class="pos">${real(q * preco * 1.1)}</b></div>`;
+    };
+    g.onchange = () => { p.value = String(GRAOS[g.value].preco).replace('.', ','); calc(); }; p.oninput = calc; calc();
+  }
+
+  // ---------- exportar a troca para o sistema da revenda ----------
+  function exportarParaDMS(t) {
+    baixarCSV(`anshur-troca-${t.id}.csv`, [['Campo', 'Valor'], ['Código Anshur', t.id], ['Categoria', NOMES[t.tipo]], ['Fabricante', t.marca], ['Modelo', t.modelo], ['Ano', t.ano], ['Horas', t.horas], ['Chassi', t.chassi || ''], ['Valor pago na troca', t.pago], ['Valor máximo recomendado', t.previsto ? t.previsto.teto : ''], ['Preparo previsto', t.preparoEst || ''], ['Preço anunciado', t.anuncio], ['Vendedor', t.vendedor || ''], ['Aprovado por', t.aprovacao ? t.aprovacao.por : ''], ['Data de entrada', data(t.entrada)]]);
+    log('exportacao', `Troca ${t.marca} ${t.modelo} exportada para o sistema da revenda`, { ref: t.id }); salvar();
+  }
+
   // ---------- rotas com transição ----------
-  const TELAS = { visao: telaVisao, avaliar: telaAvaliar, patio: telaPatio, trocas: telaTrocas, teste: telaTeste, passaportes: telaPassaportes, vendedores: telaVendedores, garantias: telaGarantias, financiamento: telaFinanciamento, relatorio: telaRelatorios, mensal: telaRelatorio, documentos: telaDocumentos, usuarios: telaUsuarios, config: telaConfig, atividades: telaAtividades };
+  const TELAS = { visao: telaVisao, avaliar: telaAvaliar, patio: telaPatio, trocas: telaTrocas, teste: telaTeste, passaportes: telaPassaportes, vendedores: telaVendedores, garantias: telaGarantias, financiamento: telaFinanciamento, relatorio: telaRelatorios, mensal: telaRelatorio, documentos: telaDocumentos, usuarios: telaUsuarios, config: telaConfig, atividades: telaAtividades, compradores: telaCompradores, mercado: telaMercado, aprovacoes: telaAprovacoes };
   function moverIndicador() {
     const ativo = $('.menu a[aria-current="page"]'), ind = $('.menu-indicador');
     if (!ativo || !ind) return;

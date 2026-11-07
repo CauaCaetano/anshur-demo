@@ -108,7 +108,28 @@
       entrada: diasAtras(entrada), venda: vendida ? diasAtras(venda) : null, quitacao: vendida && quitada ? diasAtras(Math.max(0, venda - atraso)) : null });
   }
 
+  // ---- compradores que procuram usados (CRM leve) ----
+  const NOMES_C = ['José Carlos', 'Antônio Ribeiro', 'Paulo Mendes', 'Luiz Fernando', 'Ricardo Alves', 'Márcio Tavares', 'Sérgio Lopes', 'Fábio Rezende', 'Cláudio Prado', 'Renato Guimarães', 'Eduardo Faria', 'Gilberto Souza', 'Wagner Lima', 'Adriano Melo', 'Rogério Campos', 'Valdir Moreira', 'Joaquim Barros', 'Hélio Teixeira'];
+  const COMPRADORES = NOMES_C.map((n, i) => {
+    const m = escolhe(MODELOS); const ate = Math.round(m.base * entre(0.55, 0.95) / 10000) * 10000;
+    return { id: 'C' + (i + 1), nome: n, fazenda: 'Faz. ' + escolhe(FAZENDAS), cidade: escolhe(CIDADES), tipo: m.tipo, marcas: rnd() < 0.5 ? m.marca : '', anoMin: hoje.getFullYear() - Math.round(entre(4, 10)), precoMax: ate, desde: diasAtras(entre(5, 200)), obs: escolhe(['Quer para a próxima safra', 'Aceita dar usado na troca', 'Paga à vista', 'Precisa de financiamento', 'Procura com piloto automático', '']) };
+  });
+
+  // ---- anúncios e leilões observados (mercado de fora) ----
+  const ANUNCIOS = [];
+  const FONTES = ['Agrofy', 'Mercado Máquinas', 'Leilão', 'Revenda concorrente'];
+  for (let i = 0; i < 64; i++) {
+    const m = escolhe(MODELOS), idade = Math.round(entre(2, 10)), quando = entre(3, 190);
+    const horas = Math.round(m.hAno * idade * entre(0.7, 1.3) / 10) * 10;
+    // colhedoras perdendo valor nos últimos 2 meses (sinal para a demonstração)
+    const queda = m.tipo === 'colhedora' && quando < 60 ? entre(0.84, 0.9) : 1;
+    const preco = Math.round(m.base * Math.pow(0.9, idade - 1) * (1 - Math.min(0.45, horas / (m.hAno * 12) * 0.35)) * entre(1.02, 1.14) * queda / 1000) * 1000;
+    ANUNCIOS.push({ id: 'AN' + (i + 1), data: diasAtras(quando), fonte: escolhe(FONTES), tipo: m.tipo, marca: m.marca, modelo: m.modelo, ano: hoje.getFullYear() - idade, horas, preco, cidade: escolhe(CIDADES.concat(['Rio Verde, GO', 'Uberaba, MG', 'Ribeirão Preto, SP', 'Cascavel, PR'])) });
+  }
+
   window.ANSHUR = {
+    compradores: COMPRADORES,
+    anuncios: ANUNCIOS,
     garantias: GARANTIAS,
     financiadas: FINANCIADAS,
     revenda: { nome: 'Mogiana Máquinas', cidade: 'Orlândia, SP', aviso: 'Revenda e dados fictícios, só para demonstração' },

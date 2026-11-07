@@ -38,7 +38,11 @@
     estado.fechadas.forEach((t) => { if (!A.trocas.some((x) => x.id === t.id)) A.trocas.push({ ...t }); });
   }
   // garantias e máquinas financiadas cadastradas à mão ou por documento
-  estado.extras = Object.assign({ garantias: [], financiadas: [] }, estado.extras);
+  estado.extras = Object.assign({ garantias: [], financiadas: [], compradores: [], anuncios: [] }, estado.extras);
+  if (ambiente === 'op') { A.compradores = []; A.anuncios = []; }
+  A.compradores = (A.compradores || []).concat(estado.extras.compradores);
+  A.anuncios = (A.anuncios || []).concat(estado.extras.anuncios);
+  estado.pendentes = estado.pendentes || [];
   A.garantias = (A.garantias || []).concat(estado.extras.garantias);
   A.financiadas = (A.financiadas || []).concat(estado.extras.financiadas);
   // usuários, perfis e trilha de atividades

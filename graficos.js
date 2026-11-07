@@ -2,8 +2,8 @@
 (function () {
   const { mil, pct, esc } = window.COMUM;
 
-  function linha(pontos, { formato = mil, altura = 190 } = {}) {
-    const L = 560, H = altura, pe = 34, pd = 12, ps = 14, pi = 28;
+  function linha(pontos, { formato = mil, altura = 190, largura = 560 } = {}) {
+    const L = largura, H = altura, pe = 34, pd = 12, ps = 14, pi = 28;
     const ys = pontos.map((p) => p.v), min = Math.min(...ys) * 0.92, max = Math.max(...ys) * 1.04;
     const x = (i) => pe + (i / Math.max(1, pontos.length - 1)) * (L - pe - pd);
     const y = (v) => ps + (1 - (v - min) / (max - min || 1)) * (H - ps - pi);

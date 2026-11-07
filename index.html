@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="estilo.css?v=9">
+<link rel="stylesheet" href="estilo.css?v=10">
 </head>
 <body>
 <a class="pular" href="#tela">Ir para o conteúdo</a>
@@ -28,6 +28,9 @@
       <a href="#trocas" data-aba="trocas" data-curto="Trocas"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h13l-3-3M20 17H7l3 3"/></svg><span>Inteligência de trocas</span></a>
       <a href="#teste" data-aba="teste" data-curto="Teste"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></svg><span>Teste às cegas</span></a>
       <a href="#passaportes" data-aba="passaportes" data-curto="Passaportes"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 18h2v2h-2zM14 18h2M18 14h2"/></svg><span>Passaportes</span></a>
+      <a href="#compradores" data-aba="compradores" data-curto="Compradores"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 11a4 4 0 1 0-8 0 4 4 0 0 0 8 0zM3 21a9 9 0 0 1 18 0M19 4l2 2-2 2"/></svg><span>Compradores</span></a>
+      <a href="#mercado" data-aba="mercado" data-curto="Mercado"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17l5-5 4 3 8-8M16 7h4v4"/></svg><span>Monitor de mercado</span></a>
+      <a href="#aprovacoes" data-aba="aprovacoes" data-curto="Aprovações"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 12l2 2 4-4M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/></svg><span>Aprovações</span></a>
       <a href="#vendedores" data-aba="vendedores" data-curto="Vendedores"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21v-1a6 6 0 0 1 12 0v1M17 11a3 3 0 1 0 0-6M22 21v-1a5 5 0 0 0-4-4.9"/></svg><span>Vendedores</span></a>
       <a href="#garantias" data-aba="garantias" data-curto="Garantias"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6zM8.5 12l2.5 2.5 4.5-5"/></svg><span>Garantias a receber</span></a>
       <a href="#financiamento" data-aba="financiamento" data-curto="Financiado"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10l9-6 9 6M5 10v9M19 10v9M9 10v9M15 10v9M3 21h18"/></svg><span>Estoque financiado</span></a>
@@ -61,13 +64,13 @@
 </div>
 <div id="camada"></div>
 <div class="toasts" id="toasts" aria-live="polite"></div>
-<script src="dados.js?v=9"></script>
-<script src="fotos.js?v=9"></script>
-<script src="comum.js?v=9"></script>
-<script src="importar.js?v=9"></script>
-<script src="motor.js?v=9"></script>
-<script src="graficos.js?v=9"></script>
-<script src="app.js?v=9"></script>
+<script src="dados.js?v=10"></script>
+<script src="fotos.js?v=10"></script>
+<script src="comum.js?v=10"></script>
+<script src="importar.js?v=10"></script>
+<script src="motor.js?v=10"></script>
+<script src="graficos.js?v=10"></script>
+<script src="app.js?v=10"></script>
 <script>if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then((r) => r.update()).catch(() => {}); let novo = false; navigator.serviceWorker.addEventListener('controllerchange', () => { if (!novo) { novo = true; location.reload(); } }); }</script>
 </body>
 </html>
