@@ -16,12 +16,14 @@
   const OP = K.ambiente === 'op';
   $('.selo-demo').textContent = OP ? 'Minha revenda' : 'Dados demonstrativos';
   $('.lateral-rodape').textContent = OP ? 'Dados reais da sua revenda, guardados só neste navegador.' : 'Dados demonstrativos de uma revenda fictícia.';
-  menuPerfil.innerHTML = `<p><b>${OP ? esc(A.revenda.nome) : 'Seu Antônio'}</b><span>${OP ? 'Ambiente com dados reais' : 'Proprietário · ' + esc(A.revenda.nome)}</span></p>
+  menuPerfil.innerHTML = `<p><b>${esc(K.usuarioAtual().nome)}</b><span>${K.PERFIS[K.usuarioAtual().perfil]} · ${esc(A.revenda.nome)}${OP ? ' · dados reais' : ''}</span></p>
+    <button type="button" role="menuitem" id="m-perfil">Meu perfil</button>
     <button type="button" role="menuitem" id="m-premissas">Premissas da revenda</button>
     <button type="button" role="menuitem" id="m-seg">Segurança dos dados</button>
     <button type="button" role="menuitem" id="m-ambiente">${OP ? 'Voltar para a demonstração' : 'Usar com os dados da minha revenda'}</button>
     ${OP ? '<button type="button" role="menuitem" id="m-nome">Nome da revenda</button><button type="button" role="menuitem" id="m-apagar">Apagar dados da minha revenda</button>' : '<button type="button" role="menuitem" id="m-restaurar">Restaurar dados demonstrativos</button>'}`;
   const fechaMenu = () => { menuPerfil.hidden = true; btnPerfil.setAttribute('aria-expanded', 'false'); };
+  $('#m-perfil').onclick = () => { fechaMenu(); location.hash = '#perfil'; };
   $('#m-premissas').onclick = () => { fechaMenu(); abrirPremissas(); };
   $('#m-seg').onclick = () => { fechaMenu(); abrirCamada('modal', `<h2>Segurança dos dados</h2>
       <p class="sub" style="margin-bottom:12px">O que acontece hoje com os seus números, sem promessa além do que existe.</p>
@@ -644,10 +646,10 @@
         <div class="campo"><label for="t-res">Resultado</label><select id="t-res"><option value="">Todos</option><option value="pos" ${ft.resultado === 'pos' ? 'selected' : ''}>Positivo</option><option value="neg" ${ft.resultado === 'neg' ? 'selected' : ''}>Negativo</option></select></div>
       </div>
       <div class="kpis escalonado">
-        <div class="kpi"><span class="rot">Trocas vendidas</span><span class="val">${conta(linhas.length, 'int')}</span><span class="exp">Margem média ${pct(linhas.reduce((s, l) => s + l.m, 0) / Math.max(1, linhas.length))}</span></div>
-        <div class="kpi"><span class="rot">Resultado bruto acumulado</span><span class="val">${conta(linhas.reduce((s, l) => s + l.res, 0), 'mil')}</span><span class="exp">Venda menos aquisição e preparo.</span></div>
-        <div class="kpi risco"><span class="rot">Trocas com prejuízo</span><span class="val">${prej.length} · ${mil(-prej.reduce((s, l) => s + l.res, 0))}</span><span class="exp">Venderam por menos do que custaram.</span></div>
-        <div class="kpi"><span class="rot">Pago acima do recomendado</span><span class="val">${conta(excesso, 'mil')}</span><span class="exp">Soma do que foi pago além do valor máximo que o Anshur indicaria.</span></div>
+        <div class="kpi k-marfim"><span class="rot">${ICO.barras}Trocas vendidas</span><span class="val">${conta(linhas.length, 'int')}</span><span class="exp">Margem média ${pct(linhas.reduce((s, l) => s + l.m, 0) / Math.max(1, linhas.length))}</span></div>
+        <div class="kpi k-salvia"><span class="rot">${ICO.moedas}Resultado bruto acumulado</span><span class="val">${conta(linhas.reduce((s, l) => s + l.res, 0), 'mil')}</span><span class="exp">Venda menos aquisição e preparo.</span></div>
+        <div class="kpi k-risco"><span class="rot">${ICO.alerta}Trocas com prejuízo</span><span class="val">${prej.length} ${prej.length === 1 ? 'troca' : 'trocas'}</span><span class="pilula">${mil(-prej.reduce((s, l) => s + l.res, 0))}</span><span class="exp">Venderam por menos do que custaram.</span></div>
+        <div class="kpi k-marfim"><span class="rot">${ICO.pct}Pago acima do recomendado</span><span class="val">${conta(excesso, 'mil')}</span><span class="exp">Soma do que foi pago além do valor máximo que o Anshur indicaria.</span></div>
       </div>
       <div class="grade-3">
         <section class="painel"><div class="painel-cab"><h2>Principais fontes de perda</h2></div>${G.horizontais(fontes)}</section>
@@ -1057,7 +1059,7 @@
     oficina: ['patio', 'passaportes', 'garantias', 'documentos'],
     financeiro: ['visao', 'patio', 'trocas', 'garantias', 'financiamento', 'relatorio', 'documentos', 'atividades']
   };
-  const pode = (aba) => (PERM[eu().perfil] || PERM.dono).includes(aba);
+  const pode = (aba) => aba === 'perfil' || (PERM[eu().perfil] || PERM.dono).includes(aba);
   const podeAprovar = () => ['dono', 'gerente'].includes(eu().perfil);
   const log = (tipo, texto, extra) => { K.registrar(tipo, texto, extra); };
 
@@ -1274,7 +1276,7 @@
     tela.innerHTML = `
       <div class="titulo"><div><h1>Usuários e permissões</h1><p>Quem usa o Anshur e o que cada perfil pode ver e fazer.</p></div>${botaoAdicionar([{ nome: 'Adicionar usuário', desc: 'Nome, e-mail e perfil', acao: () => addUsuario() }])}</div>
       <section class="painel"><div class="tabela-wrap"><table class="tabela grande"><thead><tr><th>Nome</th><th>Perfil</th><th>E-mail</th><th>Atividades</th><th></th></tr></thead><tbody>
-        ${estado.usuarios.map((u) => `<tr><td><span class="avatar-mini">${esc(u.nome.split(' ').map((p) => p[0]).slice(0, 2).join(''))}</span> <b>${esc(u.nome)}</b>${u.id === eu().id ? ' <span class="tag comprovado">você</span>' : ''}</td><td>${K.PERFIS[u.perfil]}</td><td>${esc(u.email || '—')}</td><td>${estado.atividades.filter((a) => a.usuario === u.nome).length}</td>
+        ${estado.usuarios.map((u) => `<tr><td>${avatarHTML(u, 36)} <b>${esc(u.nome)}</b>${u.id === eu().id ? ' <span class="tag comprovado">você</span>' : ''}</td><td>${K.PERFIS[u.perfil]}</td><td>${esc(u.email || '—')}</td><td>${estado.atividades.filter((a) => a.usuario === u.nome).length}</td>
           <td style="white-space:nowrap"><button class="link" type="button" data-entrar="${u.id}">Entrar como</button> · <button class="link" type="button" data-editar="${u.id}">Editar</button>${u.perfil !== 'dono' ? ` · <button class="link neg" type="button" data-tirar="${u.id}">Remover</button>` : ''}</td></tr>`).join('')}</tbody></table></div></section>
       <section class="painel bloco"><div class="painel-cab"><h2>${ICO.alvo}O que cada perfil acessa</h2></div>
         <div class="tabela-wrap"><table class="tabela"><thead><tr><th>Perfil</th>${paginas.map(([, n]) => `<th class="n">${n}</th>`).join('')}<th class="n">Aprovar acima do teto</th></tr></thead><tbody>
@@ -1563,8 +1565,9 @@
     $$('[data-rt]', tela).forEach((b) => b.onclick = () => verRetrato(b.dataset.rt));
     $$('[data-rec]', tela).forEach((b) => b.onclick = () => decidir(b.dataset.rec, false));
   }
-  function decidir(id, aprova) {
+  async function decidir(id, aprova) {
     const p = estado.pendentes.find((x) => x.id === id); if (!p || !podeLiberar(p.nivel || 'gerente')) return;
+    if (aprova && !(await confirmaPin())) return;
     p.status = aprova ? 'aprovada' : 'recusada'; p.decisao = { por: eu().nome, quando: new Date().toISOString() };
     if (aprova) {
       const t = K.fecharTroca(estado, p.maq, p.rec, p.valor, p.data, { ...p.extra, retrato: p.retrato, aprovacao: { por: eu().nome, motivo: p.motivo, excesso: p.valor - p.rec.teto, data: hojeISO() } });
@@ -1654,8 +1657,88 @@
     ];
   }
 
+  // ---------- MEU PERFIL ----------
+  const iniciais = (n) => String(n || '?').split(' ').filter(Boolean).map((x) => x[0]).slice(0, 2).join('').toUpperCase();
+  const avatarHTML = (u, tam = 46) => u.foto ? `<img class="foto-perfil" src="${u.foto}" alt="" width="${tam}" height="${tam}">` : `<span class="foto-perfil vazia" style="width:${tam}px;height:${tam}px;font-size:${Math.round(tam / 2.6)}px">${esc(iniciais(u.nome))}</span>`;
+  function atualizarAvatar() { const b = $('#perfil'); const u = eu(); b.innerHTML = u.foto ? `<img src="${u.foto}" alt="">` : esc(iniciais(u.nome)); b.classList.toggle('com-foto', !!u.foto); b.setAttribute('aria-label', 'Perfil de ' + u.nome); }
+  function telaPerfil() {
+    const u = eu();
+    const minhas = estado.atividades.filter((a) => a.usuario === u.nome);
+    const aval = minhas.filter((a) => a.tipo === 'avaliacao').length, trocas = minhas.filter((a) => a.tipo === 'troca').length;
+    const pend = (estado.pendentes || []).filter((p) => p.status === 'pendente' && (p.por === u.nome || podeLiberar(p.nivel || 'gerente'))).length;
+    const pref = u.notif || { Estoque: true, Financeiro: true, Comercial: true, Oficina: true, Garantia: true, Mercado: true };
+    tela.innerHTML = `
+      <div class="titulo"><div><h1>Meu perfil</h1><p>Seus dados, sua foto e como o Anshur fala com você.</p></div></div>
+      <div class="grade-2">
+        <section class="painel perfil-cartao">
+          <div class="perfil-topo">
+            <label class="perfil-foto" title="Trocar foto">${avatarHTML(u, 120)}<input type="file" accept="image/*" capture="user" id="pf-foto" class="sr"><span class="perfil-foto-acao">${ic('<path d="M4 8h3l2-3h6l2 3h3v11H4zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"/>')}</span></label>
+            <div><h2 style="font-size:28px">${esc(u.nome)}</h2><p class="sub" style="font-size:17px">${K.PERFIS[u.perfil]} · ${esc(A.revenda.nome)}</p>
+              ${u.foto ? '<button class="link" type="button" id="pf-tira">Remover foto</button>' : '<p class="ajuda">Toque na foto para colocar a sua.</p>'}</div>
+          </div>
+          <div class="numeros" style="margin-top:20px"><div><span>Avaliações feitas</span><b>${aval}</b></div><div><span>Trocas fechadas</span><b>${trocas}</b></div><div><span>Pendências para você</span><b class="${pend ? 'neg' : ''}">${pend}</b></div></div>
+        </section>
+        <section class="painel"><h2>${ICO.etiqueta}Informações pessoais</h2>${sugestoes()}
+          <div class="campos" style="margin-top:12px">
+            <div class="campo"><label for="pf-nome">Nome completo</label><input id="pf-nome" value="${esc(u.nome)}" autocomplete="name"></div>
+            <div class="campo"><label for="pf-apelido">Como prefere ser chamado</label><input id="pf-apelido" value="${esc(u.apelido || '')}" placeholder="Ex.: Seu Antônio"></div>
+            <div class="campo"><label for="pf-cargo">Cargo</label><input id="pf-cargo" list="dl-cargos" value="${esc(u.cargo || K.PERFIS[u.perfil])}">${lista('dl-cargos', ['Proprietário', 'Diretor comercial', 'Gerente de usados', 'Gerente de loja', 'Vendedor', 'Avaliador', 'Chefe de oficina', 'Financeiro'])}</div>
+            <div class="campo"><label for="pf-loja">Loja / unidade</label><input id="pf-loja" list="dl-cidade" value="${esc(u.loja || A.revenda.cidade)}"></div>
+            <div class="campo"><label for="pf-email">E-mail</label><input id="pf-email" type="email" value="${esc(u.email || '')}" autocomplete="email"></div>
+            <div class="campo"><label for="pf-tel">Celular / WhatsApp</label><input id="pf-tel" inputmode="tel" value="${esc(u.telefone || '')}" placeholder="(16) 99999-0000" autocomplete="tel"></div>
+            <div class="campo"><label for="pf-desde">Na revenda desde</label><input id="pf-desde" type="date" value="${esc(u.desde || '')}"></div>
+            ${u.perfil === 'vendedor' ? `<div class="campo"><label for="pf-meta">Meta de trocas por mês</label><input id="pf-meta" inputmode="numeric" value="${esc(u.meta || '')}"></div>` : `<div class="campo"><label for="pf-ass">Assinatura nos relatórios</label><input id="pf-ass" value="${esc(u.assinatura || '')}" placeholder="Ex.: Antônio Silva, diretor"></div>`}
+            <div class="campo inteiro"><label for="pf-bio">Observações</label><textarea id="pf-bio" rows="2" placeholder="Especialidade, marcas que conhece, região que atende">${esc(u.bio || '')}</textarea></div>
+          </div>
+          <div class="acoes"><button class="btn btn-ouro" type="button" id="pf-salvar">Salvar perfil</button></div></section>
+      </div>
+      <div class="grade-2 bloco">
+        <section class="painel"><h2>${ICO.alerta}Notificações que você quer receber</h2>
+          <div class="checks" style="margin-top:12px">${Object.keys(pref).map((k) => `<label class="check"><input type="checkbox" data-pref="${k}" ${pref[k] ? 'checked' : ''}> ${k}</label>`).join('')}</div>
+          <label class="check" style="margin-top:14px"><input type="checkbox" id="pf-resumo" ${u.resumo ? 'checked' : ''}> Resumo do dia por e-mail às 7h</label>
+          <p class="nota-rodape">O envio por e-mail e WhatsApp entra na versão com servidor; hoje as notificações aparecem no sino.</p>
+          <div class="acoes"><button class="btn btn-linha" type="button" id="pf-notif">Salvar preferências</button></div></section>
+        <section class="painel"><h2>${ICO.alvo}Segurança</h2>
+          ${['dono', 'gerente'].includes(u.perfil) ? `<p class="sub" style="margin:6px 0 12px">Com um PIN, ninguém aprova troca acima do teto usando o seu nome sem saber o código.</p>
+          <div class="campos"><div class="campo"><label for="pf-pin">${u.pin ? 'Novo PIN de aprovação' : 'Criar PIN de aprovação'} (4 a 6 números)</label><input id="pf-pin" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password"></div></div>
+          <div class="acoes"><button class="btn btn-linha" type="button" id="pf-pin-ok">${u.pin ? 'Trocar PIN' : 'Criar PIN'}</button>${u.pin ? '<span class="tag comprovado">PIN ativo</span>' : ''}</div>` : '<p class="sub" style="margin-top:6px">Seu perfil não aprova trocas acima do teto.</p>'}
+          <ul class="lista-motivos" style="margin-top:14px"><li><span>Último acesso</span><b>${new Date(u.ultimoAcesso || Date.now()).toLocaleString('pt-BR')}</b></li><li><span>Atividades registradas</span><b>${minhas.length}</b></li></ul>
+          <div class="acoes"><a class="btn btn-linha" href="#atividades">Ver minhas atividades</a>${estado.usuarios.length > 1 && pode('usuarios') ? '<a class="btn btn-linha" href="#usuarios">Trocar de usuário</a>' : ''}</div></section>
+      </div>`;
+    $('#pf-foto').onchange = (e) => {
+      const f = e.target.files[0]; if (!f) return;
+      const img = new Image(), url = URL.createObjectURL(f);
+      img.onload = () => { const lado = Math.min(img.width, img.height), cv = document.createElement('canvas'); cv.width = cv.height = 256; cv.getContext('2d').drawImage(img, (img.width - lado) / 2, (img.height - lado) / 2, lado, lado, 0, 0, 256, 256); u.foto = cv.toDataURL('image/jpeg', 0.82); URL.revokeObjectURL(url); salvar(); log('perfil', 'Foto do perfil atualizada'); atualizarAvatar(); toast('Foto atualizada.'); telaPerfil(); };
+      img.onerror = () => toast('Não foi possível ler essa imagem.', true); img.src = url;
+    };
+    const tira = $('#pf-tira'); if (tira) tira.onclick = () => { delete u.foto; salvar(); atualizarAvatar(); telaPerfil(); };
+    $('#pf-salvar').onclick = () => {
+      const nome = $('#pf-nome').value.trim(), email = $('#pf-email').value.trim();
+      if (!nome) { toast('O nome não pode ficar vazio.', true); $('#pf-nome').focus(); return; }
+      if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { toast('Confira o e-mail.', true); $('#pf-email').focus(); return; }
+      const antes = u.nome;
+      Object.assign(u, { nome, email, apelido: $('#pf-apelido').value.trim(), cargo: $('#pf-cargo').value.trim(), loja: $('#pf-loja').value.trim(), telefone: $('#pf-tel').value.trim(), desde: $('#pf-desde').value, bio: $('#pf-bio').value.trim() });
+      if ($('#pf-meta')) u.meta = $('#pf-meta').value.trim(); if ($('#pf-ass')) u.assinatura = $('#pf-ass').value.trim();
+      // mantém o histórico ligado ao novo nome
+      if (antes !== nome) estado.atividades.forEach((a) => { if (a.usuario === antes) a.usuario = nome; });
+      log('perfil', 'Perfil atualizado'); salvar(); atualizarAvatar(); toast('Perfil salvo.'); telaPerfil();
+    };
+    $('#pf-notif').onclick = () => { u.notif = {}; $$('[data-pref]', tela).forEach((c) => { u.notif[c.dataset.pref] = c.checked; }); u.resumo = $('#pf-resumo').checked; salvar(); atualizarSino(); toast('Preferências salvas.'); };
+    const pin = $('#pf-pin-ok'); if (pin) pin.onclick = async () => { const v = $('#pf-pin').value; if (!/^\d{4,6}$/.test(v)) { toast('O PIN precisa ter de 4 a 6 números.', true); return; } u.pin = await sha256(u.id + ':' + v); log('perfil', 'PIN de aprovação ' + (u.pin ? 'definido' : 'alterado')); salvar(); toast('PIN salvo. Ele será pedido em cada aprovação.'); telaPerfil(); };
+  }
+  // aprovação com PIN, quando a pessoa definiu um
+  async function confirmaPin() {
+    const u = eu(); if (!u.pin) return true;
+    return new Promise((ok) => {
+      abrirCamada('modal', `<h2>Confirme com o seu PIN</h2><p class="sub">Aprovação acima do teto em nome de ${esc(u.nome)}.</p><div class="campo" style="margin-top:12px"><label for="pin-in">PIN</label><input id="pin-in" type="password" inputmode="numeric" maxlength="6" autocomplete="off"></div><div class="acoes"><button class="btn btn-ouro" type="button" id="pin-ok">Confirmar</button><button class="btn btn-linha" type="button" id="pin-nao">Cancelar</button></div>`, (c) => {
+        $('#pin-nao', c).onclick = () => { fecharCamada(); ok(false); };
+        $('#pin-ok', c).onclick = async () => { if ((await sha256(u.id + ':' + $('#pin-in', c).value)) === u.pin) { fecharCamada(true); ok(true); } else { toast('PIN incorreto.', true); log('seguranca', 'PIN de aprovação incorreto'); salvar(); } };
+      });
+    });
+  }
+
   // ---------- rotas com transição ----------
-  const TELAS = { visao: telaVisao, avaliar: telaAvaliar, patio: telaPatio, trocas: telaTrocas, teste: telaTeste, passaportes: telaPassaportes, vendedores: telaVendedores, garantias: telaGarantias, financiamento: telaFinanciamento, relatorio: telaRelatorios, mensal: telaRelatorio, documentos: telaDocumentos, usuarios: telaUsuarios, config: telaConfig, atividades: telaAtividades, compradores: telaCompradores, mercado: telaMercado, aprovacoes: telaAprovacoes };
+  const TELAS = { visao: telaVisao, avaliar: telaAvaliar, patio: telaPatio, trocas: telaTrocas, teste: telaTeste, passaportes: telaPassaportes, vendedores: telaVendedores, garantias: telaGarantias, financiamento: telaFinanciamento, relatorio: telaRelatorios, mensal: telaRelatorio, documentos: telaDocumentos, usuarios: telaUsuarios, config: telaConfig, atividades: telaAtividades, compradores: telaCompradores, mercado: telaMercado, aprovacoes: telaAprovacoes, perfil: telaPerfil };
   function moverIndicador() {
     const ativo = $('.menu a[aria-current="page"]'), ind = $('.menu-indicador');
     if (!ativo || !ind) return;
@@ -1677,7 +1760,7 @@
   }
   $('#sino').onclick = abrirNotificacoes;
   $('#busca-btn').onclick = abrirBusca; $('#instalar-btn').onclick = simularInstalacao;
-  $('#perfil').textContent = eu().nome.split(' ').map((x) => x[0]).slice(0, 2).join('').toUpperCase();
+  atualizarAvatar(); eu().ultimoAcesso = new Date().toISOString(); salvar();
   $$('.menu a').forEach((a) => { if (!pode(a.dataset.aba)) a.hidden = true; });
   $$('.menu-grupo').forEach((g) => { let x = g.nextElementSibling, algum = false; while (x && x.tagName === 'A') { if (!x.hidden) algum = true; x = x.nextElementSibling; } g.hidden = !algum; });
   if (OP) sincronizar(false).then((r) => { if (r === 'novas') { toast(`Sincronizado com o seu sistema: ${estado.ultimaSync.novas} trocas novas.`); setTimeout(() => location.reload(), 1200); } else if (r === 'permissao') toast('Toque em Teste às cegas › Importar planilha › Sincronizar agora para atualizar com o seu sistema.'); }).catch(() => {});

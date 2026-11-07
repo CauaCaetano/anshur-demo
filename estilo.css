@@ -398,7 +398,7 @@ main { max-width: 1480px; }
 @media (max-width: 560px) { .rosca { grid-template-columns: 1fr; justify-items: center; } }
 .rosca-svg { width: 190px; height: 190px; }
 .g-arco { opacity: 0; animation: aparece .5s ease forwards; }
-.rosca-total { font-size: 19px; font-weight: 800; fill: var(--obsidiana); }
+.rosca-total { font-size: 20px; font-weight: 800; fill: var(--obsidiana); }
 .rosca-rot { font-size: 13px; fill: var(--cinza); }
 .rosca-leg { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; width: 100%; }
 .rosca-leg li { display: grid; grid-template-columns: 16px 1fr auto auto; gap: 12px; align-items: center; font-size: 16.5px; }
@@ -572,3 +572,28 @@ main { max-width: 1480px; }
   .menu-grupo { display: block; margin: 16px 16px 4px; font-size: 13.5px; font-weight: 700; letter-spacing: .01em; color: #A39C8D; }
   .menu-grupo:first-of-type { margin-top: 0; }
 }
+
+/* perfil */
+.foto-perfil { border-radius: 50%; object-fit: cover; display: inline-grid; place-items: center; vertical-align: middle; background: #F3EDE1; color: var(--grafite); font-weight: 800; }
+img.foto-perfil { background: none; }
+.avatar.com-foto { padding: 0; overflow: hidden; } .avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.perfil-topo { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
+.perfil-foto { position: relative; cursor: pointer; border-radius: 50%; }
+.perfil-foto .foto-perfil { width: 120px; height: 120px; box-shadow: 0 0 0 4px #fff, 0 0 0 6px #E5D7B8; }
+.perfil-foto .vazia { font-size: 44px; }
+.perfil-foto-acao { position: absolute; right: 2px; bottom: 2px; width: 40px; height: 40px; border-radius: 50%; background: var(--ouro); color: var(--obsidiana); display: grid; place-items: center; box-shadow: 0 4px 10px rgba(17, 24, 32, .25); transition: transform 150ms; }
+.perfil-foto:hover .perfil-foto-acao { transform: scale(1.08); }
+.perfil-foto-acao .ico { width: 20px; height: 20px; }
+.cab-info b, .cab-info span, .selo-demo, .cab-nova { white-space: nowrap; }
+@media (max-width: 1520px) { #refdata { display: none !important; } .kbd { display: none; } .busca-btn { width: 50px; padding: 0; justify-content: center; } }
+@media (max-width: 1180px) { .selo-demo { display: none; } }
+/* tamanhos que se ajustam ao espaço do cartão (corrige quebras de texto) */
+.kpi { container-type: inline-size; }
+.kpi .val { font-size: clamp(24px, 14cqi, 46px); white-space: nowrap; }
+.kpi .rot { font-size: clamp(15px, 7cqi, 19px); }
+.kpi .rot .ico { width: clamp(24px, 12cqi, 34px); height: clamp(24px, 12cqi, 34px); }
+.painel { container-type: inline-size; }
+@container (max-width: 560px) { .rosca { grid-template-columns: 1fr; justify-items: center; } .rosca-svg { width: 170px; height: 170px; } }
+.rosca-leg li span { white-space: nowrap; }
+.rosca-leg li { grid-template-columns: 16px 1fr auto auto; }
+@media (max-width: 959px) { .menu { width: 100%; max-width: 100vw; box-sizing: border-box; } html, body { overflow-x: hidden; } .passos-on li { grid-template-columns: 28px 1fr; } .passos-on li .btn { grid-column: 2; justify-self: start; } }

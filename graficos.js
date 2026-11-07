@@ -4,7 +4,9 @@
 
   function linha(pontos, { formato = mil, altura = 190, largura = 560 } = {}) {
     const L = largura, H = altura, pe = 34, pd = 12, ps = 14, pi = 28;
-    const ys = pontos.map((p) => p.v), min = Math.min(...ys) * 0.92, max = Math.max(...ys) * 1.04;
+    // escala com folga dos dois lados; funciona com valores negativos e com todos iguais
+    const ys = pontos.map((p) => p.v), lo = Math.min(...ys), hi = Math.max(...ys), folga = (hi - lo) * 0.12 || Math.abs(hi) * 0.1 || 1;
+    const min = lo - folga, max = hi + folga * 1.6;
     const x = (i) => pe + (i / Math.max(1, pontos.length - 1)) * (L - pe - pd);
     const y = (v) => ps + (1 - (v - min) / (max - min || 1)) * (H - ps - pi);
     const d = pontos.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)} ${y(p.v).toFixed(1)}`).join(' ');
@@ -42,14 +44,14 @@
 
   // rosca: [{r, v, cor}] com total no meio
   function rosca(itens, { formato = mil, rotuloTotal = 'total' } = {}) {
-    const total = itens.reduce((s, i) => s + i.v, 0) || 1, R = 70, r = 46, C = 2 * Math.PI * ((R + r) / 2), esp = R - r;
+    const total = itens.reduce((s, i) => s + i.v, 0) || 1, R = 82, r = 62, C = 2 * Math.PI * ((R + r) / 2), esp = R - r;
     let acum = 0;
     const arcos = itens.map((i, k) => {
       const frac = i.v / total, comp = frac * C, d = `<circle cx="90" cy="90" r="${(R + r) / 2}" fill="none" stroke="${i.cor}" stroke-width="${esp}" stroke-dasharray="${comp} ${C - comp}" stroke-dashoffset="${-acum}" transform="rotate(-90 90 90)" class="g-arco" style="animation-delay:${0.1 + k * 0.12}s"><title>${esc(i.r)}: ${esc(formato(i.v))}</title></circle>`;
       acum += comp; return d;
     }).join('');
     return `<div class="rosca"><svg viewBox="0 0 180 180" class="rosca-svg" role="img" aria-label="${esc(itens.map((i) => i.r + ': ' + formato(i.v)).join('; '))}">${arcos}
-      <text x="90" y="88" text-anchor="middle" class="rosca-total">${esc(formato(total))}</text><text x="90" y="108" text-anchor="middle" class="rosca-rot">${esc(rotuloTotal)}</text></svg>
+      <text x="90" y="84" text-anchor="middle" class="rosca-rot">R$</text><text x="90" y="104" text-anchor="middle" class="rosca-total" textLength="${Math.min(96, String(formato(total)).replace('R$ ', '').length * 11)}" lengthAdjust="spacingAndGlyphs">${esc(String(formato(total)).replace('R$ ', ''))}</text><text x="90" y="122" text-anchor="middle" class="rosca-rot">${esc(rotuloTotal)}</text></svg>
       <ul class="rosca-leg">${itens.map((i) => `<li><i style="background:${i.cor}"></i><span>${esc(i.r)}</span><b>${pct(i.v / total, 0)}</b><b>${esc(formato(i.v))}</b></li>`).join('')}</ul></div>`;
   }
 
