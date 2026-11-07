@@ -428,7 +428,7 @@
     $('#registrar').onclick = (e) => {
       const b = e.currentTarget; b.classList.add('carregando');
       // a avaliação congela os números e as premissas do dia: não é recalculada quando o modelo muda
-      setTimeout(() => { estado.avaliacoes.push({ id: 'AV' + Date.now(), data: hojeISO(), maq, teto: r.teto, venda: r.venda, preparo: r.preparo, faixa: r.faixa, confianca: r.confianca, amostras: r.base, mape: r.qualidade ? r.qualidade.mape : null, premissas: { margemAlvo: r.margem, jurosMes: K.cfg.jurosMes } }); log('avaliacao', `Avaliação registrada: ${maq.marca} ${maq.modelo} ${maq.ano}, máximo ${real(r.teto)}`); salvar(); b.classList.remove('carregando'); toast('Avaliação registrada com as premissas de hoje.'); telaAvaliar(); }, 450);
+      tirarRetrato(maq, r, { decisao: 'Avaliação registrada' }).then((rt) => { estado.avaliacoes.push({ retrato: rt.id, id: 'AV' + Date.now(), data: hojeISO(), maq, teto: r.teto, venda: r.venda, preparo: r.preparo, faixa: r.faixa, confianca: r.confianca, amostras: r.base, mape: r.qualidade ? r.qualidade.mape : null, premissas: { margemAlvo: r.margem, jurosMes: K.cfg.jurosMes } }); log('avaliacao', `Avaliação registrada: ${maq.marca} ${maq.modelo} ${maq.ano}, máximo ${real(r.teto)}`); salvar(); b.classList.remove('carregando'); toast('Avaliação registrada com retrato imutável.'); telaAvaliar(); });
     };
     $('#premissas').onclick = abrirPremissas;
     $('#fechar-troca').onclick = () => abrirCamada('modal', `<h2>Fechar troca</h2><p class="sub">Registre o valor efetivamente negociado. Ele pode ser diferente do valor máximo recomendado.</p>
@@ -445,23 +445,30 @@
       const checar = () => {
         const v = num(inp.value), d = v - r.teto;
         $('#t-aprov-box', c).hidden = !(d > 0); $('#t-mot-box', c).hidden = !(d > 0);
-        aviso.innerHTML = !(v > 0) ? '<span class="neg">Informe o valor pago.</span>' : d > 0 ? `<span class="neg">${real(d)} acima do valor máximo recomendado. A margem projetada cai para ${pct((r.venda - v - r.preparo) / r.venda)}. Precisa da aprovação do gerente; pela regra da revenda, ${pct(K.cfg.descontoAcima, 0)} do valor acima (${real(d * K.cfg.descontoAcima)}) sai da comissão do vendedor.</span>` : `Dentro do valor máximo recomendado (${real(r.teto)}). Margem projetada: ${pct((r.venda - v - r.preparo) / r.venda)}.`;
+        const nv = nivelExigido(maq.tipo, d);
+        $('#t-aprov-box', c).hidden = !(d > 0) || nv === 'livre'; $('#t-mot-box', c).hidden = !(d > 0);
+        aviso.innerHTML = !(v > 0) ? '<span class="neg">Informe o valor pago.</span>' : d > 0 ? `<span class="neg">${real(d)} acima do valor máximo recomendado (${NOME_NIVEL[nv]} para ${NOMES[maq.tipo].toLowerCase()}). A margem projetada cai para ${pct((r.venda - v - r.preparo) / r.venda)}. Pela regra da revenda, ${pct(K.cfg.descontoAcima, 0)} do valor acima (${real(d * K.cfg.descontoAcima)}) sai da comissão do vendedor.</span>
+          <div class="contra"><b>Antes de pagar acima, ofereça ao cliente:</b>${contraproposta(d, r).map((o) => `<div><b>${esc(o.t)}</b><span>${esc(o.d)}</span></div>`).join('')}</div>` : `Dentro do valor máximo recomendado (${real(r.teto)}). Margem projetada: ${pct((r.venda - v - r.preparo) / r.venda)}.`;
       };
       inp.oninput = checar; checar();
       $('#t-nao', c).onclick = () => fecharCamada();
-      $('#t-ok', c).onclick = (e) => {
+      $('#t-ok', c).onclick = async (e) => {
         const v = num(inp.value), dt = $('#t-data', c).value || hojeISO();
         if (!(v > 0)) { inp.focus(); toast('Informe o valor pago na troca.', true); return; }
         const acima = v > r.teto, aprov = $('#t-aprov', c).value.trim(), mot = $('#t-mot', c).value.trim();
-        if (acima && (!aprov || !mot)) { (aprov ? $('#t-mot', c) : $('#t-aprov', c)).focus(); toast('Acima do recomendado: informe quem aprovou e o motivo.', true); return; }
-        if (acima && !podeAprovar()) {
-          const ped = { id: 'P' + Date.now(), quando: new Date().toISOString(), por: eu().nome, maq, rec: { teto: r.teto, venda: r.venda, preparo: r.preparo, dias: r.dias, margem: r.margem, margemSobreVenda: r.margemSobreVenda, confianca: r.confianca, doTipo: r.doTipo, qualidade: r.qualidade ? { mape: r.qualidade.mape } : null }, valor: Math.round(v), data: dt, motivo: mot, status: 'pendente', extra: { vendedor: $('#t-vend', c).value, negociacao: av.nova || null, origem: av.local || 'Troca registrada', fotos: av.fotos.filter(Boolean), verif: { ...av.verif } } };
+        const nivel = nivelExigido(maq.tipo, v - r.teto);
+        if (acima && !mot) { $('#t-mot', c).focus(); toast('Acima do recomendado: informe o motivo.', true); return; }
+        if (acima && nivel !== 'livre' && podeLiberar(nivel) && !aprov) { $('#t-aprov', c).focus(); toast('Informe quem aprovou.', true); return; }
+        if (acima && !podeLiberar(nivel)) {
+          const rt = await tirarRetrato(maq, r, { valorPago: Math.round(v), decisao: 'Pedido de aprovação (' + NOME_NIVEL[nivel] + ')', motivo: mot });
+          const ped = { id: 'P' + Date.now(), nivel, retrato: rt.id, quando: new Date().toISOString(), por: eu().nome, maq, rec: { teto: r.teto, venda: r.venda, preparo: r.preparo, dias: r.dias, margem: r.margem, margemSobreVenda: r.margemSobreVenda, confianca: r.confianca, doTipo: r.doTipo, qualidade: r.qualidade ? { mape: r.qualidade.mape } : null }, valor: Math.round(v), data: dt, motivo: mot, status: 'pendente', extra: { vendedor: $('#t-vend', c).value, negociacao: av.nova || null, origem: av.local || 'Troca registrada', fotos: av.fotos.filter(Boolean), verif: { ...av.verif } } };
           estado.pendentes.push(ped); log('aprovacao', `Pedido de aprovação: ${maq.marca} ${maq.modelo} por ${real(v)} (máximo ${real(r.teto)})`); salvar(); atualizarSino();
-          fecharCamada(true); toast('Pedido enviado ao gerente. A troca só entra no pátio depois da aprovação.'); location.hash = '#aprovacoes'; return;
+          fecharCamada(true); toast(nivel === 'dono' ? 'Pedido enviado ao dono: para este tipo de máquina, só ele libera.' : 'Pedido enviado ao gerente. A troca só entra no pátio depois da aprovação.'); location.hash = '#aprovacoes'; return;
         }
         const b = e.currentTarget; b.classList.add('carregando');
+        const rtF = await tirarRetrato(maq, r, { valorPago: Math.round(v), decisao: acima ? (nivel === 'livre' ? 'Acima do teto, dentro da alçada do vendedor' : 'Acima do teto, aprovada por ' + aprov) : 'Dentro do valor máximo', motivo: mot });
         setTimeout(() => {
-          const t = K.fecharTroca(estado, maq, r, v, dt, { vendedor: $('#t-vend', c).value, negociacao: av.nova || null, aprovacao: acima ? { por: aprov, motivo: mot, excesso: v - r.teto, data: hojeISO() } : null, origem: av.local || 'Troca registrada',
+          const t = K.fecharTroca(estado, maq, r, v, dt, { retrato: rtF.id, vendedor: $('#t-vend', c).value, negociacao: av.nova || null, aprovacao: acima ? { por: nivel === 'livre' ? eu().nome + ' (alçada do vendedor)' : aprov, motivo: mot, excesso: v - r.teto, data: hojeISO() } : null, origem: av.local || 'Troca registrada',
             manutencoes: av.declarado ? [{ servico: av.declarado, horas: av.horas, comNota: av.verif.notas }] : [], fotos: av.fotos.filter(Boolean), verif: { ...av.verif } });
           const id = t.id;
           A.trocas.push({ ...t }); log('troca', `Troca fechada: ${t.marca} ${t.modelo} por ${real(t.pago)} (máximo recomendado ${real(r.teto)})${t.aprovacao ? `, acima do teto, aprovada por ${t.aprovacao.por}` : ''}`, { ref: t.id }); salvar(); cacheLimpa();
@@ -562,7 +569,8 @@
       <section style="margin-top:12px"><h2 style="font-size:18px;margin-bottom:8px">Compradores interessados</h2>${(() => { const cs = compradoresPara(t); return cs.length ? cs.slice(0, 5).map((c) => `<span class="tag comprovado" style="margin:0 6px 6px 0">${esc(c.nome)} · ${esc(c.cidade || '')} · até ${mil(c.precoMax)}</span>`).join('') : '<p class="sub">Ninguém cadastrado procura esta máquina. <a class="link" href="#compradores">Cadastrar comprador</a></p>'; })()}</section>
       ${checaHorimetro(t).length ? `<p class="conta neg">${checaHorimetro(t).map(esc).join(' ')}</p>` : ''}
       <section style="margin-top:12px"><h2 style="font-size:18px;margin-bottom:8px">Documentos</h2>${(t.docs || []).length ? `<ul class="lista-motivos">${t.docs.map((d) => { const doc = estado.documentos.find((x) => x.id === d); return `<li><span>${esc(doc ? doc.nome : d)}</span><b>${doc ? esc(doc.tipo) : ''}</b></li>`; }).join('')}</ul>` : '<p class="sub">Nenhum documento anexado.</p>'}<a class="btn btn-linha" href="#documentos" style="margin-top:8px">Anexar documento</a></section>
-      <div class="acoes"><a class="btn btn-ouro" href="passaporte.html?id=${t.id}">Abrir passaporte</a><button class="btn btn-linha" type="button" id="exp-dms">Exportar para o sistema</button></div>`, (c) => {
+      <div class="acoes"><a class="btn btn-ouro" href="passaporte.html?id=${t.id}">Abrir passaporte</a><button class="btn btn-linha" type="button" id="exp-dms">Exportar para o sistema</button>${t.retrato ? '<button class="btn btn-linha" type="button" id="ver-rt">Retrato da avaliação</button>' : ''}</div>`, (c) => {
+      if ($('#ver-rt', c)) $('#ver-rt', c).onclick = () => verRetrato(t.retrato);
       $('#exp-dms', c).onclick = () => exportarParaDMS(t);
       const s = $('#sim', c), res = $('#sim-res', c), ap = $('#aplicar', c);
       const atual = () => {
@@ -1298,6 +1306,10 @@
             <div><span>Desconto por troca acima</span><b>${pct(K.cfg.descontoAcima, 0)}</b></div><div><span>Hora da oficina</span><b>${real(K.cfg.valorHora)}</b></div><div><span>Base do custo</span><b>${K.cfg.baseJuros === 'total' ? 'Pago + preparo' : 'Valor pago'}</b></div></div>
           <div class="acoes"><button class="btn btn-linha" type="button" id="c-prem">Alterar regras</button></div></section>
       </div>
+      <section class="painel bloco"><h2>${ICO.alvo}Alçadas de aprovação por tipo de máquina</h2><p class="sub" style="margin:6px 0 12px">Quanto acima do valor máximo cada um pode liberar. Acima da alçada do gerente, só o dono libera. Zero = qualquer valor acima precisa de aprovação.</p>
+        <div class="tabela-wrap"><table class="tabela grande"><thead><tr><th>Tipo</th><th class="n">Vendedor libera até (R$)</th><th class="n">Gerente libera até (R$)</th><th>Acima disso</th></tr></thead><tbody>
+        ${Object.entries(alcadas()).map(([k, a]) => `<tr><td><b>${NOMES[k]}</b></td><td class="n"><input class="campo-in" style="max-width:150px;text-align:right" data-alc="${k}|vendedor" inputmode="numeric" value="${a.vendedor.toLocaleString('pt-BR')}"></td><td class="n"><input class="campo-in" style="max-width:150px;text-align:right" data-alc="${k}|gerente" inputmode="numeric" value="${a.gerente.toLocaleString('pt-BR')}"></td><td>Só o dono</td></tr>`).join('')}</tbody></table></div>
+        <div class="acoes"><button class="btn btn-ouro" type="button" id="c-alc">Salvar alçadas</button></div></section>
       <div class="grade-2 bloco">
         <section class="painel"><h2>${ICO.barras}Catálogo de modelos</h2><p class="sub" style="margin:6px 0 10px">Referências de preço usadas pelo motor. Modelos novos entram com a Fipe.</p>
           <div class="tabela-wrap" style="max-height:320px;overflow:auto"><table class="tabela"><thead><tr><th>Modelo</th><th>Categoria</th><th class="n">Referência</th></tr></thead><tbody>${A.modelos.map((m) => `<tr><td><b>${esc(m.marca)}</b> ${esc(m.modelo)}</td><td>${NOMES[m.tipo]}</td><td class="n">${mil(m.base)}</td></tr>`).join('')}</tbody></table></div>
@@ -1308,6 +1320,7 @@
       </div>`;
     $('#c-salvar').onclick = () => { estado.nomeRevenda = $('#c-nome').value.trim(); estado.cnpj = $('#c-cnpj').value.trim(); estado.cidadeRevenda = $('#c-cid').value.trim(); estado.marcasRevenda = $('#c-marcas').value.trim(); salvar(); log('config', 'Dados da revenda atualizados'); toast('Dados da revenda salvos.'); setTimeout(() => location.reload(), 600); };
     $('#c-prem').onclick = abrirPremissas;
+    $('#c-alc').onclick = () => { const n = {}; $$('[data-alc]', tela).forEach((i) => { const [k, q] = i.dataset.alc.split('|'); n[k] = n[k] || {}; n[k][q] = Math.max(0, num(i.value) || 0); }); Object.values(n).forEach((a) => { if (a.gerente < a.vendedor) a.gerente = a.vendedor; }); estado.alcadas = n; log('config', 'Alçadas de aprovação alteradas'); salvar(); toast('Alçadas salvas.'); rota(); };
     $('#c-modelo').onclick = () => formulario('Adicionar modelo ao catálogo', [{ k: 'tipo', r: 'Categoria', tipo: 'select', ops: Object.entries(NOMES) }, { k: 'marca', r: 'Fabricante', lista: 'dl-marca', obr: true }, { k: 'modelo', r: 'Modelo', lista: 'dl-modelo', obr: true }, { k: 'base', r: 'Referência de preço seminovo (R$)', num: true, obr: true }], { tipo: 'trator' }, (v) => {
       A.modelos.push({ tipo: v.tipo, marca: v.marca, modelo: v.modelo, base: v.base, hAno: { trator: 750, colhedora: 2600, pulverizador: 820, plantadeira: 270 }[v.tipo], importado: true });
       estado.modelosExtra = (estado.modelosExtra || []).concat([{ tipo: v.tipo, marca: v.marca, modelo: v.modelo, base: v.base }]); salvar(); log('config', `Modelo ${v.marca} ${v.modelo} adicionado ao catálogo`); fecharCamada(true); toast('Modelo adicionado.'); rota();
@@ -1544,15 +1557,17 @@
       <section class="painel">${l.length ? l.map((p) => `<div class="aprov ${p.status}"><div><b>${esc(p.maq.marca + ' ' + p.maq.modelo)} · ${p.maq.ano} · ${p.maq.horas.toLocaleString('pt-BR')} h</b>
         <span>Pedido por ${esc(p.por)} em ${new Date(p.quando).toLocaleString('pt-BR')} · quer pagar <b class="neg">${real(p.valor)}</b>, máximo recomendado ${real(p.rec.teto)} (<b class="neg">+${real(p.valor - p.rec.teto)}</b>)</span>
         <span>Motivo: ${esc(p.motivo || '—')}</span>${p.status !== 'pendente' ? `<span>${p.status === 'aprovada' ? 'Aprovada' : 'Recusada'} por ${esc(p.decisao.por)} em ${new Date(p.decisao.quando).toLocaleString('pt-BR')}</span>` : ''}</div>
-        ${p.status === 'pendente' ? (podeAprovar() ? `<div class="acoes" style="margin:0"><button class="btn btn-ouro" type="button" data-apr="${p.id}">Aprovar</button><button class="btn btn-perigo" type="button" data-rec="${p.id}">Recusar</button></div>` : '<span class="tag declarado">Aguardando gerente</span>') : `<span class="tag ${p.status === 'aprovada' ? 'comprovado' : 'declarado'}">${p.status === 'aprovada' ? 'Aprovada' : 'Recusada'}</span>`}</div>`).join('') : '<p class="vazio">Nenhuma troca esperando aprovação.</p>'}</section>`;
+        ${p.retrato ? `<button class="link" type="button" data-rt="${p.retrato}">Ver retrato da avaliação</button>` : ''}
+        ${p.status === 'pendente' ? (podeLiberar(p.nivel || 'gerente') ? `<div class="acoes" style="margin:0"><button class="btn btn-ouro" type="button" data-apr="${p.id}">Aprovar</button><button class="btn btn-perigo" type="button" data-rec="${p.id}">Recusar</button></div>` : `<span class="tag declarado">${p.nivel === 'dono' ? 'Aguardando o dono' : 'Aguardando gerente'}</span>`) : `<span class="tag ${p.status === 'aprovada' ? 'comprovado' : 'declarado'}">${p.status === 'aprovada' ? 'Aprovada' : 'Recusada'}</span>`}</div>`).join('') : '<p class="vazio">Nenhuma troca esperando aprovação.</p>'}</section>`;
     $$('[data-apr]', tela).forEach((b) => b.onclick = () => decidir(b.dataset.apr, true));
+    $$('[data-rt]', tela).forEach((b) => b.onclick = () => verRetrato(b.dataset.rt));
     $$('[data-rec]', tela).forEach((b) => b.onclick = () => decidir(b.dataset.rec, false));
   }
   function decidir(id, aprova) {
-    const p = estado.pendentes.find((x) => x.id === id); if (!p || !podeAprovar()) return;
+    const p = estado.pendentes.find((x) => x.id === id); if (!p || !podeLiberar(p.nivel || 'gerente')) return;
     p.status = aprova ? 'aprovada' : 'recusada'; p.decisao = { por: eu().nome, quando: new Date().toISOString() };
     if (aprova) {
-      const t = K.fecharTroca(estado, p.maq, p.rec, p.valor, p.data, { ...p.extra, aprovacao: { por: eu().nome, motivo: p.motivo, excesso: p.valor - p.rec.teto, data: hojeISO() } });
+      const t = K.fecharTroca(estado, p.maq, p.rec, p.valor, p.data, { ...p.extra, retrato: p.retrato, aprovacao: { por: eu().nome, motivo: p.motivo, excesso: p.valor - p.rec.teto, data: hojeISO() } });
       A.trocas.push({ ...t }); log('aprovacao', `Troca acima do teto aprovada: ${t.marca} ${t.modelo} por ${real(t.pago)} (pedido de ${p.por})`, { ref: t.id });
     } else log('aprovacao', `Troca acima do teto recusada: ${p.maq.marca} ${p.maq.modelo} (pedido de ${p.por})`);
     salvar(); cacheLimpa(); atualizarSino(); toast(aprova ? 'Aprovada: a máquina entrou no pátio.' : 'Recusada. O vendedor vê a decisão.'); rota();
@@ -1583,6 +1598,62 @@
     log('exportacao', `Troca ${t.marca} ${t.modelo} exportada para o sistema da revenda`, { ref: t.id }); salvar();
   }
 
+  // =====================================================================================
+  // V7: alçadas por tipo de máquina, retrato imutável da avaliação e contraproposta guiada
+  // =====================================================================================
+  const ALCADA_PADRAO = { trator: { vendedor: 5000, gerente: 40000 }, colhedora: { vendedor: 0, gerente: 0 }, pulverizador: { vendedor: 3000, gerente: 30000 }, plantadeira: { vendedor: 3000, gerente: 20000 } };
+  const alcadas = () => Object.assign({}, ALCADA_PADRAO, estado.alcadas || {});
+  // nível de quem pode liberar um valor acima do teto: livre (o próprio vendedor), gerente ou dono
+  function nivelExigido(tipo, excesso) {
+    if (excesso <= 0) return 'livre';
+    const a = alcadas()[tipo] || { vendedor: 0, gerente: 0 };
+    return excesso <= a.vendedor ? 'livre' : excesso <= a.gerente ? 'gerente' : 'dono';
+  }
+  const podeLiberar = (nivel) => nivel === 'livre' || eu().perfil === 'dono' || (nivel === 'gerente' && eu().perfil === 'gerente');
+  const NOME_NIVEL = { livre: 'dentro da alçada do vendedor', gerente: 'precisa do gerente', dono: 'só o dono libera' };
+
+  // retrato da avaliação: congela tudo o que o sistema mostrou e gera um código que denuncia qualquer alteração
+  async function sha256(txt) { const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(txt)); return [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, '0')).join(''); }
+  async function tirarRetrato(maq, r, extra = {}) {
+    const corpo = { versao: 1, quando: new Date().toISOString(), usuario: eu().nome, perfil: eu().perfil, revenda: A.revenda.nome,
+      maquina: { tipo: maq.tipo, marca: maq.marca, modelo: maq.modelo, ano: maq.ano, horas: maq.horas, inspecao: maq.cond },
+      recomendacao: { valorMaximo: r.teto, faixa: r.faixa, vendaEstimada: r.venda, preparo: r.preparo, margem: r.margemSobreVenda, qualidade: r.confianca, erroHistorico: r.qualidade ? r.qualidade.mape : null, vendasUsadas: r.base },
+      premissas: { margemAlvo: r.margem, jurosMes: K.cfg.jurosMes }, mercado: variacaoMercado(maq.tipo), compradores: compradoresPara({ ...maq, anuncio: Math.round(r.venda * 1.08) }).length,
+      horimetro: checaHorimetro({ ...maq, manutencoes: [] }), alertasMostrados: r.limites, ...extra };
+    const json = JSON.stringify(corpo), hash = await sha256(json);
+    const id = 'R' + Date.now();
+    estado.retratos = estado.retratos || {}; estado.retratos[id] = { json, hash };
+    return { id, hash };
+  }
+  async function verRetrato(id) {
+    const rt = (estado.retratos || {})[id]; if (!rt) { toast('Retrato não encontrado neste aparelho.', true); return; }
+    const ok = (await sha256(rt.json)) === rt.hash, c = JSON.parse(rt.json);
+    abrirCamada('modal retrato-modal', `<div class="retrato">
+      <img class="logo-img" src="logo/anshur-logo.png?v=5" alt="Anshur" width="150" height="38">
+      <h2 style="margin-top:12px">Retrato da avaliação</h2>
+      <p class="sub">Gerado em ${new Date(c.quando).toLocaleString('pt-BR')} por ${esc(c.usuario)} (${K.PERFIS[c.perfil] || ''}) · ${esc(c.revenda)}</p>
+      <p class="selo-verif ${ok ? 'ok' : 'falha'}">${ok ? ICO.baixo + 'Íntegro: nada foi alterado desde a avaliação' : ICO.alto + 'ALTERADO: o conteúdo não bate com o código original'}</p>
+      <div class="numeros"><div><span>Máquina</span><b>${esc(c.maquina.marca + ' ' + c.maquina.modelo)} · ${c.maquina.ano}</b></div><div><span>Horas · inspeção</span><b>${(+c.maquina.horas).toLocaleString('pt-BR')} h · ${c.maquina.inspecao}/100</b></div><div><span>Valor máximo recomendado</span><b>${real(c.recomendacao.valorMaximo)}</b></div>
+        <div><span>Venda estimada</span><b>${real(c.recomendacao.vendaEstimada)}</b></div><div><span>Qualidade da estimativa</span><b>${esc(c.recomendacao.qualidade)}</b></div><div><span>Margem-alvo do dia</span><b>${pct(c.premissas.margemAlvo, 0)}</b></div>
+        ${c.valorPago != null ? `<div><span>Valor pago</span><b class="${c.valorPago > c.recomendacao.valorMaximo ? 'neg' : 'pos'}">${real(c.valorPago)}</b></div>` : ''}${c.decisao ? `<div><span>Decisão</span><b>${esc(c.decisao)}</b></div>` : ''}</div>
+      ${(c.horimetro || []).length || c.mercado != null || (c.alertasMostrados || []).length ? `<h3 style="margin-top:14px">Alertas que o sistema mostrou</h3><ul>${[...(c.horimetro || []), ...(c.mercado != null && c.mercado < -0.05 ? [`Mercado caindo ${pct(-c.mercado)} em 2 meses`] : []), ...(c.alertasMostrados || [])].map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
+      <p class="codigo">Código de verificação (SHA-256): <code>${rt.hash}</code></p></div>
+      <div class="acoes"><button class="btn btn-ouro" type="button" onclick="print()">Imprimir ou salvar PDF</button></div>`);
+  }
+
+  // contraproposta: como cobrir a diferença sem pagar acima do teto
+  function contraproposta(excesso, r) {
+    const nova = (A.financiadas || []).find((f) => f.chassi === av.nova);
+    const b = estado.barter || { grao: 'soja', preco: GRAOS.soja.preco }, un = b.grao === 'cana' ? 'toneladas de cana' : 'sacas de ' + b.grao;
+    const parcela = Math.ceil(excesso / 3 / 100) * 100;
+    return [
+      { t: 'Desconto na máquina nova', d: `Em vez de pagar ${real(excesso)} a mais no usado, dê ${real(excesso)} de desconto${nova ? ` no ${nova.marca} ${nova.modelo}` : ' na máquina nova'}. O usado entra pelo teto (${real(r.teto)}) e a margem do usado fica protegida.` },
+      { t: 'Diferença em grãos', d: `O cliente recebe o teto em dinheiro e a diferença em ${Math.round(excesso / b.preco).toLocaleString('pt-BR')} ${un} (preço do dia ${real(b.preco)}), entregues na colheita.` },
+      { t: 'Diferença na venda do usado', d: `Pague ${real(r.teto)} agora e combine repassar até ${real(excesso)} quando o usado for vendido acima de ${real(r.venda)}. A revenda só divide o que realmente ganhar.` },
+      { t: 'Prazo em vez de valor', d: `Mantenha o teto e ofereça o pagamento da máquina nova em 3 parcelas a mais, equivalente a cerca de ${real(parcela)} por parcela de folga para o cliente.` }
+    ];
+  }
+
   // ---------- rotas com transição ----------
   const TELAS = { visao: telaVisao, avaliar: telaAvaliar, patio: telaPatio, trocas: telaTrocas, teste: telaTeste, passaportes: telaPassaportes, vendedores: telaVendedores, garantias: telaGarantias, financiamento: telaFinanciamento, relatorio: telaRelatorios, mensal: telaRelatorio, documentos: telaDocumentos, usuarios: telaUsuarios, config: telaConfig, atividades: telaAtividades, compradores: telaCompradores, mercado: telaMercado, aprovacoes: telaAprovacoes };
   function moverIndicador() {
@@ -1608,6 +1679,7 @@
   $('#busca-btn').onclick = abrirBusca; $('#instalar-btn').onclick = simularInstalacao;
   $('#perfil').textContent = eu().nome.split(' ').map((x) => x[0]).slice(0, 2).join('').toUpperCase();
   $$('.menu a').forEach((a) => { if (!pode(a.dataset.aba)) a.hidden = true; });
+  $$('.menu-grupo').forEach((g) => { let x = g.nextElementSibling, algum = false; while (x && x.tagName === 'A') { if (!x.hidden) algum = true; x = x.nextElementSibling; } g.hidden = !algum; });
   if (OP) sincronizar(false).then((r) => { if (r === 'novas') { toast(`Sincronizado com o seu sistema: ${estado.ultimaSync.novas} trocas novas.`); setTimeout(() => location.reload(), 1200); } else if (r === 'permissao') toast('Toque em Teste às cegas › Importar planilha › Sincronizar agora para atualizar com o seu sistema.'); }).catch(() => {});
   atualizarSino();
   window.addEventListener('hashchange', rota);
