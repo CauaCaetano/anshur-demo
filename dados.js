@@ -53,7 +53,9 @@
     const caro = rnd() < 0.22;
     const fator = caro ? entre(0.93, 1.03) : entre(0.78, 0.88);
     const pago = Math.round(mercado * fator / 1000) * 1000;
-    const preparo = Math.round((100 - cond) * m.base * 0.0004 / 100) * 100;
+    const preparoEst = Math.round((100 - cond) * m.base * 0.0004 / 100) * 100;
+    // o preparo real varia: às vezes a oficina gasta bem mais que o previsto
+    const preparo = Math.round(preparoEst * (rnd() < 0.15 ? entre(1.5, 2.2) : entre(0.8, 1.2)) / 100) * 100;
     const diasPatio = Math.round((m.tipo === 'colhedora' ? 70 : 35) + entre(0, 70) + (caro ? entre(20, 90) : 0));
     const entrada = vendida ? entre(diasPatio + 20, 1000) : entre(8, 160);
     const vendido = vendida ? Math.round(mercado * entre(0.97, 1.03) / 1000) * 1000 : null;
@@ -61,10 +63,16 @@
     const mans = [];
     const qtd = Math.round(entre(1, 4));
     for (let i = 0; i < qtd; i++) mans.push({ servico: escolhe(SERVICOS), horas: Math.round(horas * entre(0.3, 0.98) / 10) * 10, comNota: rnd() < 0.6 });
+    const anuncioIni = vendida ? null : Math.round(mercado * 1.08 / 1000) * 1000;
+    const precos = [];
+    if (!vendida) {
+      precos.push({ data: diasAtras(entrada - 3), valor: anuncioIni, motivo: 'Anúncio inicial' });
+      if (entrada > 75) precos.push({ data: diasAtras(entrada - 60), valor: Math.round(anuncioIni * 0.96 / 1000) * 1000, motivo: 'Redução após 60 dias' });
+    }
     TROCAS.push({
       id: idTroca, tipo: m.tipo, marca: m.marca, modelo: m.modelo, ano, horas, cond, ficha: ficha(cond),
-      pago, preparo, vendido, entrada: diasAtras(entrada), saida: vendida ? diasAtras(entrada - diasPatio) : null,
-      diasPatio: vendida ? diasPatio : null, anuncio: vendida ? null : Math.round(mercado * 1.06 / 1000) * 1000,
+      pago, preparo, preparoEst, vendido, precos, entrada: diasAtras(entrada), saida: vendida ? diasAtras(entrada - diasPatio) : null,
+      diasPatio: vendida ? diasPatio : null, anuncio: precos.length ? precos[precos.length - 1].valor : null,
       vendedor: escolhe(VENDEDORES), origem: 'Faz. ' + escolhe(FAZENDAS) + ', ' + escolhe(CIDADES),
       idAgro: rnd() < 0.55, manutencoes: mans.sort((a, b) => a.horas - b.horas)
     });

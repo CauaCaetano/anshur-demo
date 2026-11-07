@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Anshur">
+  <!-- Monograma A+N: a perna direita do A é a diagonal do N; o topo dourado da haste é a valorização -->
+  <path d="M4 56 24 8h9l17 41V8h9v48H47L28.5 13 13 56Z" fill="#101B2B"/>
+  <path d="M50 8h9v14h-9z" fill="#C4A46A"/>
+</svg>

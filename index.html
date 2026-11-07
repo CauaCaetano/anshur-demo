@@ -3,35 +3,58 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Anshur · avaliação de usados</title>
-<meta name="description" content="Anshur: avaliação do usado na troca, passaporte da máquina e controle do pátio para revendas de máquinas agrícolas. Demonstração com dados fictícios.">
-<meta name="theme-color" content="#1d2220">
+<title>Anshur · inteligência de margem para revendas</title>
+<meta name="description" content="Anshur: valor máximo na troca do usado, capital parado no pátio e histórico de margem para revendas de máquinas agrícolas. Demonstração com dados fictícios.">
+<meta name="theme-color" content="#101B2B">
+<meta property="og:title" content="Anshur · inteligência de margem para revendas de máquinas agrícolas">
+<meta property="og:description" content="Proteja sua margem na troca. Recupere seu capital no pátio.">
 <link rel="icon" href="icone.svg" type="image/svg+xml">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="estilo.css?v=1">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="estilo.css?v=3">
 </head>
 <body>
 <a class="pular" href="#tela">Ir para o conteúdo</a>
-<header class="topo">
-  <div class="marca">
-    <span class="palavra">ANSHUR</span>
-    <span class="revenda" id="revenda"></span>
+<div class="casca">
+  <aside class="lateral" aria-label="Navegação principal">
+    <a class="marca" href="#visao" id="marca"></a>
+    <nav class="menu" id="menu">
+      <span class="menu-indicador" aria-hidden="true"></span>
+      <a href="#visao" data-aba="visao" data-curto="Visão"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13h6V4H4zM14 20h6V11h-6zM14 4v4h6V4zM4 20h6v-4H4z"/></svg><span>Visão geral</span></a>
+      <a href="#avaliar" data-aba="avaliar" data-curto="Avaliar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h16M6 15l4-4 3 3 5-6"/></svg><span>Avaliar troca</span></a>
+      <a href="#patio" data-aba="patio" data-curto="Pátio"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20V9l9-5 9 5v11M7 20v-6h10v6"/></svg><span>Pátio</span></a>
+      <a href="#trocas" data-aba="trocas" data-curto="Trocas"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h13l-3-3M20 17H7l3 3"/></svg><span>Inteligência de trocas</span></a>
+      <a href="#teste" data-aba="teste" data-curto="Teste"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></svg><span>Teste às cegas</span></a>
+      <a href="#passaportes" data-aba="passaportes"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h14v18H5zM9 8h6M9 12h6M9 16h3"/></svg><span>Passaportes</span></a>
+    </nav>
+    <p class="lateral-rodape">Dados demonstrativos de uma revenda fictícia.</p>
+  </aside>
+  <div class="principal">
+    <header class="cabecalho">
+      <a class="marca marca-movel" href="#visao" id="marca-movel" aria-label="Anshur, visão geral"></a>
+      <div class="cab-info"><b id="revenda"></b><span id="refdata"></span></div>
+      <span class="selo-demo">Dados demonstrativos</span>
+      <a class="btn btn-ouro cab-nova" href="#avaliar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Nova avaliação</span></a>
+      <div class="perfil">
+        <button class="avatar" id="perfil" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Perfil e opções">SA</button>
+        <div class="perfil-menu" id="perfil-menu" role="menu" hidden>
+          <p><b>Seu Antônio</b><span>Proprietário · Mogiana Máquinas</span></p>
+          <button type="button" role="menuitem" id="restaurar">Restaurar dados demonstrativos</button>
+        </div>
+      </div>
+    </header>
+    <main id="tela" tabindex="-1"></main>
   </div>
-  <nav class="abas" aria-label="Seções">
-    <a href="#avaliar" data-aba="avaliar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h16M6 15l4-4 3 3 5-6"/></svg>Avaliar</a>
-    <a href="#patio" data-aba="patio"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20V9l9-5 9 5v11M7 20v-6h10v6"/></svg>Pátio</a>
-    <a href="#historico" data-aba="historico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5zM9 9h6M9 13h6M9 17h3"/></svg>Trocas</a>
-    <a href="#teste" data-aba="teste"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M5 8l7-5 7 5M4 14h6l-3 5zM14 14h6l-3 5z"/></svg>Teste às cegas</a>
-  </nav>
-</header>
-<p class="aviso" id="aviso"></p>
-<main id="tela" tabindex="-1"></main>
-<script src="dados.js?v=1"></script>
-<script src="comum.js?v=1"></script>
-<script src="motor.js?v=1"></script>
-<script src="app.js?v=1"></script>
+</div>
+<div id="camada"></div>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+<script src="dados.js?v=3"></script>
+<script src="comum.js?v=3"></script>
+<script src="motor.js?v=3"></script>
+<script src="graficos.js?v=3"></script>
+<script src="app.js?v=3"></script>
+<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});</script>
 </body>
 </html>
