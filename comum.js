@@ -321,11 +321,112 @@
     return { operacoes: ops, grupos, meses, total: somar(ops), agrupar };
   }
 
+  // ---------- WhatsApp: na demonstração nada sai do navegador ----------
+  // Critério (o mais seguro): só abre o WhatsApp de verdade com conta real logada (ambiente 'op' E nuvem.js carregou a
+  // sessão do servidor). Sem isso (demonstração, site da Blue Rose, localhost, sessão que não carregou) todo link para
+  // wa.me / api.whatsapp.com vira uma simulação na tela. Um ponto só: escuta os cliques da página inteira (captura),
+  // então vale para os links que as regras de cada área já geram, sem mexer nelas.
+  const ehLinkWhatsApp = (u) => /^https?:\/\/(wa\.me|api\.whatsapp\.com|web\.whatsapp\.com|(www\.)?whatsapp\.com\/send)/i.test(String(u || ''));
+  const whatsappReal = () => !!(N && ambiente === 'op');
+  function lerWhatsApp(url) {
+    let numero = '', texto = '';
+    try {
+      const u = new URL(url);
+      numero = (u.hostname.toLowerCase() === 'wa.me' ? u.pathname.slice(1) : (u.searchParams.get('phone') || '')).replace(/\D/g, '');
+      texto = u.searchParams.get('text') || '';
+    } catch (e) { /* link estranho: mostra sem número e sem texto */ }
+    return { numero, texto };
+  }
+  // +55 16 9••••-4567: o suficiente para ver que é o cliente certo, sem expor o número inteiro na demonstração
+  function mascararNumero(n) {
+    const d = String(n || '').replace(/\D/g, '');
+    if (!d) return 'contato escolhido na hora';
+    if (d.length < 8) return '••••' + d.slice(-2);
+    const ddi = d.length > 11 ? d.slice(0, d.length - 11) : '';
+    const resto = ddi ? d.slice(ddi.length) : d;
+    const ddd = resto.length >= 10 ? resto.slice(0, 2) : '';
+    const local = ddd ? resto.slice(2) : resto;
+    return [(ddi ? '+' + ddi : ''), ddd, local.slice(0, 1) + '••••-' + local.slice(-4)].filter(Boolean).join(' ');
+  }
+  const AVISO_WA_DEMO = 'Demonstração: nada foi enviado. Na versão contratada, isso abre o WhatsApp da revenda com a mensagem pronta.';
+  function simularWhatsApp(url) {
+    if (typeof document === 'undefined') return;
+    const { numero, texto } = lerWhatsApp(url);
+    if (!document.getElementById('wa-demo-css')) {
+      const s = document.createElement('style'); s.id = 'wa-demo-css';
+      s.textContent = `
+.wa-demo-fundo{position:fixed;inset:0;z-index:90;background:rgba(17,24,32,.45);display:grid;place-items:center;padding:16px}
+.wa-demo{width:min(440px,100%);max-height:calc(100dvh - 32px);display:flex;flex-direction:column;background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 30px 60px -24px rgba(17,24,32,.5);font-family:Inter,system-ui,sans-serif;color:#111820}
+.wa-demo-topo{display:flex;align-items:center;gap:12px;padding:14px 16px;background:#202D35;color:#F4F0E8}
+.wa-demo-av{width:40px;height:40px;border-radius:50%;background:#71877B;display:grid;place-items:center;flex:none}
+.wa-demo-av svg{width:22px;height:22px;fill:none;stroke:#fff;stroke-width:1.8}
+.wa-demo-topo b{display:block;font-size:16px}.wa-demo-topo span{font-size:13px;color:#C9C2B4}
+.wa-demo-conversa{flex:1;overflow:auto;padding:18px 14px;background:#EFE9DE}
+.wa-demo-balao{margin-left:auto;max-width:88%;background:#E3ECE6;border-radius:12px 12px 2px 12px;padding:10px 12px 6px;font-size:15px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere;box-shadow:0 1px 1px rgba(17,24,32,.08)}
+.wa-demo-balao small{display:block;text-align:right;font-size:11.5px;color:#5C676E;margin-top:4px}
+.wa-demo-vazio{color:#5C676E;font-style:italic}
+.wa-demo-aviso{margin:0;padding:12px 16px;font-size:14px;line-height:1.45;background:#FDF8EE;border-top:1px solid #EADFC6;color:#5C4A24}
+.wa-demo-acoes{display:flex;gap:10px;padding:12px 16px 16px;flex-wrap:wrap}
+.wa-demo-acoes button{flex:1 1 auto;white-space:nowrap;padding:0 16px;min-height:46px;border-radius:12px;font:600 15px Inter,system-ui,sans-serif;cursor:pointer;border:1px solid #CFC6B5;background:#fff;color:#111820}
+.wa-demo-acoes button.ouro{background:#C1A36A;border-color:#C1A36A}
+.wa-demo-acoes button:hover{border-color:#AD8E55}.wa-demo-acoes button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(193,163,106,.35)}`;
+      document.head.appendChild(s);
+    }
+    const ant = document.querySelector('.wa-demo-fundo'); if (ant) ant.remove();
+    const volta = document.activeElement;
+    const f = document.createElement('div'); f.className = 'wa-demo-fundo';
+    const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    f.innerHTML = `<div class="wa-demo" role="dialog" aria-modal="true" aria-labelledby="wa-demo-t">
+  <div class="wa-demo-topo"><span class="wa-demo-av" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0"/></svg></span>
+  <div><b id="wa-demo-t">Simulação do WhatsApp</b><span>Para: <span data-wa-numero>${esc(mascararNumero(numero))}</span></span></div></div>
+  <div class="wa-demo-conversa"><div class="wa-demo-balao">${texto ? esc(texto) : '<span class="wa-demo-vazio">Mensagem em branco</span>'}<small>${esc(hora)} · não enviada</small></div></div>
+  <p class="wa-demo-aviso" role="status">${esc(AVISO_WA_DEMO)}</p>
+  <div class="wa-demo-acoes"><button type="button" class="ouro" data-wa-copiar>Copiar mensagem</button><button type="button" data-wa-fechar>Fechar</button></div></div>`;
+    const fechar = () => { f.remove(); document.removeEventListener('keydown', tecla, true); if (volta && volta.focus) try { volta.focus(); } catch (e) { /* segue */ } };
+    const tecla = (e) => { if (e.key === 'Escape') { e.stopPropagation(); fechar(); } };
+    f.addEventListener('click', (e) => { if (e.target === f) fechar(); });
+    f.querySelector('[data-wa-fechar]').onclick = fechar;
+    const bc = f.querySelector('[data-wa-copiar]');
+    bc.onclick = async () => {
+      let ok = false;
+      try { await navigator.clipboard.writeText(texto); ok = true; } catch (e) {
+        try { const t = document.createElement('textarea'); t.value = texto; t.style.position = 'fixed'; t.style.opacity = '0'; document.body.appendChild(t); t.select(); ok = document.execCommand('copy'); t.remove(); } catch (e2) { ok = false; }
+      }
+      bc.textContent = ok ? 'Mensagem copiada' : 'Não deu para copiar';
+    };
+    document.addEventListener('keydown', tecla, true);
+    document.body.appendChild(f);
+    bc.focus();
+  }
+  // abre o WhatsApp (conta real) ou mostra a simulação (demonstração); devolve true quando simulou
+  function abrirWhatsApp(url) {
+    if (whatsappReal()) { if (typeof window !== 'undefined') window.open(url, '_blank', 'noopener'); return false; }
+    simularWhatsApp(url); return true;
+  }
+  if (typeof document !== 'undefined' && typeof window !== 'undefined' && !raiz.__anshurWaDemo) {
+    raiz.__anshurWaDemo = true;
+    const interceptar = (e) => {
+      if (whatsappReal()) return;
+      const a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+      if (!a || !ehLinkWhatsApp(a.href)) return;
+      e.preventDefault(); e.stopImmediatePropagation();
+      if (e.type === 'click' || e.button === 1) simularWhatsApp(a.href);
+    };
+    document.addEventListener('click', interceptar, true);
+    document.addEventListener('auxclick', interceptar, true);
+    const abrirOriginal = window.open;
+    window.open = function (url, ...resto) {
+      if (!whatsappReal() && ehLinkWhatsApp(url)) { simularWhatsApp(String(url)); return null; }
+      return abrirOriginal.call(window, url, ...resto);
+    };
+  }
+
   // recarregar só depois de terminar de enviar ao servidor
   const recarregar = () => (N && ambiente === 'op' ? N.recarregar() : location.reload());
   if (N && ambiente === 'op') { N.aoSalvarNoServidor = () => avisarOutrasAbas('servidor'); }
   raiz.COMUM = { A, ambiente, aoMudarEmOutraAba, nuvem: N && ambiente === 'op' ? N : null, lojasPermitidas, lembrarLoja, recarregar, repo, estado, cfg, PADRAO, PERFIS, usuarioAtual, registrar, real, mil, pct, hojeISO, diasEntre, diasDesde, data, esc, NOMES, FICHA, logo, C,
     fecharTroca, registrarPreparo, registrarVenda, registrarCustos, aplicarMovimentos, margemOperacao, relatorioMargem,
     cad: CAD, garantirCadastro, acharCadastro, normal, digitos, custosDoFinanceiro, aplicarFinanceiro,
+    ehLinkWhatsApp, lerWhatsApp, mascararNumero, abrirWhatsApp, simularWhatsApp, whatsappReal, AVISO_WA_DEMO,
     gravar: (d) => repo.gravar(d), ler: () => repo.ler(), restaurar: () => { repo.apagar('demo'); delItem('anshur-demo-v1'); } };
 })(typeof window !== 'undefined' ? window : globalThis);
