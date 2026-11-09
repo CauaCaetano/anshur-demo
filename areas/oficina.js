@@ -7,7 +7,7 @@
   const O = raiz.OFICINA, R = raiz.ANSHUR_AREAS;
   if (!R) return;
   // sem as regras (areas/oficina-regras.js não carregou): fica honesta como "Em breve", sem tela
-  if (!O) { R.registrar({ id: 'oficina', nome: 'Oficina', curto: 'Oficina', ordem: 40, pronta: false, perfis: ['dono', 'gerente', 'oficina', 'financeiro', 'auditor'], descricao: 'Ordens de serviço, orçamento, mecânicos, horas, garantia e entrega.', icone: '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/>', previsto: ['OS com diagnóstico, orçamento e aprovação do cliente', 'Mecânicos, horas, serviços e checklist', 'Peças consumidas do estoque real', 'Garantia e entrega; custo e faturamento no Financeiro'], hoje: 'Hoje já existe: preparo dos usados (Pátio) e Garantias a receber.' }); return; }
+  if (!O) { R.registrar({ id: 'oficina', nome: 'Oficina', curto: 'Oficina', ordem: 40, pronta: false, perfis: ['dono', 'gerente', 'oficina', 'financeiro', 'auditor'], descricao: 'Ordens de serviço, orçamento, mecânicos, horas, garantia e entrega.', icone: '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/>', previsto: ['OS com diagnóstico, orçamento e aprovação do cliente', 'Mecânicos, horas, serviços e checklist', 'Peças consumidas do estoque real', 'Garantia e entrega; custo e faturamento no Financeiro'], jaExiste: 'Hoje já existe: preparo dos usados (Pátio) e Garantias a receber.' }); return; }
   const VER = ['dono', 'gerente', 'oficina', 'financeiro', 'auditor'];
   let U = null;
   const P = () => raiz.PECAS || null;
@@ -42,10 +42,9 @@
   const SIT = { aberta: 'aberto', aguardando: 'hoje', execucao: 'aberto', pronta: 'pago', entregue: 'pago', cancelada: 'cancelado' };
   const tagSt = (os) => `<span class="sit sit-${SIT[os.status]}">${O.STATUS[os.status]}</span>`;
   const atrasada = (os) => O.ABERTOS.includes(os.status) && os.previsao && os.previsao < U.hojeISO();
-  // registro: Atividades (ui.log, com ref da máquina para a linha do tempo do Pátio) + trilha do servidor (anshur_eventos)
+  // registro: Atividades (ui.log, com ref da máquina para a linha do tempo do Pátio); 'oficina' está em CRITICOS (comum.js) e vai para a trilha do servidor
   function gravar(texto, os) {
     U.log('oficina', texto, os && os.maquina ? { ref: os.maquina } : undefined);
-    if (U.K.nuvem && U.K.nuvem.evento) U.K.nuvem.evento('oficina', texto); // 'oficina' ainda não está em CRITICOS (comum.js): envia direto
     U.salvar();
   }
   const tentar = (fn) => { try { return fn(); } catch (e) { U.toast(e.message, true); return null; } };
@@ -484,6 +483,21 @@
       if (ui.eu().perfil === 'vendedor') { const n = ui.estado.oficina.os.filter((o) => O.doVendedor(o, ui.eu().nome) && O.ABERTOS.includes(o.status)).length; return { valor: String(n), texto: `${n === 1 ? 'OS aberta' : 'OS abertas'} de clientes seus` }; }
       const r = O.resumo(ui.estado, { loja: ui.estado.lojaAtual || '', lojas: ui.K.lojasPermitidas, hoje: ui.hojeISO() });
       return { valor: String(r.abertas), texto: `OS abertas · ${r.por.aguardando} aguardando peça · ${r.por.pronta} prontas${r.atrasadas ? ` · ${r.atrasadas} atrasadas` : ''}`, alerta: r.atrasadas > 0 };
+    },
+    // tarefas do dia e rotina: OS atrasadas, máquinas prontas para entregar e orçamentos esperando o cliente
+    hoje: (estado, u, ui) => {
+      if (!['dono', 'gerente', 'oficina'].includes(u.perfil)) return [];
+      const h = ui.hojeISO(), l = O.garantir(estado).os.filter(O.daLoja(estado.lojaAtual || '', ui.K.lojasPermitidas)).filter((o) => O.ABERTOS.includes(o.status)), out = [];
+      const nm = (o) => { const m = o.maquina && ui.K.cad.maquina(o.maquina); return (m ? m.nome : o.maqTexto) || 'máquina'; };
+      const atr = l.filter((o) => o.previsao && o.previsao < h), pr = l.filter((o) => o.status === 'pronta'), ap = l.filter((o) => o.aprovacao && o.aprovacao.status === 'pendente' && o.itens.length);
+      if (atr.length) out.push({ id: 'of-atr-' + atr.map((o) => o.id).join(','), cat: 'os', catNome: 'Oficina', nivel: 1, valor: 2e5 + atr.length, titulo: `${atr.length} ${atr.length === 1 ? 'OS atrasada' : 'OS atrasadas'} (passou da data prometida)`, txt: atr.slice(0, 3).map((o) => `${o.numero} · ${nm(o)} · prometida para ${O.dataBR(o.previsao)}`).join(' · '), botao: { rotulo: 'Ver as OS', ir: '#/oficina/of-os' } });
+      if (pr.length) out.push({ id: 'of-pr-' + pr.length, cat: 'os', catNome: 'Oficina', nivel: 2, valor: 1e5, titulo: `${pr.length} ${pr.length === 1 ? 'máquina pronta' : 'máquinas prontas'} para entregar`, txt: pr.slice(0, 3).map((o) => `${o.numero} · ${nm(o)}`).join(' · ') + '. Avise o cliente e feche a OS na entrega.', botao: { rotulo: 'Entregar', ir: '#/oficina/of-os' } });
+      if (ap.length) out.push({ id: 'of-ap-' + ap.length, cat: 'os', catNome: 'Oficina', nivel: 2, valor: ap.reduce((s, o) => s + O.totais(o).total, 0), titulo: `${ap.length} ${ap.length === 1 ? 'orçamento esperando' : 'orçamentos esperando'} o cliente aprovar`, txt: ap.slice(0, 3).map((o) => `${o.numero} · ${O.brl(O.totais(o).total)}`).join(' · '), botao: { rotulo: 'Cobrar a aprovação', ir: '#/oficina/of-os' } });
+      return out;
+    },
+    rotina: (estado, u, ui) => {
+      const h = ui.hojeISO(), ab = O.garantir(estado).os.filter((o) => O.ABERTOS.includes(o.status));
+      return [{ perfil: 'oficina', periodo: 'dia', id: 'of-situacao', titulo: 'Atualizar a situação das OS e apontar as horas', qtd: ab.filter((o) => o.previsao && o.previsao < h).length, ir: '#/oficina/of-apont' }];
     },
     buscar,
     novo: (ui) => { U = ui; formNova(); },

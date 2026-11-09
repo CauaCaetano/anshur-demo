@@ -15,13 +15,41 @@
   const vazio = () => ({ versao: 3, fechadas: [], avaliacoes: [], precos: {}, vendas: {}, preparos: {}, custos: {}, historico: [], config: {} });
   const nuvem = (amb) => amb === 'op' && N && ambiente === 'op';
   let vivo = null; // no ambiente real, o estado carregado do servidor é o único em memória
+  // ---------- várias abas abertas (ex.: Financeiro numa aba e Oficina noutra) ----------
+  // Sem conta (demonstração ou dados só neste navegador) todas as abas gravam no mesmo lugar. Cada aba lembra o que leu
+  // por último (base); se outra aba gravou no meio, esta aplica só o que ELA mudou (por item, com id: as mesmas operações
+  // da fila do servidor) por cima do que está gravado, sem apagar o trabalho da outra. Depois avisa as outras abas.
+  let base = null; const inicioAba = Date.now();
+  const canal = (() => { try { return typeof BroadcastChannel !== 'undefined' && typeof document !== 'undefined' ? new BroadcastChannel('anshur-abas') : null; } catch (e) { return null; } })();
+  const ouvintes = [];
+  const aoMudarEmOutraAba = (fn) => { ouvintes.push(fn); };
+  const avisarOutrasAbas = (motivo) => {
+    if (Date.now() - inicioAba < 4000) return; // gravações de quando a aba abre (último acesso, demonstração) não fazem as outras recarregarem
+    const msg = { motivo, amb: ambiente, quando: Date.now() };
+    try { if (canal) canal.postMessage(msg); else setItem('anshur-aviso-abas', JSON.stringify(msg)); } catch (e) { /* sem canal */ }
+  };
+  const receber = (m) => { if (m && m.amb === ambiente) ouvintes.forEach((fn) => { try { fn(m); } catch (e) { /* segue */ } }); };
+  if (canal) canal.onmessage = (e) => receber(e.data);
+  else if (typeof addEventListener === 'function') addEventListener('storage', (e) => { if (e.key === 'anshur-aviso-abas' && e.newValue) { try { receber(JSON.parse(e.newValue)); } catch (er) { /* aviso ilegível */ } } });
+  function gravarLocal(d, amb) {
+    const chave = CHAVES[amb], P = raiz.NUVEM_PURO;
+    let saida = d;
+    if (amb === ambiente && P && base !== null) {
+      const atual = getItem(chave);
+      if (atual && atual !== base) { try { saida = P.aplicarOps(JSON.parse(atual), P.diferenca(JSON.parse(base), d)); } catch (e) { saida = d; } }
+    }
+    const txt = JSON.stringify(saida), ok = setItem(chave, txt);
+    if (ok && amb === ambiente) { base = saida === d ? txt : JSON.stringify(d); if (getItem(chave) !== base) base = JSON.stringify(d); avisarOutrasAbas('salvo'); }
+    return ok;
+  }
   const repo = {
     ler: (amb = ambiente) => {
       // com conta: o que o servidor confirmou + as alterações deste aparelho que ainda esperam internet (N.vista)
       if (nuvem(amb)) return vivo || Object.assign(vazio(), JSON.parse(JSON.stringify(N.vista || N.dados || {})));
-      try { return Object.assign(vazio(), JSON.parse(getItem(CHAVES[amb])) || {}); } catch (e) { return vazio(); }
+      const txt = getItem(CHAVES[amb]); if (amb === ambiente) base = txt || null;
+      try { return Object.assign(vazio(), JSON.parse(txt) || {}); } catch (e) { return vazio(); }
     },
-    gravar: (d, amb = ambiente) => (nuvem(amb) ? N.salvar(d) : setItem(CHAVES[amb], JSON.stringify(d))),
+    gravar: (d, amb = ambiente) => (nuvem(amb) ? N.salvar(d) : gravarLocal(d, amb)),
     apagar: (amb = ambiente) => (nuvem(amb) ? false : delItem(CHAVES[amb])),
     trocarAmbiente: (amb) => setItem('anshur-ambiente', amb)
   };
@@ -115,7 +143,7 @@
     achar: acharCadastro
   };
   // atividades críticas também vão para a trilha do servidor (anshur_eventos: só inserção)
-  const CRITICOS = new Set(['troca', 'aprovacao', 'preco', 'venda', 'usuario', 'convite', 'lgpd', 'exportacao', 'seguranca', 'importacao', 'exclusao', 'config', 'novas', 'crm', 'ia', 'financeiro']);
+  const CRITICOS = new Set(['troca', 'aprovacao', 'preco', 'venda', 'usuario', 'convite', 'lgpd', 'exportacao', 'seguranca', 'importacao', 'exclusao', 'config', 'novas', 'crm', 'ia', 'financeiro', 'oficina', 'pecas', 'fiscal']);
   function registrar(tipo, texto, extra = {}) {
     estado.atividades.unshift({ id: 'a' + Date.now() + Math.random().toString(36).slice(2, 6), quando: new Date().toISOString(), usuario: usuarioAtual().nome, perfil: usuarioAtual().perfil, tipo, texto, ...extra });
     if (estado.atividades.length > 600) estado.atividades.length = 600;
@@ -295,7 +323,8 @@
 
   // recarregar só depois de terminar de enviar ao servidor
   const recarregar = () => (N && ambiente === 'op' ? N.recarregar() : location.reload());
-  raiz.COMUM = { A, ambiente, nuvem: N && ambiente === 'op' ? N : null, lojasPermitidas, lembrarLoja, recarregar, repo, estado, cfg, PADRAO, PERFIS, usuarioAtual, registrar, real, mil, pct, hojeISO, diasEntre, diasDesde, data, esc, NOMES, FICHA, logo, C,
+  if (N && ambiente === 'op') { N.aoSalvarNoServidor = () => avisarOutrasAbas('servidor'); }
+  raiz.COMUM = { A, ambiente, aoMudarEmOutraAba, nuvem: N && ambiente === 'op' ? N : null, lojasPermitidas, lembrarLoja, recarregar, repo, estado, cfg, PADRAO, PERFIS, usuarioAtual, registrar, real, mil, pct, hojeISO, diasEntre, diasDesde, data, esc, NOMES, FICHA, logo, C,
     fecharTroca, registrarPreparo, registrarVenda, registrarCustos, aplicarMovimentos, margemOperacao, relatorioMargem,
     cad: CAD, garantirCadastro, acharCadastro, normal, digitos, custosDoFinanceiro, aplicarFinanceiro,
     gravar: (d) => repo.gravar(d), ler: () => repo.ler(), restaurar: () => { repo.apagar('demo'); delItem('anshur-demo-v1'); } };

@@ -11,7 +11,7 @@
     id: 'novas', nome: 'Máquinas Novas', curto: 'Novas', ordem: 20, pronta: false, perfis: PERFIS,
     descricao: 'Catálogo, pedidos, reservas, propostas e vendas de máquinas novas.', icone: ICONE,
     previsto: ['Catálogo com marca, modelo, versão, custo, preço e disponibilidade', 'Pedidos à fábrica e reservas', 'Propostas e negociações até a venda', 'Venda vira conta a receber e comissão no Financeiro'],
-    hoje: 'Hoje já existe: Estoque financiado (floor plan das novas) no Financeiro e em Usados.',
+    jaExiste: 'Hoje já existe: Estoque financiado (floor plan das novas) no Financeiro e em Usados.',
     dados: { novas: ['catalogo', 'pedidos', 'reservas', 'propostas', 'vendas'], cadastros: ['clientes'] }
   });
   const N = raiz.NOVAS;
@@ -105,10 +105,10 @@
     const ult = n.vendas.filter((v) => ve(v) && daLoja(v)).sort((a, b) => b.data.localeCompare(a.data)).slice(0, 5);
     U.tela.innerHTML = cab('Máquinas Novas', `Catálogo, pedidos, reservas, propostas e vendas${loja() ? ' · loja ' + U.esc(loja()) : ''}. ${perfil() === 'vendedor' ? 'Você vê as suas propostas e reservas.' : ''}`, botoes()) + `
       <div class="kpis fin-k">
-        <a class="kpi k-marfim" href="#nv-catalogo"><span class="rot">${I.maq}Em estoque</span><span class="val">${r.estoque}</span><span class="exp">${r.reservadas} reservadas${perfil() === 'vendedor' ? '' : ' · ' + brl(r.valorEstoque) + ' em custo'}</span></a>
-        <a class="kpi ${r.pedidosAtrasados ? 'k-risco' : ''}" href="#nv-pedidos"><span class="rot">${I.fabrica}A caminho da fábrica</span><span class="val">${r.aCaminho}</span><span class="exp">${r.pedidosAbertos} ${r.pedidosAbertos === 1 ? 'pedido aberto' : 'pedidos abertos'}${r.pedidosAtrasados ? ` · ${r.pedidosAtrasados} atrasados` : ''}</span></a>
+        <a class="kpi k-marfim" href="#nv-catalogo"><span class="rot">${I.maq}Em estoque</span><span class="val">${r.estoque}</span><span class="exp">${r.reservadas} ${r.reservadas === 1 ? 'reservada' : 'reservadas'}${perfil() === 'vendedor' ? '' : ' · ' + brl(r.valorEstoque) + ' em custo'}</span></a>
+        <a class="kpi ${r.pedidosAtrasados ? 'k-risco' : ''}" href="#nv-pedidos"><span class="rot">${I.fabrica}A caminho da fábrica</span><span class="val">${r.aCaminho}</span><span class="exp">${r.pedidosAbertos} ${r.pedidosAbertos === 1 ? 'pedido aberto' : 'pedidos abertos'}${r.pedidosAtrasados ? ` · ${r.pedidosAtrasados} ${r.pedidosAtrasados === 1 ? 'atrasado' : 'atrasados'}` : ''}</span></a>
         <a class="kpi ${r.propostasVencendo || r.aguardando ? 'k-risco' : 'k-salvia'}" href="#nv-propostas"><span class="rot">${I.doc}Propostas abertas</span><span class="val">${r.propostasAbertas}</span><span class="exp">${brl(r.valorPropostas)} · ${r.propostasVencendo} vencendo em 3 dias${r.aguardando ? ` · ${r.aguardando} esperando aprovação` : ''}</span></a>
-        <a class="kpi k-salvia" href="#nv-vendas"><span class="rot">${I.moeda}Vendas no mês</span><span class="val">${r.vendasMes}</span><span class="exp">${brl(r.valorVendasMes)}${r.entregasPendentes ? ` · ${r.entregasPendentes} entregas técnicas pendentes` : ''}</span></a>
+        <a class="kpi k-salvia" href="#nv-vendas"><span class="rot">${I.moeda}Vendas no mês</span><span class="val">${r.vendasMes}</span><span class="exp">${brl(r.valorVendasMes)}${r.entregasPendentes ? ` · ${r.entregasPendentes} ${r.entregasPendentes === 1 ? 'entrega técnica pendente' : 'entregas técnicas pendentes'}` : ''}</span></a>
       </div>
       <section class="painel bloco"><div class="painel-cab"><h2>${I.alerta}Precisa de atenção</h2><p>${pend.length ? 'Toque para abrir' : ''}</p></div>
         ${pend.length ? `<ul class="nc-lista">${pend.slice(0, 14).map((x, k) => `<li class="clicavel" tabindex="0" data-pend="${k}"><div><b>${U.esc(x.t)}</b><span>${U.esc(x.d)}</span></div><span class="nc-tag ${x.n === 1 ? 'risco' : x.n === 2 ? 'ouro' : ''}">${x.n === 1 ? 'Agora' : x.n === 2 ? 'Esta semana' : 'Pendente'}</span></li>`).join('')}</ul>` : vazio('Nada pendente: nenhuma proposta vencendo, reserva expirando, pedido atrasado ou entrega por fazer.')}</section>
@@ -424,11 +424,11 @@
       <ul class="lista-motivos" style="margin-top:10px"><li><span>Contas a receber</span><b>${k.valorTroca ? brl(k.valorTroca) + ' do usado (compensação) + ' : ''}${k.forma === 'avista' ? brl(k.saldo) + ' à vista' : `${k.entrada ? brl(k.entrada) + ' de entrada + ' : ''}${k.forma === 'parcelado' ? `${k.parcelas}× ${brl(k.parcela)}` : brl(k.financiado) + ' do ' + (k.forma === 'consorcio' ? 'consórcio' : 'banco') + ' em 30 dias'}`}</b></li>
         <li><span>Comissão de ${U.esc(p.vendedor)}</span><b>${brl(k.comissao)} (dia 10 do mês seguinte)</b></li>${p.troca && p.troca.avaliacao ? '<li><span>Usado da troca</span><b>entra no pátio como troca fechada</b></li>' : ''}</ul>
       <div class="campos" style="margin-top:12px"><div class="campo"><label for="ft-d">Data da venda</label><input id="ft-d" type="date" value="${hoje()}"></div>
-        ${k.valorTroca && cs.length ? `<div class="campo"><label for="ft-c">Conta da compensação do usado</label><select id="ft-c">${opt(cs.map((x) => [x.id, x.nome]), contaPadrao(p.loja))}</select></div>` : ''}</div>
+        ${k.valorTroca ? `<p class="nota-rodape" style="grid-column:1/-1;margin:0">O usado da troca entra como compensação: paga parte da máquina nova sem passar pelo banco (não aparece no extrato nem na conciliação).</p>` : ''}</div>
       <div class="acoes"><button class="btn btn-ouro" type="button" id="ft-ok">Faturar</button><button class="btn btn-linha" type="button" id="ft-nao">Cancelar</button></div>`, (c) => {
       U.$('#ft-nao', c).onclick = () => U.fecharCamada();
       U.$('#ft-ok', c).onclick = () => {
-        const data = U.$('#ft-d', c).value, contaSel = U.$('#ft-c', c) ? U.$('#ft-c', c).value : '';
+        const data = U.$('#ft-d', c).value;
         const chk = tente(() => N.conferirFaturar(est(), p.id, data)); if (!chk) return;
         const i = chk.i;
         // 1) o usado da troca entra no pátio pelo mesmo caminho das trocas (retrato da avaliação, alçada já decidida na proposta)
@@ -442,16 +442,17 @@
           U.log('troca', `Troca fechada na venda de nova: ${t.marca} ${t.modelo} por ${brl(t.pago)} (máximo recomendado ${brl(av.teto)})`, { ref: t.id });
         }
         // 2) floor plan: a máquina vendida sai do estoque financiado (juros param de correr na venda)
-        const fp = (est().extras && est().extras.financiadas || []).find((x) => x.chassi === i.chassi);
+        const fp = (U.A.financiadas || []).find((x) => x.chassi === i.chassi);
         if (fp && !fp.venda) fp.venda = data;
+        if (fp && !U.OP && !fp.quitacao) fp.quitacao = data; // demonstração: quitada no dia da venda (juros param)
         const maq = (U.A.financiadas || []).some((x) => x.chassi === i.chassi) ? 'F:' + i.chassi : '';
-        const r = tente(() => N.faturar(est(), p.id, { F: f, data, quem: nome(), agora: agora(), cfg: U.K.cfg, conta: contaSel, maquina: maq, trocaId }));
+        const r = tente(() => N.faturar(est(), p.id, { F: f, data, quem: nome(), agora: agora(), cfg: U.K.cfg, maquina: maq, trocaId }));
         if (!r) return;
         U.log('venda', `Venda de máquina nova faturada: ${N.nomeItem(i)} (${i.chassi}) para ${nomeCliente(p.cliente)} por ${brl(p.preco)}`, { ref: r.venda.id });
         U.log('financeiro', `Venda ${r.venda.id}: ${r.lancamentos.length} lançamentos (a receber e comissão de ${p.vendedor})`);
         U.K.aplicarFinanceiro(U.A.todasTrocas || U.A.trocas, est());
         gravar(`Venda faturada: ${N.nomeItem(i)} · ${nomeCliente(p.cliente)} · ${brl(p.preco)}`); U.toast('Venda faturada: contas a receber e comissão lançadas no Financeiro.'); U.fecharCamada(true);
-        location.hash = '#nv-vendas'; setTimeout(() => detalheVenda(r.venda.id), 320);
+        location.hash = '#nv-vendas'; setTimeout(() => { if (/nv-vendas$/.test(location.hash)) detalheVenda(r.venda.id); }, 320);
       };
     });
   }
@@ -516,6 +517,17 @@
 
   // ---------- demonstração: dados fictícios coerentes (clientes e vendedores da demo) ----------
   // Roda depois do Financeiro (que cria as contas e os clientes); semeia Novas e CRM juntos para a história ficar ligada.
+  // floor plan: a nova vendida sai do estoque financiado no dia da venda. Na demonstração a revenda quita com o banco
+  // em até 2 dias (os juros param de correr); com dados reais a venda fica marcada e o aviso "Quitar com o banco" segue até a quitação.
+  function sincronizarFloor(ui) {
+    const fps = ui.A.financiadas || [], h = ui.hojeISO();
+    N.garantir(ui.estado).vendas.forEach((v) => {
+      const f = v.chassi && fps.find((x) => x.chassi === v.chassi); if (!f) return;
+      if (!f.venda) f.venda = v.data;
+      if (!ui.OP && !f.quitacao) { const q = N.somarDias(f.venda, 2); f.quitacao = q > h ? h : q; }
+    });
+  }
+  raiz.NOVAS_FLOOR = sincronizarFloor;
   function semear(ui) {
     const e = ui.estado; if (ui.OP || (e.novas && e.novas.semente)) return;
     const f = raiz.FINANCEIRO, C2 = raiz.CRM; if (!f || !C2 || !(e.fin && e.fin.semente)) return;
@@ -625,9 +637,24 @@
     telas: { 'nv-painel': T(telaPainel), 'nv-catalogo': T(telaCatalogo), 'nv-pedidos': T(telaPedidos), 'nv-reservas': T(telaReservas), 'nv-propostas': T(telaPropostas), 'nv-vendas': T(telaVendas) },
     permissoes,
     numero: (ui) => { U = ui; const r = N.resumo(ui.estado, { hoje: ui.hojeISO(), perfil: ui.eu().perfil, nome: ui.eu().nome, loja: ui.estado.lojaAtual || '' }); return { valor: String(r.propostasAbertas), texto: `${r.propostasAbertas === 1 ? 'proposta aberta' : 'propostas abertas'} · ${r.propostasVencendo} vencendo em 3 dias · ${r.estoque} em estoque${r.aguardando ? ` · ${r.aguardando} esperando aprovação` : ''}`, alerta: r.propostasVencendo + r.aguardando + r.propostasVencidas > 0 }; },
+    // tarefas do dia e rotina: propostas na alçada, propostas e reservas vencendo, entregas técnicas pendentes
+    hoje: (estado, u, ui) => {
+      if (!['dono', 'gerente', 'vendedor'].includes(u.perfil)) return [];
+      const r = N.resumo(estado, { hoje: ui.hojeISO(), perfil: u.perfil, nome: u.nome, loja: estado.lojaAtual || '' }), out = [], it = (o) => Object.assign({ cat: 'novas', catNome: 'Máquinas Novas' }, o);
+      if (r.aguardando && N.gestor(u.perfil)) out.push(it({ id: 'nv-ag-' + r.aguardando, nivel: 1, valor: 5e5, titulo: `${r.aguardando} ${r.aguardando === 1 ? 'proposta de nova espera' : 'propostas de novas esperam'} sua aprovação`, txt: 'O vendedor está com o cliente esperando a resposta do desconto ou da troca.', botao: { rotulo: 'Decidir', ir: '#/novas/nv-propostas' } }));
+      if (r.propostasVencendo) out.push(it({ id: 'nv-pv-' + r.propostasVencendo, nivel: 2, valor: 2e5, titulo: `${r.propostasVencendo} ${r.propostasVencendo === 1 ? 'proposta vence' : 'propostas vencem'} em até 3 dias`, txt: 'Ligue para o cliente antes que a proposta perca a validade.', botao: { rotulo: 'Ver propostas', ir: '#/novas/nv-propostas' } }));
+      if (r.reservasVencendo || r.reservasVencidas) out.push(it({ id: 'nv-rs-' + (r.reservasVencendo + r.reservasVencidas), nivel: 2, valor: 1e5, titulo: `${r.reservasVencendo + r.reservasVencidas} ${r.reservasVencendo + r.reservasVencidas === 1 ? 'reserva vencendo ou vencida' : 'reservas vencendo ou vencidas'}`, txt: 'Prorrogue com o cliente ou libere a máquina para outra venda.', botao: { rotulo: 'Ver reservas', ir: '#/novas/nv-reservas' } }));
+      if (r.entregasPendentes) out.push(it({ id: 'nv-et-' + r.entregasPendentes, nivel: 3, valor: 0, titulo: `${r.entregasPendentes} ${r.entregasPendentes === 1 ? 'entrega técnica pendente' : 'entregas técnicas pendentes'}`, txt: 'Máquina vendida sem a entrega técnica registrada (checklist e assinatura do cliente).', botao: { rotulo: 'Registrar entrega', ir: '#/novas/nv-vendas' } }));
+      return out;
+    },
+    rotina: (estado, u, ui) => {
+      const r = N.resumo(estado, { hoje: ui.hojeISO(), perfil: 'dono' });
+      return [{ perfil: 'gerente', periodo: 'dia', id: 'nv-alcada', titulo: 'Decidir as propostas de novas fora da alçada do vendedor', qtd: r.aguardando, ir: '#/novas/nv-propostas' },
+        { perfil: 'vendedor', periodo: 'semana', id: 'nv-validade', titulo: 'Renovar propostas e reservas de novas perto de vencer', qtd: r.propostasVencendo + r.reservasVencendo, ir: '#/novas/nv-propostas' }];
+    },
     buscar,
     novo: (ui) => { U = ui; estilo(); if (leitura()) { ui.toast('Seu perfil só lê.', true); return; } ui.abrirCamada('modal', `<h2>Máquinas novas</h2><p class="sub">O que você vai registrar?</p><div class="acoes" style="flex-wrap:wrap"><button class="btn btn-ouro" type="button" data-nn="proposta">${I.doc}Proposta</button><button class="btn btn-linha" type="button" data-nn="reserva">${I.trava}Reserva</button>${gestor() ? `<button class="btn btn-linha" type="button" data-nn="item">${I.maq}Máquina no catálogo</button><button class="btn btn-linha" type="button" data-nn="pedido">${I.fabrica}Pedido à fábrica</button>` : ''}</div>`, (c) => { U.$$('[data-nn]', c).forEach((b) => b.onclick = () => ({ proposta: () => formProposta(), reserva: () => formReserva(), item: () => formItem(), pedido: () => formPedido() })[b.dataset.nn]()); }); },
-    iniciar: semear
+    iniciar: (ui) => { semear(ui); sincronizarFloor(ui); }
   });
   raiz.NOVAS_UI = { semear, formProposta: (pre) => formProposta(pre), detalheProposta: (id) => detalheProposta(id), detalheVenda: (id) => detalheVenda(id), estilo, usar: (ui) => { U = ui; } };
 })(typeof window !== 'undefined' ? window : globalThis);

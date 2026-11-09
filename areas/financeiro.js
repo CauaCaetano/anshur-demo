@@ -178,7 +178,7 @@
         <label class="check inteiro"><input type="checkbox" id="fl-pago"> Já foi ${tipo === 'pagar' ? 'pago' : 'recebido'} (baixar agora)</label>
         <div class="campos inteiro" id="fl-baixa" hidden><div class="campo"><label for="fl-bdata">Data do pagamento</label><input id="fl-bdata" type="date" value="${U.hojeISO()}"></div>
           <div class="campo"><label for="fl-bconta">Conta / caixa</label><select id="fl-bconta">${opt(fin().contas.filter((c) => !c.inativa).map((c) => [c.id, c.nome]), contaPadrao(v.loja))}</select></div>
-          <div class="campo"><label for="fl-bforma">Forma</label><select id="fl-bforma">${opt(Object.entries(F.FORMAS), 'pix')}</select></div></div>`}
+          <div class="campo"><label for="fl-bforma">Forma</label><select id="fl-bforma">${opt(F.FORMAS_TELA.map((k) => [k, F.FORMAS[k]]), 'pix')}</select></div></div>`}
         <div class="campo inteiro"><label for="fl-obs">Observação</label><input id="fl-obs" value="${U.esc(v.obs || '')}"></div>
       </form><div class="acoes"><button class="btn btn-ouro" type="button" id="fl-ok">Salvar</button><button class="btn btn-linha" type="button" id="fl-nao">Cancelar</button></div>`, (c) => {
       const $ = (s) => U.$(s, c);
@@ -220,7 +220,7 @@
     U.abrirCamada('modal', `<h2>${l.tipo === 'pagar' ? 'Registrar pagamento' : 'Registrar recebimento'}</h2><p class="sub">${U.esc(l.descricao)} · vence ${F.dataBR(l.vencimento)} · <b>${brl(l.valor)}</b></p>
       <div class="campos" style="margin-top:12px">
         <div class="campo"><label for="bx-data">Data</label><input id="bx-data" type="date" value="${U.hojeISO()}"></div>
-        <div class="campo"><label for="bx-forma">Forma</label><select id="bx-forma">${opt(Object.entries(F.FORMAS), l.tipo === 'receber' ? 'pix' : 'boleto')}</select></div>
+        <div class="campo"><label for="bx-forma">Forma</label><select id="bx-forma">${opt(F.FORMAS_TELA.map((k) => [k, F.FORMAS[k]]), l.tipo === 'receber' ? 'pix' : 'boleto')}</select></div>
         <div class="campo inteiro"><label for="bx-conta">${l.tipo === 'pagar' ? 'Saiu da conta' : 'Entrou na conta'}</label><select id="bx-conta">${opt(fin().contas.filter((c) => !c.inativa).map((c) => [c.id, c.nome + (c.loja ? ' · ' + c.loja : '')]), contaPadrao(l.loja))}</select></div>
         <div class="campo"><label for="bx-juros">Juros / multa (R$)</label><input id="bx-juros" inputmode="decimal" placeholder="0,00"></div>
         <div class="campo"><label for="bx-desc">Desconto (R$)</label><input id="bx-desc" inputmode="decimal" placeholder="0,00"></div>
@@ -250,7 +250,7 @@
       <p class="fin-valor ${l.tipo === 'pagar' ? 'neg' : 'pos'}">${brl(F.valorEfetivo(l))}</p>
       <ul class="lista-motivos">${linha('Vencimento', F.dataBR(l.vencimento))}${linha('Competência', F.dataBR(l.competencia))}${linha(l.tipo === 'pagar' ? 'Fornecedor' : 'Cliente', U.esc(pessoa(l)))}${linha('Categoria', U.esc(nomeCat(l.categoria)))}${linha('Centro de custo', U.esc(nomeCentro(l.centro)))}
         ${linha('Loja', U.esc(l.loja))}${linha('Máquina', U.esc(nomeMaq(l.maquina)))}${linha('Documento', U.esc(l.documento))}${linha('Parcela', l.parcela ? `${l.parcela.n} de ${l.parcela.de}` : '')}${linha('Recorrência', l.recorrencia ? `mensal, ${l.recorrencia.n} de ${l.recorrencia.de}` : '')}
-        ${l.pago ? linha('Pago em', `${F.dataBR(l.pago.data)} · ${F.FORMAS[l.pago.forma]} · ${U.esc(nomeConta(l.pago.conta))}`) + linha('Juros / desconto', l.pago.juros || l.pago.desconto ? `${brl(l.pago.juros)} / ${brl(l.pago.desconto)}` : '') + linha('Baixado por', U.esc(l.pago.por)) : ''}
+        ${l.pago ? linha(F.ehCompensacao(l) ? 'Compensado em' : 'Pago em', `${F.dataBR(l.pago.data)} · ${F.FORMAS[l.pago.forma]}${l.pago.conta ? ' · ' + U.esc(nomeConta(l.pago.conta)) : ' · não passa pelo banco'}`) + linha('Juros / desconto', l.pago.juros || l.pago.desconto ? `${brl(l.pago.juros)} / ${brl(l.pago.desconto)}` : '') + linha('Baixado por', U.esc(l.pago.por)) : ''}
         ${linha('Conciliado com o extrato', l.conciliado ? 'Sim' : '')}${linha('Cancelado', l.cancelado ? `${U.esc(l.cancelado.por)} · ${U.esc(l.cancelado.motivo || 'sem motivo')}` : '')}${linha('Lançado por', U.esc(l.criadoPor || (l.auto ? 'Anshur (automático)' : '')))}${linha('Valor', l.estimada ? 'Comissão estimada pela regra da revenda; confira antes de pagar' : '')}${linha('Observação', U.esc(l.obs))}</ul>
       <div class="acoes" style="flex-wrap:wrap">
         ${pode && !l.pago && !l.cancelado ? `<button class="btn btn-ouro" type="button" id="dt-baixar">${l.tipo === 'pagar' ? 'Pagar' : 'Receber'}</button><button class="btn btn-linha" type="button" id="dt-editar">Editar</button><button class="btn btn-linha" type="button" id="dt-parcelar">Parcelar</button><button class="btn btn-perigo" type="button" id="dt-cancelar">Cancelar</button>` : ''}
@@ -587,6 +587,21 @@
     telas: { fin: T(telaPainel), 'fin-receber': T(() => telaLista('receber')), 'fin-pagar': T(() => telaLista('pagar')), 'fin-contas': T(telaContas), 'fin-conciliacao': T(telaConciliacao), 'fin-fluxo': T(telaFluxo), 'fin-dre': T(telaDRE), 'fin-inadimplencia': T(telaInad), 'fin-comissoes': T(telaComissoes), 'fin-maquinas': T(telaMaquinas), cadastros: T(telaCadastros) },
     permissoes: { fin: VER, 'fin-receber': VER, 'fin-pagar': VER, 'fin-contas': VER, 'fin-conciliacao': VER, 'fin-fluxo': VER, 'fin-dre': VER, 'fin-inadimplencia': VER, 'fin-comissoes': VER, 'fin-maquinas': VER, cadastros: ['dono', 'financeiro', 'gerente', 'auditor', 'vendedor'] },
     numero: (ui) => { U = ui; F.garantir(ui.estado); const r = F.resumo(ui.estado, Object.assign({ hoje: ui.hojeISO(), ctx: ctx() }, fl())); const n = r.pagarHoje.n + r.receberHoje.n; return { valor: brl(r.pagarHoje.valor), texto: `a pagar hoje · ${brl(r.receberHoje.valor)} a receber${r.pagarVencido.n ? ` · ${r.pagarVencido.n} vencidas` : ''}`, alerta: r.pagarVencido.n > 0, n }; },
+    // tarefas do dia e rotina: contas vencidas, contas de hoje e recebimentos atrasados
+    hoje: (estado, u, ui) => {
+      if (!['dono', 'financeiro'].includes(u.perfil)) return [];
+      U = ui; F.garantir(estado); const r = F.resumo(estado, Object.assign({ hoje: ui.hojeISO(), ctx: ctx() }, fl())), out = [];
+      if (r.pagarVencido.n) out.push({ id: 'fin-pv-' + r.pagarVencido.n, cat: 'contas', catNome: 'Financeiro', nivel: 1, valor: r.pagarVencido.valor, titulo: `${r.pagarVencido.n} ${r.pagarVencido.n === 1 ? 'conta a pagar vencida' : 'contas a pagar vencidas'}`, txt: `${brl(r.pagarVencido.valor)} em atraso: juros e multa correndo.`, botao: { rotulo: 'Pagar agora', ir: '#/financeiro/fin-pagar' } });
+      if (r.pagarHoje.n) out.push({ id: 'fin-ph-' + r.pagarHoje.n, cat: 'contas', catNome: 'Financeiro', nivel: 2, valor: r.pagarHoje.valor, titulo: `${r.pagarHoje.n} ${r.pagarHoje.n === 1 ? 'conta vence' : 'contas vencem'} hoje`, txt: `${brl(r.pagarHoje.valor)} a pagar hoje. Saldo nas contas: ${brl(r.saldo)}.`, botao: { rotulo: 'Ver contas a pagar', ir: '#/financeiro/fin-pagar' } });
+      if (r.receberVencido.n) out.push({ id: 'fin-rv-' + r.receberVencido.n, cat: 'contas', catNome: 'Financeiro', nivel: 2, valor: r.receberVencido.valor, titulo: `${r.receberVencido.n} ${r.receberVencido.n === 1 ? 'recebimento atrasado' : 'recebimentos atrasados'}`, txt: `${brl(r.receberVencido.valor)} a cobrar de clientes.`, botao: { rotulo: 'Cobrar no WhatsApp', ir: '#/financeiro/fin-inadimplencia' } });
+      if (r.pagar7.n) out.push({ id: 'fin-p7-' + r.pagar7.n, cat: 'contas', catNome: 'Financeiro', nivel: 3, valor: r.pagar7.valor, titulo: `${r.pagar7.n} ${r.pagar7.n === 1 ? 'conta vence' : 'contas vencem'} nos próximos 7 dias`, txt: `${brl(r.pagar7.valor)} a pagar na semana; ${brl(r.receber7.valor)} a receber.`, botao: { rotulo: 'Ver o fluxo de caixa', ir: '#/financeiro/fin-fluxo' } });
+      return out;
+    },
+    rotina: (estado, u, ui) => {
+      U = ui; F.garantir(estado); const r = F.resumo(estado, { hoje: ui.hojeISO(), ctx: ctx() });
+      return [{ perfil: 'financeiro', periodo: 'dia', id: 'fin-baixas', titulo: 'Baixar o que foi pago e recebido e tratar os vencidos', qtd: r.pagarVencido.n + r.receberVencido.n + r.pagarHoje.n, ir: '#/financeiro/fin' },
+        { perfil: 'financeiro', periodo: 'semana', id: 'fin-conciliar', titulo: 'Conferir o extrato do banco (conciliação)', qtd: null, ir: '#/financeiro/fin-conciliacao' }];
+    },
     buscar,
     novo: (ui) => { U = ui; if (!editor()) { ui.toast('Só o dono e o financeiro lançam.', true); return; } ui.abrirCamada('modal', `<h2>Novo lançamento</h2><p class="sub">O que você vai lançar?</p><div class="acoes" style="flex-wrap:wrap"><button class="btn btn-ouro" type="button" data-nt="receber">${I.entra}Conta a receber</button><button class="btn btn-ouro" type="button" data-nt="pagar">${I.sai}Conta a pagar</button>${fin().contas.length > 1 ? '<a class="btn btn-linha" href="#fin-contas">Transferência entre contas</a>' : ''}</div>`, (c) => { U.$$('[data-nt]', c).forEach((b) => b.onclick = () => formLancamento({ tipo: b.dataset.nt })); }); },
     iniciar: semearDemo

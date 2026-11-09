@@ -195,6 +195,14 @@
     return out.sort((a, b) => b.data.localeCompare(a.data));
   }
 
+  // OS da Oficina (estado.oficina.os) no formato do histórico do cliente: tipo + problema/diagnóstico + situação e o valor
+  // (faturado na entrega ou o orçamento). semValor: o vendedor vê só a situação, como na própria Oficina.
+  function osParaHistorico(lista, { O = raiz.OFICINA, semValor = false } = {}) {
+    return (lista || []).map((o) => ({ id: o.id, numero: o.numero, cliente: o.cliente, abertura: o.abertura || String(o.criadoEm || '').slice(0, 10),
+      descricao: [O ? O.TIPOS[o.tipo] : o.tipo, o.diagnostico || o.problema, O ? O.STATUS[o.status] : o.status].filter(Boolean).join(' · '),
+      total: semValor ? null : o.fechamento ? o.fechamento.venda : O ? O.totais(o).total : null }));
+  }
+
   // ---------- calendário de safra → oportunidades ----------
   // safra: o calendário que o Anshur já usa (app.js › SAFRA: { tipo: { janela, motivo, meses: [0..11] } })
   const mesesAte = (meses, mesAtual) => { if (!meses || !meses.length) return 99; return Math.min(...meses.map((m) => (m - mesAtual + 12) % 12)); };
@@ -230,6 +238,6 @@
 
   raiz.CRM = { ETAPAS, NOME_ETAPA, ABERTAS, ORIGENS, MOTIVOS_PERDA, TIPOS_ATIV, CULTURAS, MAQ_CULTURA, r2, somarDias, diasEntre, novoId, vazio, garantir, lead, perfilDe, podeVer, visivel, podeEditar, podeCriar,
     criarLead, mover, avancar, editarLead, registrarAtividade, concluir, reabrir, agenda, semFollowup, mensagemFollowup, linkWhats, funil, porVendedor, salvarPerfil, ligarMaquina, areaTotal, culturas,
-    historicoCliente, mesesAte, oportunidadesSafra, resumo };
+    historicoCliente, osParaHistorico, mesesAte, oportunidadesSafra, resumo };
   if (typeof module !== 'undefined' && module.exports) module.exports = raiz.CRM;
 })(typeof window !== 'undefined' ? window : globalThis);

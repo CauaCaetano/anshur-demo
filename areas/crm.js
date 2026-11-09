@@ -11,7 +11,7 @@
     id: 'crm', nome: 'Vendas e Clientes', curto: 'CRM', ordem: 60, pronta: false, perfis: PERFIS,
     descricao: 'Funil, leads, clientes, atividades, tarefas e follow-ups.', icone: ICONE,
     previsto: ['Funil do primeiro contato ao faturamento', 'Leads, clientes, atividades e tarefas', 'Follow-ups com WhatsApp', 'Ligado aos compradores de usados e às comissões'],
-    hoje: 'Hoje já existe: Compradores (Usados) e o cadastro único de clientes.',
+    jaExiste: 'Hoje já existe: Compradores (Usados) e o cadastro único de clientes.',
     dados: { crm: ['leads', 'atividades', 'perfis'], cadastros: ['clientes'] }
   });
   const CR = raiz.CRM;
@@ -253,12 +253,14 @@
     if (nv) return { nome: N().nomeItem(nv), origem: 'nova vendida pela revenda' };
     return { nome: m.descricao || 'Máquina', origem: 'de fora' };
   }
+  // OS da Oficina no histórico (regra em crm-regras.js); vendedor vê só a situação, sem valores
+  const osDoCliente = (cid) => CR.osParaHistorico((est().oficina && Array.isArray(est().oficina.os) ? est().oficina.os : []).filter((o) => o.cliente === cid), { semValor: perfil() === 'vendedor' });
   function historico(cid) {
     const c = cliente(cid), n = N() ? N().garantir(est()) : { propostas: [], vendas: [] }, f = F();
     const verFin = f && f.podeVer(perfil());
     return CR.historicoCliente(est(), cid, { avaliacoes: est().avaliacoes || [], propostas: n.propostas.filter(ve), vendasNovas: n.vendas.filter(ve), nomeItem: (id) => (N() ? N().nomeItem(N().item(est(), id)) : ''),
       trocas: (U.A.todasTrocas || U.A.trocas || []).filter((t) => t.vendido && t.comprador && U.K.normal(t.comprador) === U.K.normal(c.nome)),
-      os: (est().oficina && Array.isArray(est().oficina.os) ? est().oficina.os : []), lancamentos: verFin ? f.garantir(est()).lancamentos : [] });
+      os: osDoCliente(cid), lancamentos: verFin ? f.garantir(est()).lancamentos : [] });
   }
   const NOME_H = { crm: 'CRM', atividade: 'Atividade', avaliacao: 'Avaliação', proposta: 'Proposta', compra: 'Compra', os: 'Oficina', financeiro: 'Financeiro' };
   function fichaCliente(cid) {
@@ -373,6 +375,23 @@
     telas: { 'crm-funil': T(telaFunil), 'crm-leads': T(telaLeads), 'crm-agenda': T(telaAgenda), 'crm-clientes': T(telaClientes), 'crm-safra': T(telaSafra), 'crm-equipe': T(telaEquipe) },
     permissoes,
     numero: (ui) => { U = ui; const r = CR.resumo(ui.estado, { hoje: ui.hojeISO(), perfil: ui.eu().perfil, nome: ui.eu().nome, loja: ui.estado.lojaAtual || '' }); return { valor: String(r.abertos), texto: `${r.abertos === 1 ? 'oportunidade aberta' : 'oportunidades abertas'} · ${r.tarefasHoje} tarefas hoje${r.atrasadas ? ` · ${r.atrasadas} atrasadas` : ''}`, alerta: r.atrasadas > 0 }; },
+    // tarefas do dia (portal e "Tarefas do dia") e rotina da equipe: retornos atrasados, agenda de hoje e oportunidades sem contato
+    hoje: (estado, u, ui) => {
+      if (!['dono', 'gerente', 'vendedor'].includes(u.perfil)) return [];
+      const h = ui.hojeISO(), ag = CR.agenda(estado, { hoje: h, perfil: u.perfil, nome: u.nome }), sf = CR.semFollowup(estado, { hoje: h, perfil: u.perfil, nome: u.nome }), out = [];
+      const cli = (id) => { const c = id && ui.K.cad.cliente(id); return c ? c.nome : ''; };
+      const it = (a) => `${a.texto}${a.cliente && cli(a.cliente) ? ' (' + cli(a.cliente) + ')' : ''}`;
+      const n = ag.atrasadas.length;
+      if (n) out.push({ id: 'crm-atr-' + n, cat: 'crm', catNome: 'Vendas e Clientes', nivel: 1, valor: 4e5 + n, titulo: `${n} ${n === 1 ? 'retorno atrasado' : 'retornos atrasados'} com clientes`, txt: ag.atrasadas.slice(0, 3).map(it).join(' · '), botao: { rotulo: 'Abrir a agenda', ir: '#/crm/crm-agenda' } });
+      if (ag.hoje.length) out.push({ id: 'crm-hoje-' + ag.hoje.length, cat: 'crm', catNome: 'Vendas e Clientes', nivel: 2, valor: 3e5, titulo: `${ag.hoje.length} ${ag.hoje.length === 1 ? 'contato marcado' : 'contatos marcados'} para hoje`, txt: ag.hoje.slice(0, 3).map((a) => (a.hora ? a.hora + ' ' : '') + it(a)).join(' · '), botao: { rotulo: 'Ver a agenda de hoje', ir: '#/crm/crm-agenda' } });
+      if (sf.length) out.push({ id: 'crm-sf-' + sf.length, cat: 'crm', catNome: 'Vendas e Clientes', nivel: 2, valor: sf.reduce((s, x) => s + (x.lead.valor || 0), 0), titulo: `${sf.length} ${sf.length === 1 ? 'oportunidade parada' : 'oportunidades paradas'}, sem contato há 5 dias ou mais`, txt: sf.slice(0, 3).map((x) => `${cli(x.lead.cliente) || 'Cliente'} · ${x.parado} dias`).join(' · '), botao: { rotulo: 'Fazer o follow-up', ir: '#/crm/crm-agenda' } });
+      return out;
+    },
+    rotina: (estado, u, ui) => {
+      const h = ui.hojeISO(), ag = CR.agenda(estado, { hoje: h, perfil: 'dono' });
+      return [{ perfil: 'vendedor', periodo: 'dia', id: 'crm-retornos', titulo: 'Fazer os retornos e follow-ups com os clientes', qtd: ag.atrasadas.length + ag.hoje.length + CR.semFollowup(estado, { hoje: h }).length, ir: '#/crm/crm-agenda' },
+        { perfil: 'gerente', periodo: 'semana', id: 'crm-funil', titulo: 'Revisar o funil de vendas com os vendedores', qtd: null, ir: '#/crm/crm-funil' }];
+    },
     buscar,
     novo: (ui) => { U = ui; estilo(); formLead(); },
     // a demonstração de Novas e CRM é uma história só (semeada depois do Financeiro): ver areas/novas.js › semear

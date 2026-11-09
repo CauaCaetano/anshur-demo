@@ -21,12 +21,12 @@
   const it = (aba, rotulo, curto) => I(aba, rotulo, curto, ICO[aba]);
 
   R.registrar({
-    id: 'usados', nome: 'Usados e Trocas', curto: 'Usados', ordem: 10, inicio: 'hoje',
+    id: 'usados', nome: 'Usados e Trocas', curto: 'Usados', ordem: 10, inicio: 'visao',
     descricao: 'Avaliação com IA, pátio, aprovações, passaportes, compradores e teste às cegas.',
     icone: '<path d="M4 7h13l-3-3M20 17H7l3 3"/>',
-    acao: { rotulo: 'Nova avaliação', href: '#avaliar' }, atalhos: ['hoje', 'avaliar', 'patio', 'aprovacoes'],
+    acao: { rotulo: 'Nova avaliação', href: '#avaliar' }, atalhos: ['visao', 'avaliar', 'patio', 'aprovacoes'],
     menu: [
-      { grupo: 'Dia a dia', itens: [it('hoje', 'Hoje', 'Hoje'), it('visao', 'Visão geral', 'Visão'), it('rotina', 'Rotina da equipe', 'Rotina')] },
+      { grupo: 'Painel', itens: [it('visao', 'Painel dos usados', 'Painel')] },
       { grupo: 'Comercial', itens: [it('avaliar', 'Avaliar troca', 'Avaliar'), it('aprovacoes', 'Aprovações', 'Aprovações'), it('compradores', 'Compradores', 'Compradores'), it('vendedores', 'Vendedores', 'Vendedores'), it('teste', 'Teste às cegas', 'Teste'), it('memoria', 'Memória comercial', 'Memória')] },
       { grupo: 'Estoque', itens: [it('patio', 'Pátio', 'Pátio'), it('passaportes', 'Passaportes', 'Passaportes'), it('mercado', 'Monitor de mercado', 'Mercado')] },
       { grupo: 'Resultado', itens: [it('trocas', 'Inteligência de trocas', 'Trocas'), it('garantias', 'Garantias a receber', 'Garantias'), it('financiamento', 'Estoque financiado', 'Financiado')] }

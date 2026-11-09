@@ -18,7 +18,12 @@
   //   numero: (ui) => ({ valor, texto, alerta })  número vivo do cartão da entrada,
   //   buscar: (q, ui) => [{ g, n, d, ir }]        resultados na busca global (Ctrl+K),
   //   dados: { grupo: ['lista', ...] }  listas com id dentro de estado[grupo] (fila offline idempotente),
-  //   iniciar: (ui) => {}               roda uma vez quando o app abre (ex.: semear a demonstração) }
+  //   iniciar: (ui) => {}               roda uma vez quando o app abre (ex.: semear a demonstração),
+  //   hoje: (estado, usuario, ui) => [{ id, cat, catNome, nivel (1 urgente · 2 hoje · 3 rotina), valor, titulo, txt, botao: { rotulo, ir: '#/area/aba' } }]
+  //                                     tarefas e alertas da área que entram na tela "Tarefas do dia" e nos avisos do portal (filtrar pelo perfil do usuario),
+  //   rotina: (estado, usuario, ui) => [{ perfil, periodo: 'dia' | 'semana', id, titulo, qtd (0 = em dia; null = sem contagem), ir }]
+  //                                     o que cada perfil faz todo dia/semana nesta área (entra na "Rotina da equipe"),
+  //   jaExiste: 'texto'                 (só para área "Em breve": o que já existe hoje no Anshur) }
   function registrar(def) {
     if (!def || !def.id) throw new Error('Área sem id');
     const i = lista.findIndex((a) => a.id === def.id);
@@ -42,5 +47,9 @@
   function permissao(aba) { for (const a of lista) if (a.permissoes[aba]) return a.permissoes[aba]; return null; }
   function item(aba) { for (const a of ordenadas()) { const x = itens(a).find((y) => y.aba === aba); if (x) return Object.assign({ area: a.id }, x); } return null; }
 
-  raiz.ANSHUR_AREAS = { registrar, lista: ordenadas, area, itens, abas, areaDaAba, tela, permissao, item, gruposDados: () => grupos };
+  // junta as tarefas do dia e a rotina de todas as áreas prontas (uma área com erro não derruba as outras)
+  const juntar = (campo) => (estado, usuario, ui, filtro) => ordenadas().filter((a) => a.pronta && typeof a[campo] === 'function' && (!filtro || filtro(a))).flatMap((a) => {
+    try { return (a[campo](estado, usuario, ui) || []).map((x) => Object.assign({ area: a.id, areaNome: a.nome }, x)); } catch (e) { if (typeof console !== 'undefined') console.error('Área ' + a.id + ' (' + campo + ')', e); return []; }
+  });
+  raiz.ANSHUR_AREAS = { registrar, lista: ordenadas, area, itens, abas, areaDaAba, tela, permissao, item, gruposDados: () => grupos, tarefas: juntar('hoje'), rotinas: juntar('rotina') };
 })(typeof window !== 'undefined' ? window : globalThis);

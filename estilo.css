@@ -821,3 +821,101 @@ body.so-leitura .aprov .acoes, body.so-leitura .aprov button { display: none !im
 .menu svg, .area-troca svg { flex: none; }
 .fin-filtros > .btn { justify-self: start; }
 .kpis.fin-k .kpi .val { font-size: clamp(20px, 10.5cqi, 40px); }
+
+/* ===================== v20: portal + sistemas (modelo ERP): cada sistema com cabeçalho e menu próprios ===================== */
+/* sem lateral compartilhada: no computador o menu do sistema fica na barra do cabeçalho; no celular, na barra de baixo */
+.cabecalho { display: block; padding: 0 !important; gap: 0; }
+.cab-linha { display: flex; align-items: center; gap: 12px; padding: 12px 28px; min-width: 0; }
+.sis-grade { flex: none; }
+.sis-grade > span { font-weight: 650; font-size: 15px; }
+.sis-nome { display: flex; align-items: center; gap: 10px; min-width: 0; text-decoration: none; color: var(--obsidiana); margin-right: auto; border-radius: 10px; }
+.sis-nome .logo-img { width: 132px; max-width: none; }
+.sis-ico { width: 40px; height: 40px; border-radius: 11px; background: var(--obsidiana); color: var(--ouro); display: grid; place-items: center; flex: none; }
+.sis-ico svg { width: 23px; height: 23px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.sis-txt { display: grid; line-height: 1.1; min-width: 0; }
+.sis-txt small { font-size: 11.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--ouro-texto); }
+.sis-txt b { font-size: 21px; font-weight: 750; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+body[data-modo="portal"] .cab-nova { display: none !important; }
+.sis-barra { display: none; }
+.perfil-loja { display: none; }
+@media (min-width: 960px) {
+  .casca { display: block; }
+  .lateral { display: none !important; }
+  main { margin: 0 auto; }
+  body[data-modo="sistema"] .sis-barra { display: flex; flex-wrap: wrap; align-items: stretch; gap: 2px; padding: 0 22px; border-top: 1px solid var(--borda); background: #fff; }
+  .sb-item, .sb-btn { display: inline-flex; align-items: center; gap: 6px; min-height: 48px; padding: 0 14px; border: 0; border-bottom: 3px solid transparent; background: none; color: var(--grafite); font: 600 15.5px Inter, sans-serif; text-decoration: none; cursor: pointer; white-space: nowrap; }
+  .sb-item:hover, .sb-btn:hover, .sb-btn[aria-expanded="true"] { color: var(--obsidiana); background: #FAF7F0; }
+  .sb-item[aria-current="page"], .sb-grupo.atual > .sb-btn { color: var(--obsidiana); border-bottom-color: var(--ouro); }
+  .sb-btn .seta { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; color: var(--cinza); transition: transform var(--t); }
+  .sb-btn[aria-expanded="true"] .seta { transform: rotate(180deg); }
+  .sb-grupo { position: relative; display: flex; }
+  .sb-pop { position: absolute; top: calc(100% + 4px); left: 0; z-index: 40; min-width: 270px; display: grid; gap: 2px; padding: 6px; background: #fff; border: 1px solid var(--borda); border-radius: 12px; box-shadow: 0 22px 44px -18px rgba(17, 24, 32, .35); }
+  .sb-pop[hidden] { display: none; }
+  .sb-pop a { display: grid; grid-template-columns: 24px 1fr; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 8px; color: var(--obsidiana); text-decoration: none; font-size: 15px; }
+  .sb-pop a:hover, .sb-pop a:focus-visible { background: var(--marinho-3); outline: none; }
+  .sb-pop a[aria-current="page"] { background: #F4ECDA; box-shadow: inset 3px 0 0 var(--ouro); font-weight: 650; }
+  .sb-pop svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; color: var(--ouro-texto); }
+}
+@media (max-width: 1180px) and (min-width: 960px) { .cab-info { display: none !important; } }
+/* celular: cabeçalho numa linha só (grade de sistemas · nome do sistema · busca · alertas · ação · perfil) */
+@media (max-width: 959px) {
+  .cab-linha { gap: 6px; padding: 8px 10px; }
+  .cabecalho .loja-sel, .cabecalho .selo-demo, .cabecalho .cab-info, .cabecalho #instalar-btn, .cabecalho .kbd { display: none !important; }
+  .sis-grade > span { display: none; }
+  .sis-grade { min-height: 40px; width: 40px; padding: 0; justify-content: center; }
+  .sis-ico { width: 34px; height: 34px; border-radius: 9px; } .sis-ico svg { width: 20px; height: 20px; }
+  .sis-txt small { font-size: 10px; letter-spacing: .1em; } .sis-txt b { font-size: 16px; }
+  .sis-nome .logo-img { width: 108px; }
+  .cabecalho .sino, .cabecalho .avatar { width: 40px; height: 40px; flex: none; }
+  .cabecalho .cab-nova { min-width: 40px; min-height: 40px; padding: 0 9px; flex: none; }
+  .cabecalho .cab-nova span { display: none; }
+  .perfil-loja { display: grid; gap: 4px; padding: 6px 10px 10px; font-size: 13px; font-weight: 650; color: var(--cinza); border-bottom: 1px solid var(--linha); margin-bottom: 6px; }
+  .perfil-loja[hidden] { display: none; }
+  .perfil-loja select { min-height: 40px; border-radius: 10px; border: 1px solid var(--borda); background: #fff; padding: 0 8px; font-size: 15px; color: var(--obsidiana); }
+  body[data-modo="portal"] .menu, body[data-modo="portal"] .menu-fundo { display: none !important; }
+  body[data-modo="portal"] .principal { padding-bottom: 0; }
+}
+@media (max-width: 380px) { .sis-txt small { display: none; } .cab-linha { gap: 4px; } }
+/* seletor de sistemas */
+.area-pop .pop-portal { background: #FAF7F0; margin-bottom: 4px; }
+.area-pop .pop-linha { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 2px; }
+.area-pop .pop-aba { display: grid; place-items: center; width: 40px; height: 40px; padding: 0; grid-template-columns: none; border-radius: 10px; color: var(--cinza); }
+.area-pop .pop-aba svg { width: 18px; height: 18px; color: var(--cinza); }
+/* portal */
+.portal-busca { position: relative; display: flex; align-items: center; gap: 10px; margin: 4px 0 18px; padding: 0 14px; min-height: 54px; background: #fff; border: 1px solid var(--borda); border-radius: 14px; }
+.portal-busca:focus-within { border-color: var(--ouro); box-shadow: 0 0 0 3px rgba(193, 163, 106, .18); }
+.portal-busca .ico { color: var(--cinza); }
+.portal-busca input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; font-size: 16.5px; min-height: 50px; }
+.portal-res { position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 30; display: grid; gap: 2px; padding: 6px; background: #fff; border: 1px solid var(--borda); border-radius: 12px; box-shadow: 0 22px 44px -18px rgba(17, 24, 32, .3); }
+.portal-res[hidden] { display: none; }
+.portal-res a { padding: 10px 12px; border-radius: 8px; text-decoration: none; color: var(--obsidiana); font-weight: 600; }
+.portal-res a:hover, .portal-res a:first-child { background: var(--marinho-3); }
+.avisos-dia .acoes-dia .cat { display: block; font-size: 12.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ouro-texto); }
+.recentes { margin-top: 6px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.chip { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 12px; background: #fff; border: 1px solid var(--borda); text-decoration: none; color: var(--obsidiana); max-width: 100%; }
+.chip:hover { border-color: var(--ouro); }
+.chip svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; color: var(--ouro-texto); flex: none; }
+.chip span { display: grid; line-height: 1.2; font-weight: 650; font-size: 14.5px; min-width: 0; } .chip small { font-weight: 500; color: var(--cinza); font-size: 12.5px; }
+.area-caixa { position: relative; display: grid; }
+.area-caixa[hidden] { display: none; }
+.area-extra { position: absolute; top: 14px; right: 14px; display: flex; gap: 6px; }
+.area-mini { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 10px; border: 1px solid var(--borda); background: #fff; color: var(--cinza); cursor: pointer; padding: 0; }
+.area-mini:hover { border-color: var(--ouro); color: var(--obsidiana); }
+.area-mini svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.area-mini.ligado { color: var(--ouro-texto); border-color: var(--ouro); } .area-mini.ligado svg { fill: var(--ouro); }
+.area-cartao.favorito { border-color: rgba(193, 163, 106, .7); }
+.area-cartao .area-nome { padding-right: 86px; }
+.ico-inline { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; vertical-align: -2px; }
+.aviso-abas { position: fixed; right: 16px; bottom: calc(86px + env(safe-area-inset-bottom)); z-index: 60; box-shadow: 0 14px 30px -12px rgba(17, 24, 32, .45); }
+@media (min-width: 960px) { .aviso-abas { bottom: 24px; } }
+@media print { .sis-barra, .cab-linha { display: none !important; } }
+
+/* abas de modo no celular: quebram em linhas em vez de sair da tela */
+@media (max-width: 600px) { .abas-modo { display: flex; flex-wrap: wrap; max-width: 100%; } .abas-modo button { flex: 1 1 auto; } }
+/* cabeçalho do sistema no computador: o nome do sistema nunca é cortado; nome da revenda fica no portal e no menu do perfil */
+@media (min-width: 960px) { .sis-nome { flex: none; } body[data-modo="sistema"] .cab-info { display: none !important; } }
+@media (max-width: 1440px) { body[data-modo="sistema"] .selo-demo { display: none; } }
+.cab-nova.repetido { display: none !important; }
+.filtros-hist .campo, .filtros-hist input, .filtros-hist select { min-width: 0; max-width: 100%; }
+.filtros-hist input[type="date"] { width: 100%; }

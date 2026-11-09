@@ -502,6 +502,7 @@
     const ops = diferenca(vista, d);
     vista = copia(d) || {};
     if (!ops.length) return true;
+    if (filaNoAparelho) fila = lerFila(); // outra aba pode ter posto ou enviado operações
     fila.push(...ops);
     if (!gravarFila()) situacao('Sem espaço neste aparelho para guardar as alterações. Não feche o Anshur até a internet voltar.', 'erro', true);
     else mostrarFila();
@@ -536,16 +537,19 @@
         falhaRede(); return;
       }
       for (let volta = 0; volta < 6; volta++) {
+        if (filaNoAparelho) fila = lerFila();
+        if (!fila.length) { avisar(); return; }
         const lote = fila.slice(), dados = aplicarOps(N.dados, lote);
         let resp; try { resp = await sb.rpc('anshur_salvar', { p_revenda: N.revenda.id, p_dados: dados, p_versao_esperada: N.versao }); } catch (e) { resp = { error: e }; }
         const { data, error } = resp;
         if (!error) {
           N.dados = dados; N.versao = data; semConexao = false; tentativas = 0;
-          const enviados = new Set(lote.map((o) => o.oid)); fila = fila.filter((o) => !enviados.has(o.oid));
+          const enviados = new Set(lote.map((o) => o.oid)); fila = (filaNoAparelho ? lerFila() : fila).filter((o) => !enviados.has(o.oid));
           gravarCache(); gravarFila();
           if (fila.length) { deNovo = true; return; }
           N.offline = false;
           enviarEventosGuardados();
+          if (typeof N.aoSalvarNoServidor === 'function') N.aoSalvarNoServidor();
           if (juntou) situacao('Salvo no servidor, junto com o que outra pessoa salvou ao mesmo tempo.', '', true, { rotulo: 'Atualizar a tela', fn: () => location.reload() });
           else situacao('Salvo no servidor');
           avisar();

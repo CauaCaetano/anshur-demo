@@ -10,7 +10,7 @@
   // se a página ainda não carregou as regras (index.html antigo em cache), carrega agora
   if (!raiz.FISCAL && typeof document !== 'undefined') {
     const s = document.createElement('script'); s.src = 'areas/fiscal-regras.js?v=18';
-    s.onload = () => { try { if (raiz.ANSHUR_UI && /^#fs/.test(location.hash)) raiz.ANSHUR_UI.rota(); } catch (e) { /* nada */ } };
+    s.onload = () => { try { if (raiz.ANSHUR_UI && /^#(\/fiscal|fs)/.test(location.hash)) raiz.ANSHUR_UI.rota(); } catch (e) { /* nada */ } };
     document.head.appendChild(s);
   }
   const FS = () => raiz.FISCAL;
@@ -32,10 +32,9 @@
   }
   const daLoja = (d) => { const l = est().lojaAtual, perm = U.K.lojasPermitidas; if (perm && perm.length && d.loja && !perm.includes(d.loja)) return false; return !l || !d.loja || d.loja === l; };
   const docs = () => FS().documentos(est(), ctx()).filter(daLoja);
-  // trilha: Atividades (no aparelho) + trilha do servidor anshur_eventos (tipo "fiscal"), como as outras áreas
+  // trilha: Atividades (no aparelho); 'fiscal' está em CRITICOS (comum.js) e vai para a trilha do servidor, como as outras áreas
   function gravar(texto) {
     U.log('fiscal', texto);
-    try { if (U.OP && U.NV && typeof U.NV.evento === 'function') U.NV.evento('fiscal', texto); } catch (e) { /* a fila do servidor guarda sem internet */ }
     U.salvar();
   }
   const ic = (d) => `<svg class="ico" viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
@@ -487,7 +486,7 @@
     descricao: 'O que precisa de nota, dados prontos para o seu emissor e XML autorizado guardado na operação. Emissão direto pelo Anshur: em preparação.',
     icone: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6M9 16h3"/>',
     previsto: ['Emissão de NF-e direto pelo Anshur: em preparação (só depois de homologada na SEFAZ com o certificado da revenda)'],
-    hoje: 'O Anshur não emite nota: organiza, exporta os dados e guarda o XML autorizado emitido no seu emissor.',
+    jaExiste: 'O Anshur não emite nota: organiza, exporta os dados e guarda o XML autorizado emitido no seu emissor.',
     acao: { rotulo: 'Importar XML', href: '#fs-notas', novo: true },
     dados: { fiscal: ['naturezas', 'ncms', 'notas', 'decisoes'] },
     menu: [
@@ -501,6 +500,13 @@
       const r = FS().resumo(ui.estado, ctx());
       return { valor: String(r.vendasMesSemNota), texto: `vendas do mês sem nota vinculada${r.vendasMesSemNota ? ' · ' + brl(r.valorVendasMesSemNota) : ''}${r.comprasSemNota ? ` · ${plural(r.comprasSemNota, 'compra de usado', 'compras de usado')} sem nota` : ''}${r.perfilOk ? '' : ' · cadastro fiscal incompleto'}`, alerta: r.vendasMesSemNota > 0 || !r.perfilOk };
     },
+    // tarefas do dia e rotina: vendas do mês ainda sem nota vinculada
+    hoje: (estado, u, ui) => {
+      if (!['dono', 'financeiro'].includes(u.perfil) || !FS()) return [];
+      U = ui; const r = FS().resumo(estado, ctx()); if (!r.vendasMesSemNota) return [];
+      return [{ id: 'fs-sn-' + r.vendasMesSemNota, cat: 'fiscal', catNome: 'Fiscal', nivel: 3, valor: r.valorVendasMesSemNota || 0, titulo: `${plural(r.vendasMesSemNota, 'venda do mês', 'vendas do mês')} sem nota vinculada`, txt: `${brl(r.valorVendasMesSemNota || 0)} vendidos. Emita no seu emissor e guarde o XML no Anshur.`, botao: { rotulo: 'Ver documentos fiscais', ir: '#/fiscal/fs-documentos' } }];
+    },
+    rotina: (estado, u, ui) => { if (!FS()) return []; U = ui; const r = FS().resumo(estado, ctx()); return [{ perfil: 'financeiro', periodo: 'semana', id: 'fs-notas', titulo: 'Guardar o XML das notas emitidas na semana', qtd: r.vendasMesSemNota, ir: '#/fiscal/fs-notas' }]; },
     buscar,
     novo: (ui) => { U = ui; if (!FS()) return; estilo(); abrirImportar(); },
     iniciar: (ui) => { try { if (FS()) semearDemo(ui); } catch (e) { console.error('Fiscal: demonstração', e); } }

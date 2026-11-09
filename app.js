@@ -7,7 +7,6 @@
 
   // ---------- cabeçalho ----------
   $('#marca').innerHTML = '<img class="logo-img" src="logo/anshur-logo.png?v=5" alt="Anshur" width="216" height="54">';
-  $('#marca-movel').innerHTML = '<img class="logo-img" src="logo/anshur-logo.png?v=5" alt="Anshur" width="132" height="33">';
   $('#revenda').innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20V9l9-5 9 5v11M7 20v-6h10v6"/></svg>${esc(A.revenda.nome)}`;
   $('#refdata').innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v14H4zM4 10h16M8 3v4M16 3v4"/></svg>${new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).replace('.', '')}`;
   const btnPerfil = $('#perfil'), menuPerfil = $('#perfil-menu');
@@ -21,6 +20,8 @@
   $('.lateral-rodape').textContent = OP ? (NV ? 'Dados da sua revenda, guardados na conta da revenda.' : 'Dados reais da sua revenda, guardados só neste navegador.') : 'Dados demonstrativos de uma revenda fictícia.';
   const ehDono = () => K.usuarioAtual().perfil === 'dono';
   menuPerfil.innerHTML = `<p><b>${esc(K.usuarioAtual().nome)}</b><span>${K.PERFIS[K.usuarioAtual().perfil]} · ${esc(A.revenda.nome)}${OP ? ' · dados reais' : ''}${NV ? '<br>' + esc(NV.usuario.email || '') : ''}</span></p>
+    <label class="perfil-loja" for="loja-sel-m">Loja<select id="loja-sel-m" aria-label="Loja"></select></label>
+    <button type="button" role="menuitem" id="m-portal">Voltar ao portal</button>
     <button type="button" role="menuitem" id="m-perfil">Meu perfil</button>
     <button type="button" role="menuitem" id="m-instalar">Instalar o app</button>
     <button type="button" role="menuitem" id="m-premissas">Premissas da revenda</button>
@@ -29,7 +30,8 @@
     ${NV ? `<button type="button" role="menuitem" id="m-nome">Nome da revenda</button>${(NV.revendas || []).length > 1 ? '<button type="button" role="menuitem" id="m-trocar">Trocar de revenda</button>' : ''}${ehDono() && !NV.offline ? '<button type="button" role="menuitem" id="m-apagar">Excluir a revenda e todos os dados</button>' : ''}<button type="button" role="menuitem" id="m-sair">Sair da conta</button>`
       : OP ? '<button type="button" role="menuitem" id="m-nome">Nome da revenda</button><button type="button" role="menuitem" id="m-apagar">Apagar dados da minha revenda</button>' : '<button type="button" role="menuitem" id="m-restaurar">Restaurar dados demonstrativos</button>'}`;
   const fechaMenu = () => { menuPerfil.hidden = true; btnPerfil.setAttribute('aria-expanded', 'false'); };
-  $('#m-perfil').onclick = () => { fechaMenu(); location.hash = '#perfil'; };
+  $('#m-perfil').onclick = () => { fechaMenu(); location.hash = '#/config/perfil'; };
+  $('#m-portal').onclick = () => { fechaMenu(); location.hash = '#/'; };
   $('#m-instalar').onclick = () => { fechaMenu(); $('#instalar-btn').click(); };
   $('#m-premissas').onclick = () => { fechaMenu(); abrirPremissas(); };
   $('#m-seg').onclick = () => { fechaMenu(); abrirCamada('modal', `<h2>Segurança dos dados</h2>
@@ -304,7 +306,7 @@
   // no rascunho e nos dados ficam miniaturas leves
   let fotosGrandes = {};
   const RT = window.RETENCAO;
-  ['input', 'change', 'click'].forEach((ev) => tela.addEventListener(ev, (e) => { if (e.target.closest && e.target.closest('#passo') && (location.hash || '') === '#avaliar') guardarRascunho(); }));
+  ['input', 'change', 'click'].forEach((ev) => tela.addEventListener(ev, (e) => { if (e.target.closest && e.target.closest('#passo') && /(^#|\/)avaliar$/.test(location.hash || '')) guardarRascunho(); }));
   const condDe = (f) => Math.round(FICHA.reduce((s, [k]) => s + f[k], 0) / FICHA.length * 20);
   const maqAv = () => ({ tipo: av.tipo, marca: av.marca, modelo: av.modelo, ano: av.ano, horas: av.horas, cond: condDe(av.ficha), ficha: { ...av.ficha } });
   const num = (s) => { const v = parseFloat(String(s).replace(/[^\d,.-]/g, '').replace(/\./g, '').replace(',', '.')); return isFinite(v) ? v : 0; };
@@ -2123,11 +2125,14 @@
   // V8: várias lojas, auditor, privacidade (LGPD), manter ou vender, anúncio para portais
   // =====================================================================================
   function seletorLoja() {
-    const s = $('#loja-sel'); if (!s) return;
-    if (!estado.lojas.length) { s.hidden = true; return; }
-    const permitidas = K.lojasPermitidas && K.lojasPermitidas.length ? K.lojasPermitidas : null;
-    s.innerHTML = (permitidas ? '' : `<option value="">Todas as lojas</option>`) + (permitidas || estado.lojas).map((l) => `<option ${estado.lojaAtual === l ? 'selected' : ''}>${esc(l)}</option>`).join('');
-    s.onchange = () => { estado.lojaAtual = s.value; K.lembrarLoja(s.value); salvar(); log('loja', s.value ? `Vendo a loja ${s.value}` : 'Vendo todas as lojas'); salvar(); K.recarregar(); };
+    const sm = $('#loja-sel-m'), lm = sm && sm.closest('label');
+    [$('#loja-sel'), sm].forEach((s) => {
+      if (!s) return;
+      if (!estado.lojas.length) { s.hidden = true; if (s === sm && lm) lm.hidden = true; return; }
+      const permitidas = K.lojasPermitidas && K.lojasPermitidas.length ? K.lojasPermitidas : null;
+      s.innerHTML = (permitidas ? '' : `<option value="">Todas as lojas</option>`) + (permitidas || estado.lojas).map((l) => `<option ${estado.lojaAtual === l ? 'selected' : ''}>${esc(l)}</option>`).join('');
+      s.onchange = () => { estado.lojaAtual = s.value; K.lembrarLoja(s.value); salvar(); log('loja', s.value ? `Vendo a loja ${s.value}` : 'Vendo todas as lojas'); salvar(); K.recarregar(); };
+    });
   }
   const somenteLeitura = () => eu().perfil === 'auditor';
   // privacidade: contatos mascarados para quem não precisa ver
@@ -2228,21 +2233,21 @@
   // ---------- CENTRAL DO DIA ("Hoje") ----------
   function telaHoje() {
     if (!A.todasTrocas.length && !estado.avaliacoes.length) return semDados();
-    const t0 = performance.now(), u = eu(), ctx = ctxDia(), { prioridades, acoes } = RT.acoesDoDia(ctx);
-    const minhas = RT.rituais(ctx).filter((r) => r.perfil === u.perfil && (r.periodo === 'dia' || new Date().getDay() === 1 || r.qtd));
+    const t0 = performance.now(), u = eu(), acoes = tarefasDoDia(), prioridades = acoes.slice(0, 3);
+    const minhas = rituaisTodos().filter((r) => r.perfil === u.perfil && (r.periodo === 'dia' || new Date().getDay() === 1 || r.qtd));
     const v = M.validar(), vend = A.todasTrocas.filter((t) => t.vendido && t.saida).length;
     const h = new Date().getHours(), saud = h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
-    const grupos = {}; acoes.slice(3).forEach((a) => { (grupos[a.cat] = grupos[a.cat] || []).push(a); });
+    const grupos = {}; acoes.slice(3).forEach((a) => { const g = a.catNome || CAT_NOME[a.cat] || a.cat; (grupos[g] = grupos[g] || []).push(a); });
     tela.innerHTML = `
-      <div class="titulo"><div><h1>Hoje</h1><p>${saud}, ${esc(primeiroNome(u))} · ${esc(PERFIL_NOME(u.perfil))} · ${estado.lojaAtual ? 'loja ' + esc(estado.lojaAtual) : estado.lojas.length ? 'todas as lojas' : esc(A.revenda.nome)} · ${new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}</p></div>
+      <div class="titulo"><div><h1>Tarefas do dia</h1><p>${saud}, ${esc(primeiroNome(u))} · ${esc(PERFIL_NOME(u.perfil))} · ${estado.lojaAtual ? 'loja ' + esc(estado.lojaAtual) : estado.lojas.length ? 'todas as lojas' : esc(A.revenda.nome)} · ${new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}</p></div>
         <div class="acoes">${pode('avaliar') && !somenteLeitura() ? '<a class="btn btn-ouro" href="#avaliar">Nova avaliação</a>' : ''}${pode('visao') ? '<a class="btn btn-linha" href="#visao">Visão geral</a>' : ''}</div></div>
       <section class="prioridades" aria-label="As 3 prioridades de hoje">
-        ${prioridades.length ? prioridades.map((a, i) => `<article class="prio n${a.nivel}"><span class="prio-n" aria-hidden="true">${i + 1}</span><div><span class="cat">${esc(CAT_NOME[a.cat] || a.cat)}</span><h2>${esc(a.titulo)}</h2><p>${esc(a.txt)}</p>
+        ${prioridades.length ? prioridades.map((a, i) => `<article class="prio n${a.nivel}"><span class="prio-n" aria-hidden="true">${i + 1}</span><div><span class="cat">${esc(a.catNome || CAT_NOME[a.cat] || a.cat)}</span><h2>${esc(a.titulo)}</h2><p>${esc(a.txt)}</p>
           <div class="acoes">${botaoAcao(a)}${a.extra ? `<a class="btn btn-linha" href="${a.extra.ir}">${esc(a.extra.rotulo)}</a>` : ''}${(a.whats || []).slice(1).map((w) => `<a class="btn btn-linha" href="${esc(w.href)}" target="_blank" rel="noopener" data-whats="${esc(a.id)}">WhatsApp de ${esc(String(w.nome).split(' ')[0])}</a>`).join('')}</div></div></article>`).join('')
-          : `<article class="prio n3"><span class="prio-n" aria-hidden="true">${ICO.baixo}</span><div><span class="cat">Em dia</span><h2>Nada urgente para você hoje</h2><p>Nenhuma aprovação, avaliação parada ou máquina mudando de faixa no seu perfil. Bom momento para cadastrar compradores ou revisar o pátio.</p><div class="acoes"><a class="btn btn-linha" href="#${pode('patio') ? 'patio' : 'perfil'}">Abrir o pátio</a></div></div></article>`}
+          : `<article class="prio n3"><span class="prio-n" aria-hidden="true">${ICO.baixo}</span><div><span class="cat">Em dia</span><h2>Nada urgente para você hoje</h2><p>Nenhuma aprovação, conta vencida, OS atrasada, retorno de cliente ou máquina mudando de faixa no seu perfil.</p><div class="acoes"><a class="btn btn-linha" href="#/">Voltar ao portal</a></div></div></article>`}
       </section>
       ${acoes.length > 3 ? `<section class="painel bloco"><div class="painel-cab"><h2>${ICO.alvo}Também para hoje</h2><p>${acoes.length - 3} ${acoes.length - 3 === 1 ? 'ação' : 'ações'}, cada uma com o botão que resolve</p></div>
-        ${Object.entries(grupos).map(([cat, l]) => `<h3 class="grupo-acao">${esc(CAT_NOME[cat] || cat)} <span class="sub">${l.length}</span></h3><ul class="acoes-dia">${l.map((a) => `<li class="n${a.nivel}"><div><b>${esc(a.titulo)}</b><span>${esc(a.txt)}</span></div>${botaoAcao(a, 'btn-linha')}</li>`).join('')}</ul>`).join('')}</section>` : ''}
+        ${Object.entries(grupos).map(([cat, l]) => `<h3 class="grupo-acao">${esc(cat)} <span class="sub">${l.length}</span></h3><ul class="acoes-dia">${l.map((a) => `<li class="n${a.nivel}"><div><b>${esc(a.titulo)}</b><span>${esc(a.txt)}</span></div>${botaoAcao(a, 'btn-linha')}</li>`).join('')}</ul>`).join('')}</section>` : ''}
       <div class="grade-2 bloco">
         <section class="painel"><div class="painel-cab"><h2>${ICO.baixo}Sua rotina</h2><p>${esc(PERFIL_NOME(u.perfil))}</p></div>
           <ul class="rotina">${minhas.map((r) => itemRitual(r)).join('') || '<li class="vazio">Sem rotina para o seu perfil.</li>'}</ul>
@@ -2252,11 +2257,17 @@
           <p class="conta">Cada troca vendida entra na referência interna da revenda e o erro é medido de novo. É a memória da revenda, não valor de mercado.</p>
           <div class="acoes"><a class="btn btn-linha" href="#memoria">Ver a memória comercial</a></div></section>` : ''}
       </div>
-      <p class="nota-rodape" id="hoje-tempo">Montado em ${Math.max(1, Math.round(performance.now() - t0))} ms a partir dos dados da revenda. Cada item vem de um registro real; nada aqui é alerta inventado.</p>`;
+      <p class="nota-rodape" id="hoje-tempo">Junta o que pede atenção em todos os sistemas que você usa (Usados, Máquinas Novas, Financeiro, Oficina, Peças, Vendas e Fiscal). Montado em ${Math.max(1, Math.round(performance.now() - t0))} ms; cada item vem de um registro real.</p>`;
     ligarAcoes(tela); ligarRituais(tela);
   }
 
   // ---------- ROTINA POR PERFIL ----------
+  // rotina dos usados (retencao.js) + a de cada sistema (rotina() de cada área), com a mesma chave de dia/semana
+  function rituaisTodos() {
+    const ctx = ctxDia(), h = hojeISO(), base = RT.rituais(ctx);
+    const extra = AR ? AR.rotinas(estado, eu(), UI).map((r) => { const chave = RT.chavePeriodo(r.periodo, h) + '|' + r.perfil + '|' + r.id, feito = (estado.rituais || {})[chave] || null; return Object.assign({}, r, { chave, feito, emDia: !feito && r.qtd === 0 }); }) : [];
+    return base.concat(extra);
+  }
   function itemRitual(r) {
     const meu = r.perfil === eu().perfil && !somenteLeitura();
     const st = r.feito ? `<span class="tag comprovado">Feito por ${esc(r.feito.por)} · ${new Date(r.feito.quando).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>` : r.emDia ? '<span class="tag comprovado">Em dia: nada pendente</span>' : '';
@@ -2270,7 +2281,7 @@
     });
   }
   function telaRotina() {
-    const ctx = ctxDia(), todos = RT.rituais(ctx), ver = ['dono', 'gerente', 'auditor'].includes(eu().perfil);
+    const todos = rituaisTodos(), ver = ['dono', 'gerente', 'auditor'].includes(eu().perfil);
     const exec = RT.execucaoRituais(estado.rituais, hojeISO(), 4);
     const perfis = ver ? Object.keys(K.PERFIS) : [eu().perfil];
     const resp = (p) => estado.usuarios.filter((x) => x.perfil === p).map((x) => x.nome);
@@ -2453,7 +2464,9 @@
     else { ind.style.transform = `translateX(${ativo.offsetLeft}px)`; ind.style.width = ativo.offsetWidth + 'px'; }
   }
   // =====================================================================================
-  // ÁREAS: tela de entrada (escolha de área), menu de cada área, troca rápida e telas dos módulos (areas/*.js)
+  // PORTAL E SISTEMAS (modelo dos ERPs: portal com os sistemas e cada sistema com cabeçalho, menu e tela inicial próprios)
+  // Endereços: #/ (portal), #/hoje, #/rotina, #/<sistema>/<tela> (ex.: #/financeiro/fin-pagar). Cada sistema pode ficar
+  // aberto numa aba própria do navegador; endereços antigos (#tela) continuam valendo e viram o endereço novo.
   // =====================================================================================
   const AR = window.ANSHUR_AREAS;
   const lsG = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
@@ -2464,113 +2477,215 @@
   const areaVisivel = (a) => (a.pronta ? itensVisiveis(a).length > 0 && (!a.perfis || a.perfis.includes(eu().perfil)) : (!a.perfis || a.perfis.includes(eu().perfil)));
   const areasVisiveis = () => (AR ? AR.lista().filter(areaVisivel) : []);
   const inicioDaArea = (a) => { const l = itensVisiveis(a); return (l.find((x) => x.aba === a.inicio) || l[0] || {}).aba || 'inicio'; };
-  const abrirDireto = () => { const a = AR && AR.area(lsG(chaveU('area-fixa'))); return a && a.pronta && areaVisivel(a) ? inicioDaArea(a) : ''; };
-  const acoesDasAreas = () => areasVisiveis().filter((a) => a.pronta).flatMap((a) => [['Área ' + a.nome, '#' + inicioDaArea(a)]].concat(itensVisiveis(a).map((x) => [`${x.rotulo} · ${a.nome}`, '#' + x.aba])));
+  const PORTAL = { inicio: 'Portal', hoje: 'Tarefas do dia', rotina: 'Rotina da equipe' };
+  const urlSis = (id, aba) => '#/' + id + (aba ? '/' + aba : '');
+  const urlPortal = (p) => '#/' + (p && p !== 'inicio' ? p : '');
+  const abrirDireto = () => { const a = AR && AR.area(lsG(chaveU('area-fixa'))); return a && a.pronta && areaVisivel(a) ? urlSis(a.id) : ''; };
+  const acoesDasAreas = () => [['Portal: todos os sistemas', '#/'], ['Tarefas do dia', '#/hoje'], ['Rotina da equipe', '#/rotina']].concat(areasVisiveis().filter((a) => a.pronta).flatMap((a) => [['Sistema ' + a.nome, urlSis(a.id)]].concat(itensVisiveis(a).map((x) => [`${x.rotulo} · ${a.nome}`, urlSis(a.id, x.aba)]))));
   let areaAtual = lsG(chaveU('area')) || '';
   const svgI = (d) => `<svg viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
   const ICO_AREAS = '<path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/>';
+  const ICO_NOVA_ABA = '<path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6"/>';
+  const ICO_ESTRELA = '<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.8l-5.2 2.8 1-5.8-4.3-4.1 5.9-.9z"/>';
+  // favoritos e recentes: por pessoa, neste aparelho
+  const lerJ = (k, p) => { try { return JSON.parse(lsG(chaveU(k))) || p; } catch (e) { return p; } };
+  const favoritos = () => lerJ('favoritos', []);
+  const recentes = () => lerJ('recentes', []);
+  function lembrarRecente(sis, aba) {
+    const l = recentes().filter((x) => !(x.sis === sis && x.aba === aba)); l.unshift({ sis, aba, quando: new Date().toISOString() });
+    lsS(chaveU('recentes'), JSON.stringify(l.slice(0, 8)));
+  }
   let menuDe = null;
   function montarMenu(id) {
-    const chave = id || '#inicio'; if (menuDe === chave) return; menuDe = chave;
+    const chave = id || 'portal'; if (menuDe === chave) return; menuDe = chave;
+    const a = id && AR.area(id);
+    const grupos = a ? a.menu.map((g) => ({ grupo: g.grupo, its: g.itens.filter((x) => pode(x.aba) && telaDe(x.aba)) })).filter((g) => g.its.length) : [];
+    // celular: barra de baixo com 4 atalhos do sistema + "Mais" (todos os itens do sistema por grupo)
     const menu = $('#menu'); $$('a, .menu-grupo', menu).forEach((x) => x.remove());
     let html = '', n = 0;
-    const link = (href, aba, curto, icone, rotulo, extra = '', at = null) => { const atalho = at === null ? n < 4 : at; n++; return `<a href="${href}" ${aba ? `data-aba="${aba}"` : ''} data-curto="${esc(curto)}" class="${atalho ? 'atalho' : ''}" ${extra}>${svgI(icone)}<span>${esc(rotulo)}</span></a>`; };
-    const a = id && AR.area(id);
-    if (a) {
-      const atalhos = a.atalhos || [];
-      a.menu.forEach((g) => { const its = g.itens.filter((x) => pode(x.aba) && telaDe(x.aba)); if (!its.length) return; html += `<p class="menu-grupo">${esc(g.grupo)}</p>` + its.map((x) => link('#' + x.aba, x.aba, x.curto || x.rotulo, x.icone, x.rotulo, '', atalhos.length ? atalhos.includes(x.aba) : null)).join(''); });
-    } else {
-      const as = areasVisiveis();
-      html += '<p class="menu-grupo">Áreas</p>' + link('#inicio', 'inicio', 'Áreas', ICO_AREAS, 'Todas as áreas');
-      html += as.filter((x) => x.pronta).map((x) => link('#' + inicioDaArea(x), '', x.curto || x.nome, x.icone, x.nome, `data-area="${x.id}"`)).join('');
-      const br = as.filter((x) => !x.pronta); if (br.length) html += '<p class="menu-grupo">Em breve</p>' + br.map((x) => link('#inicio', '', x.curto || x.nome, x.icone, x.nome, `data-breve="${x.id}"`)).join('');
-    }
+    const atalhos = a ? a.atalhos || [] : [];
+    const link = (x) => { const at = atalhos.length ? atalhos.includes(x.aba) : n < 4; n++; return `<a href="${urlSis(a.id, x.aba)}" data-aba="${x.aba}" data-curto="${esc(x.curto || x.rotulo)}" class="${at ? 'atalho' : ''}">${svgI(x.icone)}<span>${esc(x.rotulo)}</span></a>`; };
+    grupos.forEach((g) => { html += `<p class="menu-grupo">${esc(g.grupo)}</p>` + g.its.map(link).join(''); });
     const mais = $('#menu-mais', menu);
     if (mais) mais.insertAdjacentHTML('beforebegin', html); else menu.insertAdjacentHTML('beforeend', html);
-    // troca rápida (lateral e cabeçalho) e botão principal da área
-    const nome = a ? a.nome : 'Escolha a área', ico = a ? a.icone : ICO_AREAS;
-    $$('.area-troca').forEach((b) => { b.innerHTML = `${svgI(ico)}<span><small>Área</small><b>${esc(nome)}</b></span><svg class="seta" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg>`; b.setAttribute('aria-label', 'Trocar de área (agora: ' + nome + ')'); });
+    // computador: barra do sistema com menus suspensos por grupo (como nos ERPs)
+    const seta = '<svg class="seta" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg>';
+    $('#sis-barra').innerHTML = grupos.map((g, i) => g.its.length === 1
+      ? `<a class="sb-item" href="${urlSis(a.id, g.its[0].aba)}" data-aba="${g.its[0].aba}">${esc(g.its[0].rotulo)}</a>`
+      : `<div class="sb-grupo"><button type="button" class="sb-btn" aria-haspopup="true" aria-expanded="false" aria-controls="sb-pop-${i}">${esc(g.grupo)}${seta}</button><div class="sb-pop" id="sb-pop-${i}" role="menu" hidden>${g.its.map((x) => `<a role="menuitem" href="${urlSis(a.id, x.aba)}" data-aba="${x.aba}">${svgI(x.icone)}<span>${esc(x.rotulo)}</span></a>`).join('')}</div></div>`).join('');
+    // cabeçalho: nome do sistema (ou a marca no portal), título da aba do navegador e o botão principal do sistema
+    const nomeSis = $('#sis-nome');
+    nomeSis.href = a ? urlSis(a.id) : '#/';
+    nomeSis.innerHTML = a ? `<span class="sis-ico">${svgI(a.icone)}</span><span class="sis-txt"><small>Anshur</small><b>${esc(a.nome)}</b></span>` : '<img class="logo-img" src="logo/anshur-logo.png?v=5" alt="Anshur" width="132" height="33">';
+    nomeSis.setAttribute('aria-label', a ? `Anshur ${a.nome}: tela inicial do sistema` : 'Anshur: portal');
+    document.title = a ? `Anshur ${a.nome} · ${A.revenda.nome}` : `Anshur · ${A.revenda.nome}`;
     const nova = $('.cab-nova');
-    if (nova) { const ac = a && a.acao ? a.acao : null; nova.hidden = !ac || somenteLeitura(); if (ac) { nova.href = ac.href; $('span', nova).textContent = ac.rotulo; nova.onclick = ac.novo && a.novo ? (e) => { e.preventDefault(); a.novo(UI); } : null; } }
+    if (nova) { const ac = a && a.acao ? a.acao : null; nova.hidden = !ac || somenteLeitura(); if (ac) { nova.href = /^#\//.test(ac.href) ? ac.href : urlSis(a.id, ac.href.slice(1)); $('span', nova).textContent = ac.rotulo; nova.setAttribute('aria-label', ac.rotulo); nova.onclick = ac.novo && a.novo ? (e) => { e.preventDefault(); a.novo(UI); } : null; } }
+    document.body.dataset.modo = a ? 'sistema' : 'portal';
     document.body.dataset.areaAtual = id || 'inicio';
   }
+  // menus suspensos da barra do sistema: clique abre, clique fora / Esc fecha, setas andam entre os itens
+  const fecharSuspensos = (exceto) => $$('#sis-barra .sb-btn').forEach((b) => { if (b === exceto) return; b.setAttribute('aria-expanded', 'false'); b.nextElementSibling.hidden = true; });
+  $('#sis-barra').addEventListener('click', (e) => {
+    const b = e.target.closest('.sb-btn');
+    if (b) { const abrir = b.getAttribute('aria-expanded') !== 'true'; fecharSuspensos(b); b.setAttribute('aria-expanded', abrir); b.nextElementSibling.hidden = !abrir; if (abrir) { const l = b.nextElementSibling.querySelector('a'); if (l && e.detail === 0) l.focus(); } return; }
+    if (e.target.closest('a')) fecharSuspensos();
+  });
+  $('#sis-barra').addEventListener('keydown', (e) => {
+    const pop = e.target.closest('.sb-pop'), b = e.target.closest('.sb-grupo') && e.target.closest('.sb-grupo').querySelector('.sb-btn');
+    if (e.key === 'Escape' && b) { fecharSuspensos(); b.focus(); return; }
+    if (!pop || !['ArrowDown', 'ArrowUp'].includes(e.key)) return;
+    const l = $$('a', pop), i = l.indexOf(document.activeElement); (l[(i + (e.key === 'ArrowDown' ? 1 : -1) + l.length) % l.length]).focus(); e.preventDefault();
+  });
+  document.addEventListener('click', (e) => { if (!e.target.closest('#sis-barra')) fecharSuspensos(); });
   function irArea(id) {
     const a = AR.area(id); if (!a) return;
     if (!a.pronta) { abrirEmBreve(a); return; }
-    areaAtual = id; lsS(chaveU('area'), id); fecharTrocaArea();
-    const alvo = '#' + inicioDaArea(a);
+    fecharTrocaArea();
+    const alvo = urlSis(id);
     if (location.hash === alvo) rota(); else location.hash = alvo;
   }
   function abrirEmBreve(a) {
-    abrirCamada('modal', `<div class="instala-topo"><span class="area-ico">${svgI(a.icone)}</span><div><h2>${esc(a.nome)}</h2><p class="sub"><span class="tag declarado">Em breve</span> Esta área ainda está sendo construída.</p></div></div>
+    abrirCamada('modal', `<div class="instala-topo"><span class="area-ico">${svgI(a.icone)}</span><div><h2>${esc(a.nome)}</h2><p class="sub"><span class="tag declarado">Em breve</span> Este sistema ainda está sendo construído.</p></div></div>
       ${a.previsto && a.previsto.length ? `<p style="margin:14px 0 6px;font-weight:650">O que vai ter</p><ul class="passos-instalar">${a.previsto.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
-      ${a.hoje ? `<p class="nota-rodape" style="margin-top:12px">${esc(a.hoje)}</p>` : ''}<p class="nota-rodape">Enquanto isso, a revenda continua usando o sistema atual para esta parte. Nada aqui é demonstração disfarçada.</p>`);
+      ${a.jaExiste ? `<p class="nota-rodape" style="margin-top:12px">${esc(a.jaExiste)}</p>` : ''}<p class="nota-rodape">Enquanto isso, a revenda continua usando o sistema atual para esta parte. Nada aqui é demonstração disfarçada.</p>`);
   }
-  // seletor de áreas (popover) aberto pela lateral ou pelo cabeçalho
+  // seletor de sistemas (ícone de grade no canto): volta ao portal ou abre outro sistema, aqui ou em nova aba
   function fecharTrocaArea() { const p = $('#area-pop'); if (p) p.remove(); $$('.area-troca').forEach((b) => b.setAttribute('aria-expanded', 'false')); }
   function abrirTrocaArea(botao) {
     if ($('#area-pop')) { fecharTrocaArea(); return; }
     const r = botao.getBoundingClientRect(), as = areasVisiveis();
-    const pop = document.createElement('div'); pop.id = 'area-pop'; pop.className = 'area-pop'; pop.setAttribute('role', 'menu');
-    pop.innerHTML = `<a href="#inicio" role="menuitem" data-ir-inicio>${svgI(ICO_AREAS)}<span><b>Todas as áreas</b><small>Tela de entrada</small></span></a>` + as.map((a) => `<a href="${a.pronta ? '#' + inicioDaArea(a) : '#inicio'}" role="menuitem" ${a.pronta ? `data-area="${a.id}"` : `data-breve="${a.id}"`} class="${a.id === areaAtual && document.body.dataset.areaAtual !== 'inicio' ? 'atual' : ''} ${a.pronta ? '' : 'breve'}">${svgI(a.icone)}<span><b>${esc(a.nome)}</b><small>${a.pronta ? esc(a.descricao.split(',')[0]) : 'Em breve'}</small></span></a>`).join('');
+    const pop = document.createElement('div'); pop.id = 'area-pop'; pop.className = 'area-pop'; pop.setAttribute('role', 'menu'); pop.setAttribute('aria-label', 'Sistemas');
+    pop.innerHTML = `<a href="#/" role="menuitem" data-ir-inicio class="pop-portal">${svgI('<path d="M10 19l-7-7 7-7M3 12h18"/>')}<span><b>Voltar ao portal</b><small>Todos os sistemas e os avisos do dia</small></span></a>` + as.map((a) => a.pronta
+      ? `<div class="pop-linha"><a href="${urlSis(a.id)}" role="menuitem" data-area="${a.id}" class="${a.id === areaAtual && document.body.dataset.modo === 'sistema' ? 'atual' : ''}">${svgI(a.icone)}<span><b>${esc(a.nome)}</b><small>${esc(a.descricao.split(/[,.]/)[0])}</small></span></a><a class="pop-aba" href="${urlSis(a.id)}" target="_blank" rel="noopener" title="Abrir ${esc(a.nome)} em nova aba" aria-label="Abrir ${esc(a.nome)} em nova aba">${svgI(ICO_NOVA_ABA)}</a></div>`
+      : `<a href="#/" role="menuitem" data-breve="${a.id}" class="breve">${svgI(a.icone)}<span><b>${esc(a.nome)}</b><small>Em breve</small></span></a>`).join('');
     document.body.appendChild(pop);
-    const larg = Math.min(340, innerWidth - 16); pop.style.width = larg + 'px';
+    const larg = Math.min(360, innerWidth - 16); pop.style.width = larg + 'px';
     pop.style.left = Math.max(8, Math.min(r.left, innerWidth - larg - 8)) + 'px'; pop.style.top = (r.bottom + 6) + 'px';
     botao.setAttribute('aria-expanded', 'true');
-    const ini = $('[data-ir-inicio]', pop); ini.onclick = () => fecharTrocaArea();
+    $('[data-ir-inicio]', pop).onclick = () => fecharTrocaArea();
     setTimeout(() => (pop.querySelector('a.atual') || pop.querySelector('a')).focus(), 30);
-    pop.onkeydown = (e) => { const l = $$('a', pop), i = l.indexOf(document.activeElement); if (e.key === 'ArrowDown') { (l[i + 1] || l[0]).focus(); e.preventDefault(); } if (e.key === 'ArrowUp') { (l[i - 1] || l[l.length - 1]).focus(); e.preventDefault(); } if (e.key === 'Escape') { fecharTrocaArea(); botao.focus(); } };
+    pop.onkeydown = (e) => { const l = $$('a[role="menuitem"]', pop), i = l.indexOf(document.activeElement); if (e.key === 'ArrowDown') { (l[i + 1] || l[0]).focus(); e.preventDefault(); } if (e.key === 'ArrowUp') { (l[i - 1] || l[l.length - 1]).focus(); e.preventDefault(); } if (e.key === 'Escape') { fecharTrocaArea(); botao.focus(); } };
   }
   document.addEventListener('click', (e) => {
     const tr = e.target.closest('.area-troca'); if (tr) { e.preventDefault(); e.stopPropagation(); abrirTrocaArea(tr); return; }
-    const ar = e.target.closest('[data-area]'); if (ar) { e.preventDefault(); fecharTrocaArea(); document.body.classList.remove('menu-aberto'); irArea(ar.dataset.area); return; }
+    const fav = e.target.closest('[data-fav]'); if (fav) { e.preventDefault(); const l = favoritos(), id = fav.dataset.fav; lsS(chaveU('favoritos'), JSON.stringify(l.includes(id) ? l.filter((x) => x !== id) : l.concat(id))); toast(l.includes(id) ? 'Tirado dos favoritos.' : 'Sistema nos favoritos: aparece primeiro no portal.'); telaInicio(); return; }
+    if (e.target.closest('[target="_blank"]')) { fecharTrocaArea(); return; }
+    const ar = e.target.closest('[data-area]'); if (ar && !e.ctrlKey && !e.metaKey && !e.shiftKey) { e.preventDefault(); fecharTrocaArea(); document.body.classList.remove('menu-aberto'); irArea(ar.dataset.area); return; }
     const br = e.target.closest('[data-breve]'); if (br) { e.preventDefault(); fecharTrocaArea(); document.body.classList.remove('menu-aberto'); abrirEmBreve(AR.area(br.dataset.breve)); return; }
     if ($('#area-pop') && !e.target.closest('#area-pop')) fecharTrocaArea();
   });
-  // troca de área pelo teclado: Alt+1…9 na ordem da tela de entrada
-  document.addEventListener('keydown', (e) => { if (e.altKey && !e.ctrlKey && /^[1-9]$/.test(e.key)) { const a = areasVisiveis().filter((x) => x.pronta)[+e.key - 1]; if (a) { e.preventDefault(); irArea(a.id); } } });
+  // troca de sistema pelo teclado: Alt+1…9 na ordem do portal; Alt+0 volta ao portal
+  document.addEventListener('keydown', (e) => {
+    if (!e.altKey || e.ctrlKey || !/^[0-9]$/.test(e.key)) return;
+    if (e.key === '0') { e.preventDefault(); location.hash = '#/'; return; }
+    const a = areasVisiveis().filter((x) => x.pronta)[+e.key - 1]; if (a) { e.preventDefault(); irArea(a.id); }
+  });
 
+  // ---------- tarefas do dia de todos os sistemas (Usados pela retencao.js + o que cada área registra em hoje()) ----------
+  const ORDEM_CAT = { aprovar: 0, rascunho: 1, comprador: 2, floor: 3, avaliacao: 4 };
+  function tarefasDoDia() {
+    const u = eu(), ctx = ctxDia(), { acoes } = RT.acoesDoDia(ctx);
+    const dasAreas = AR ? AR.tarefas(estado, u, UI, (a) => areaVisivel(a)) : [];
+    const todas = acoes.map((x) => Object.assign({ area: 'usados' }, x)).concat(dasAreas).filter((a) => !estado.resolvidos[a.id]);
+    return todas.sort((a, b) => a.nivel - b.nivel || (ORDEM_CAT[a.cat] ?? 9) - (ORDEM_CAT[b.cat] ?? 9) || (b.valor || 0) - (a.valor || 0));
+  }
+
+  // ---------- PORTAL ----------
   function telaInicio() {
-    const as = areasVisiveis(), ult = AR.area(lsG(chaveU('area'))), fixa = lsG(chaveU('area-fixa')) || '';
-    const h = new Date().getHours(), saud = h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite', nome = (() => { const w = String(eu().nome || '').trim().split(/\s+/); return /^(seu|dona|dr\.?|dra\.?)$/i.test(w[0]) ? w.slice(0, 2).join(' ') : w[0]; })();
-    const cartao = (a, i) => {
-      if (!a.pronta) return `<button type="button" class="area-cartao breve" data-breve="${a.id}"><span class="area-ico">${svgI(a.icone)}</span><span class="area-nome">${esc(a.nome)}<span class="tag declarado">Em breve</span></span><span class="area-desc">${esc(a.descricao)}</span><span class="area-num">${esc(a.hoje || 'Ainda não está pronta.')}</span></button>`;
+    const as = areasVisiveis(), fixa = lsG(chaveU('area-fixa')) || '', favs = favoritos();
+    const h = new Date().getHours(), saud = h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite', nome = primeiroNome(eu());
+    const prontas = as.filter((a) => a.pronta).sort((x, y) => (favs.includes(y.id) ? 1 : 0) - (favs.includes(x.id) ? 1 : 0)), breves = as.filter((a) => !a.pronta);
+    const ordem = as.filter((a) => a.pronta);
+    const cartao = (a) => {
+      if (!a.pronta) return `<div class="area-caixa"><button type="button" class="area-cartao breve" data-breve="${a.id}"><span class="area-ico">${svgI(a.icone)}</span><span class="area-nome">${esc(a.nome)}<span class="tag declarado">Em breve</span></span><span class="area-desc">${esc(a.descricao)}</span><span class="area-num">${esc(a.jaExiste || 'Ainda não está pronto.')}</span></button></div>`;
       let n = null; try { n = a.numero ? a.numero(UI) : null; } catch (er) { n = null; }
-      return `<a class="area-cartao ${a.id === (ult && ult.id) ? 'ultima' : ''}" href="#${inicioDaArea(a)}" data-area="${a.id}"><span class="area-ico">${svgI(a.icone)}</span><span class="area-nome">${esc(a.nome)}${a.id === fixa ? '<span class="tag comprovado">Abre direto</span>' : ''}</span><span class="area-desc">${esc(a.descricao)}</span>
-        ${n ? `<span class="area-num ${n.alerta ? 'alerta' : ''}"><b>${esc(n.valor)}</b> ${esc(n.texto)}</span>` : '<span class="area-num"></span>'}<span class="area-ir"><kbd>Alt ${i + 1}</kbd>Abrir<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></a>`;
+      const fav = favs.includes(a.id), i = ordem.indexOf(a);
+      return `<div class="area-caixa" data-sis="${a.id}" data-busca="${esc(K.normal(a.nome + ' ' + a.descricao + ' ' + itensVisiveis(a).map((x) => x.rotulo).join(' ')))}"><a class="area-cartao ${fav ? 'favorito' : ''}" href="${urlSis(a.id)}" data-area="${a.id}"><span class="area-ico">${svgI(a.icone)}</span><span class="area-nome">${esc(a.nome)}${a.id === fixa ? '<span class="tag comprovado">Abre direto</span>' : ''}</span><span class="area-desc">${esc(a.descricao)}</span>
+        ${n ? `<span class="area-num ${n.alerta ? 'alerta' : ''}"><b>${esc(n.valor)}</b> ${esc(n.texto)}</span>` : '<span class="area-num"></span>'}<span class="area-ir">${i >= 0 && i < 9 ? `<kbd>Alt ${i + 1}</kbd>` : ''}Abrir<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></a>
+        <div class="area-extra"><button type="button" class="area-mini ${fav ? 'ligado' : ''}" data-fav="${a.id}" aria-pressed="${fav}" title="${fav ? 'Tirar dos favoritos' : 'Favoritar'}" aria-label="${fav ? 'Tirar' : 'Pôr'} ${esc(a.nome)} ${fav ? 'dos' : 'nos'} favoritos">${svgI(ICO_ESTRELA)}</button><a class="area-mini" href="${urlSis(a.id)}" target="_blank" rel="noopener" title="Abrir em nova aba" aria-label="Abrir ${esc(a.nome)} em nova aba">${svgI(ICO_NOVA_ABA)}</a></div></div>`;
     };
-    const prontas = as.filter((a) => a.pronta), breves = as.filter((a) => !a.pronta);
-    tela.innerHTML = `<div class="titulo inicio-titulo"><div><h1>${saud}${nome ? ', ' + esc(nome) : ''}</h1><p>${esc(A.revenda.nome)} · escolha a área para trabalhar. O menu mostra só o que é daquela área; troque quando quiser pelo seletor de área.</p></div>
-        ${ult && ult.pronta && areaVisivel(ult) ? `<a class="btn btn-ouro" href="#${inicioDaArea(ult)}" data-area="${ult.id}">Continuar em ${esc(ult.nome)}</a>` : ''}</div>
-      <div class="areas-grade">${prontas.map(cartao).join('')}</div>
-      ${breves.length ? `<h2 class="areas-sub">Em construção</h2><p class="sub" style="margin-bottom:12px">Aparecem aqui para você saber o que vem. Ainda não funcionam: nada de dado inventado.</p><div class="areas-grade breves">${breves.map(cartao).join('')}</div>` : ''}
+    const tarefas = tarefasDoDia(), urg = tarefas.filter((x) => x.nivel <= 2);
+    const rec = recentes().map((r) => { const a = AR.area(r.sis), x = a && itensVisiveis(a).find((y) => y.aba === r.aba); return a && x && areaVisivel(a) ? { a, x } : null; }).filter(Boolean).slice(0, 6);
+    tela.innerHTML = `<div class="titulo inicio-titulo"><div><h1>${saud}${nome ? ', ' + esc(nome) : ''}</h1><p>${esc(A.revenda.nome)} · ${esc(PERFIL_NOME(eu().perfil))} · ${new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}</p></div>
+        ${areaAtual && AR.area(areaAtual) && areaVisivel(AR.area(areaAtual)) && AR.area(areaAtual).pronta ? `<a class="btn btn-ouro" href="${urlSis(areaAtual)}" data-area="${areaAtual}">Continuar em ${esc(AR.area(areaAtual).nome)}</a>` : ''}</div>
+      <div class="portal-busca"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-4-4"/></svg><input id="portal-q" type="search" placeholder="Procurar sistema ou tela (ex.: contas a pagar, OS, pátio)" aria-label="Procurar sistema ou tela" autocomplete="off"><div id="portal-res" class="portal-res" hidden></div></div>
+      <section class="painel avisos-dia" aria-label="Avisos do dia"><div class="painel-cab"><h2>${ICO.alvo}Avisos do dia</h2><p>${tarefas.length ? `${urg.length} para hoje · ${tarefas.length} no total, de todos os sistemas que você usa` : 'Nada pendente agora'}</p></div>
+        ${tarefas.length ? `<ul class="acoes-dia">${tarefas.slice(0, 5).map((a) => `<li class="n${a.nivel}"><div><span class="cat">${esc(a.catNome || CAT_NOME[a.cat] || 'Usados')}</span><b>${esc(a.titulo)}</b><span>${esc(a.txt)}</span></div>${botaoAcao(a, 'btn-linha')}</li>`).join('')}</ul>
+          <div class="acoes"><a class="btn btn-linha" href="#/hoje">Ver todas as tarefas do dia (${tarefas.length})</a><a class="btn btn-linha" href="#/rotina">Rotina da equipe</a></div>`
+        : '<p class="vazio">Nenhuma aprovação, conta vencida, OS atrasada ou retorno de cliente pendente para o seu perfil.</p>'}</section>
+      ${rec.length ? `<div class="recentes"><h2 class="areas-sub">Abertos por último</h2><div class="chips">${rec.map(({ a, x }) => `<a class="chip" href="${urlSis(a.id, x.aba)}">${svgI(x.icone || a.icone)}<span>${esc(x.rotulo)}<small>${esc(a.nome)}</small></span></a>`).join('')}</div></div>` : ''}
+      <h2 class="areas-sub">${favs.length ? 'Sistemas (favoritos primeiro)' : 'Sistemas'}</h2>
+      <div class="areas-grade" id="areas-grade">${prontas.map(cartao).join('')}</div>
+      ${breves.length ? `<h2 class="areas-sub">Em construção</h2><div class="areas-grade breves">${breves.map(cartao).join('')}</div>` : ''}
       <div class="grade-2 bloco inicio-rodape">
-        <section class="painel"><h2><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>Ao abrir o Anshur</h2><p class="sub">Neste aparelho, para ${esc(eu().nome)}.</p>
-          <div class="campo" style="margin-top:12px"><label for="in-fixa">Abrir em</label><select id="in-fixa"><option value="">Esta tela de áreas</option>${prontas.map((a) => `<option value="${a.id}" ${a.id === fixa ? 'selected' : ''}>Direto em ${esc(a.nome)}</option>`).join('')}</select></div></section>
+        <section class="painel"><h2><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>Ao abrir o Anshur</h2><p class="sub">Neste aparelho, para ${esc(eu().nome)}. Cada sistema também pode ficar aberto numa aba própria do navegador (botão ${svgI(ICO_NOVA_ABA).replace('<svg', '<svg class="ico-inline"')} do cartão).</p>
+          <div class="campo" style="margin-top:12px"><label for="in-fixa">Abrir em</label><select id="in-fixa"><option value="">Este portal</option>${ordem.map((a) => `<option value="${a.id}" ${a.id === fixa ? 'selected' : ''}>Direto no ${esc(a.nome)}</option>`).join('')}</select></div></section>
         ${blocoInstalar()}
       </div>`;
-    $('#in-fixa').onchange = (e) => { lsS(chaveU('area-fixa'), e.target.value); toast(e.target.value ? `O Anshur vai abrir direto em ${AR.area(e.target.value).nome}.` : 'O Anshur vai abrir nesta tela de áreas.'); telaInicio(); };
+    ligarAcoes(tela);
+    $('#in-fixa').onchange = (e) => { lsS(chaveU('area-fixa'), e.target.value); toast(e.target.value ? `O Anshur vai abrir direto no ${AR.area(e.target.value).nome}.` : 'O Anshur vai abrir neste portal.'); telaInicio(); };
+    // busca do portal: filtra os cartões e mostra as telas que combinam
+    const q = $('#portal-q'), res = $('#portal-res');
+    q.oninput = () => {
+      const t = K.normal(q.value);
+      $$('.area-caixa[data-sis]').forEach((c) => { c.hidden = !!t && !c.dataset.busca.includes(t); });
+      const telas = t ? acoesDasAreas().filter(([n]) => K.normal(n).includes(t)).slice(0, 8) : [];
+      res.hidden = !telas.length; res.innerHTML = telas.map(([n, h]) => `<a href="${h}">${esc(n)}</a>`).join('');
+    };
+    q.onkeydown = (e) => { if (e.key === 'Enter') { const p = $('a', res); if (p) { e.preventDefault(); location.hash = p.getAttribute('href'); } } if (e.key === 'Escape') { q.value = ''; q.oninput(); } };
   }
   TELAS.inicio = telaInicio;
 
+  // endereço → { sis, aba }: portal, sistema ou endereço antigo (#tela)
+  function resolver(primeiraVez) {
+    let h = (location.hash || '').slice(1);
+    if (!h) { const d = primeiraVez ? abrirDireto() : ''; h = d ? d.slice(1) : '/'; }
+    if (h[0] === '/') {
+      const [s = '', b = ''] = h.slice(1).split('/');
+      if (!s || PORTAL[s]) return { sis: null, aba: s || 'inicio' };
+      const a = AR.area(s); if (!a || !a.pronta || !areaVisivel(a)) return { sis: null, aba: 'inicio' };
+      if (!b || !telaDe(b) || !pode(b)) return { sis: s, aba: inicioDaArea(a) };
+      if (itensVisiveis(a).some((x) => x.aba === b)) return { sis: s, aba: b };
+      const outra = AR.areaDaAba(b, s); // tela de outro sistema: abre no sistema dela
+      return outra && outra !== s ? { sis: outra, aba: b } : { sis: s, aba: b };
+    }
+    if (PORTAL[h]) return { sis: null, aba: h };
+    if (!telaDe(h) || !pode(h)) return { sis: null, aba: 'inicio' };
+    const ar = AR.areaDaAba(h, areaAtual) || (areaAtual && AR.area(areaAtual) && areaVisivel(AR.area(areaAtual)) ? areaAtual : null);
+    return { sis: ar, aba: h };
+  }
   let primeira = true;
   function rota() {
-    let nome = (location.hash || '').slice(1);
-    if (!nome) { nome = abrirDireto() || 'inicio'; history.replaceState(null, '', '#' + nome); }
-    let ativa = telaDe(nome) ? nome : 'inicio';
-    if (!pode(ativa)) ativa = 'inicio';
-    if (ativa !== 'inicio') { const ar = AR ? AR.areaDaAba(ativa, areaAtual) : null; if (ar && ar !== areaAtual) { areaAtual = ar; lsS(chaveU('area'), ar); } montarMenu(ar || areaAtual); }
-    else montarMenu(null);
-    fecharTrocaArea();
-    $$('.menu a').forEach((a) => { if (a.dataset.aba === ativa) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+    const r = resolver(primeira), canon = r.sis ? urlSis(r.sis, r.aba) : urlPortal(r.aba);
+    if (location.hash !== canon) history.replaceState(null, '', canon);
+    if (r.sis) { areaAtual = r.sis; lsS(chaveU('area'), r.sis); lembrarRecente(r.sis, r.aba); }
+    montarMenu(r.sis);
+    fecharTrocaArea(); fecharSuspensos();
+    $$('.menu a, #sis-barra a').forEach((a) => { if (a.dataset.aba === r.aba) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+    $$('#sis-barra .sb-grupo').forEach((g) => g.classList.toggle('atual', !!g.querySelector('a[aria-current]')));
     moverIndicador();
     fecharCamada(true);
-    const fn = telaDe(ativa);
-    const desenhar = () => { tela.classList.remove('saindo'); fn(); tela.classList.remove('entrando'); void tela.offsetWidth; tela.classList.add('entrando'); };
+    const fn = telaDe(r.aba);
+    // o botão principal do cabeçalho some quando a própria tela já mostra o mesmo botão (sem ação repetida na tela)
+    const semRepetir = () => { const nv = $('.cab-nova'); if (!nv) return; const t = ($('span', nv).textContent || '').trim().toLowerCase(); nv.classList.toggle('repetido', !!t && $$('.titulo a, .titulo button', tela).some((b) => b.textContent.trim().toLowerCase() === t)); };
+    const desenhar = () => { tela.classList.remove('saindo'); fn(); semRepetir(); tela.classList.remove('entrando'); void tela.offsetWidth; tela.classList.add('entrando'); };
     if (primeira || reduzido) { primeira = false; desenhar(); return; }
     tela.classList.add('saindo');
     setTimeout(() => { desenhar(); window.scrollTo(0, 0); }, 120);
   }
+  // ---------- duas ou mais abas abertas (ex.: Financeiro numa, Oficina noutra) ----------
+  // A gravação junta o que cada aba mudou (comum.js); quando outra aba grava, esta se atualiza sozinha se estiver parada
+  // (ou escondida) e, se a pessoa estiver no meio de um formulário, avisa com o botão "Atualizar" para não perder o que digitou.
+  let atualizarPendente = false;
+  const ocupada = () => !!($('#camada') && $('#camada').children.length) || /^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || '') && document.activeElement.id !== 'portal-q';
+  function atualizarDeOutraAba() {
+    if (document.hidden || !ocupada()) { atualizarPendente = false; location.reload(); return; }
+    if (atualizarPendente) return; atualizarPendente = true;
+    toast('Outra aba do Anshur salvou alterações. Termine o que está fazendo e toque em Atualizar.');
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn-ouro aviso-abas'; b.textContent = 'Atualizar com a outra aba'; b.onclick = () => location.reload(); document.body.appendChild(b);
+  }
+  if (K.aoMudarEmOutraAba) K.aoMudarEmOutraAba(atualizarDeOutraAba);
   $('#sino').onclick = abrirNotificacoes; seletorLoja(); if (somenteLeitura()) document.body.classList.add('so-leitura');
   $('#busca-btn').onclick = abrirBusca; $('#instalar-btn').onclick = simularInstalacao; atualizarInstalar();
   // com conta, abrir o app não grava nada (evita versão nova a cada acesso e conflito com quem está usando)

@@ -110,7 +110,7 @@
     const vendida = rnd() < 0.62 && entrada > 60;
     const venda = vendida ? entrada - entre(30, entrada - 10) : null;
     const atraso = vendida ? (rnd() < 0.45 ? entre(12, 75) : entre(0, 6)) : null; // dias entre a venda e a quitação
-    const quitada = vendida && rnd() < 0.7;
+    const quitada = vendida && (rnd() < 0.7 || venda > 5); // demonstração: vendida há mais de 5 dias já foi quitada (os juros pararam); só a venda recente espera a quitação
     FINANCIADAS.push({ chassi: 'CH' + (88120 + i * 13), marca: m.marca, modelo: m.modelo, tipo: m.tipo, valor, banco: escolhe(['Banco da montadora', 'Banco do Brasil', 'Sicredi']), taxaMes: 0.011, carencia: 90,
       entrada: diasAtras(entrada), venda: vendida ? diasAtras(venda) : null, quitacao: vendida && quitada ? diasAtras(Math.max(0, venda - atraso)) : null });
   }

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Anshur · gestão da revenda de máquinas agrícolas</title>
+<title>Anshur · portal da revenda</title>
 <meta name="description" content="Anshur: o sistema da revenda de máquinas agrícolas. Usados e trocas com IA, financeiro completo, relatórios e mais. Demonstração com dados fictícios.">
 <meta name="theme-color" content="#F4F0E8">
 <meta property="og:title" content="Anshur · inteligência de margem para revendas de máquinas agrícolas">
@@ -18,49 +18,49 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="estilo.css?v=19">
+<link rel="stylesheet" href="estilo.css?v=20">
 </head>
 <body>
 <a class="pular" href="#tela">Ir para o conteúdo</a>
 <div class="casca">
-  <aside class="lateral" aria-label="Navegação principal">
-    <a class="marca" href="#inicio" id="marca" aria-label="Anshur, todas as áreas"></a>
-    <button class="area-troca area-troca-lateral" id="area-troca" type="button" aria-haspopup="menu" aria-expanded="false">Áreas</button>
-    <nav class="menu" id="menu" aria-label="Menu da área">
+  <!-- celular: barra de baixo com o menu do sistema aberto (no computador o menu fica na barra do sistema, no cabeçalho) -->
+  <aside class="lateral" aria-label="Menu do sistema no celular">
+    <a class="marca" href="#/" id="marca" aria-label="Anshur, portal"></a>
+    <nav class="menu" id="menu" aria-label="Menu do sistema">
       <span class="menu-indicador" aria-hidden="true"></span>
     </nav>
     <p class="lateral-rodape">Dados demonstrativos de uma revenda fictícia.</p>
   </aside>
   <div class="principal">
     <header class="cabecalho">
-      <a class="marca marca-movel" href="#inicio" id="marca-movel" aria-label="Anshur, todas as áreas"></a>
-      <button class="area-troca area-troca-cab" type="button" aria-haspopup="menu" aria-expanded="false">Áreas</button>
-      <div class="cab-info"><b id="revenda"></b><span id="refdata"></span></div>
-      <select class="loja-sel" id="loja-sel" aria-label="Loja"></select>
-      <span class="selo-demo">Dados demonstrativos</span>
-      <button class="sino busca-btn" type="button" id="busca-btn" aria-label="Buscar (Ctrl+K)"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-4-4"/></svg><span class="kbd">Ctrl K</span></button>
-      <button class="sino" type="button" id="instalar-btn" aria-label="Instalar o app" title="Instalar o Anshur"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg></button>
-      <button class="sino" type="button" id="sino" aria-label="Alertas"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 20a2 2 0 0 0 4 0"/></svg><b id="sino-n" hidden></b></button>
-      <a class="btn btn-ouro cab-nova" href="#avaliar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Nova avaliação</span></a>
-      <div class="perfil">
-        <button class="avatar" id="perfil" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Perfil e opções">SA</button>
-        <div class="perfil-menu" id="perfil-menu" role="menu" hidden>
-          <p><b>Seu Antônio</b><span>Proprietário · Mogiana Máquinas</span></p>
-          <button type="button" role="menuitem" id="restaurar">Restaurar dados demonstrativos</button>
+      <div class="cab-linha">
+        <button class="area-troca sis-grade" id="sis-grade" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Sistemas: voltar ao portal ou abrir outro sistema" title="Sistemas e portal"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h3v3H5zM10.5 5h3v3h-3zM16 5h3v3h-3zM5 10.5h3v3H5zM10.5 10.5h3v3h-3zM16 10.5h3v3h-3zM5 16h3v3H5zM10.5 16h3v3h-3zM16 16h3v3h-3z"/></svg><span>Sistemas</span></button>
+        <a class="sis-nome" id="sis-nome" href="#/"></a>
+        <div class="cab-info"><b id="revenda"></b><span id="refdata"></span></div>
+        <select class="loja-sel" id="loja-sel" aria-label="Loja"></select>
+        <span class="selo-demo">Dados demonstrativos</span>
+        <button class="sino busca-btn" type="button" id="busca-btn" aria-label="Buscar em todos os sistemas (Ctrl+K)"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-4-4"/></svg><span class="kbd">Ctrl K</span></button>
+        <button class="sino" type="button" id="instalar-btn" aria-label="Instalar o app" title="Instalar o Anshur"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg></button>
+        <button class="sino" type="button" id="sino" aria-label="Alertas"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 20a2 2 0 0 0 4 0"/></svg><b id="sino-n" hidden></b></button>
+        <a class="btn btn-ouro cab-nova" href="#/usados/avaliar" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Nova avaliação</span></a>
+        <div class="perfil">
+          <button class="avatar" id="perfil" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Perfil e opções">SA</button>
+          <div class="perfil-menu" id="perfil-menu" role="menu" hidden></div>
         </div>
       </div>
+      <nav class="sis-barra" id="sis-barra" aria-label="Menu do sistema"></nav>
     </header>
     <main id="tela" tabindex="-1"></main>
   </div>
 </div>
 <div id="camada"></div>
 <div class="toasts" id="toasts" aria-live="polite"></div>
-<script src="instalar.js?v=19"></script>
-<script src="areas.js?v=19"></script>
-<script src="dados.js?v=19"></script>
-<script src="fotos.js?v=19"></script>
+<script src="instalar.js?v=20"></script>
+<script src="areas.js?v=20"></script>
+<script src="dados.js?v=20"></script>
+<script src="fotos.js?v=20"></script>
 <!-- nuvem.js: na demonstração carrega o app na hora; no ambiente real, entra na conta e carrega os dados do servidor antes -->
-<script src="nuvem.js?v=19" data-app="comum.js?v=19 importar.js?v=19 motor.js?v=19 retencao.js?v=19 graficos.js?v=19 areas/nucleo.js?v=19 areas/novas-regras.js?v=19 areas/novas.js?v=19 areas/financeiro-regras.js?v=19 areas/financeiro.js?v=19 areas/pecas-regras.js?v=19 areas/oficina-regras.js?v=19 areas/oficina.js?v=19 areas/pecas.js?v=19 areas/crm-regras.js?v=19 areas/crm.js?v=19 areas/fiscal-regras.js?v=19 areas/fiscal.js?v=19 app.js?v=19"></script>
+<script src="nuvem.js?v=20" data-app="comum.js?v=20 importar.js?v=20 motor.js?v=20 retencao.js?v=20 graficos.js?v=20 areas/nucleo.js?v=20 areas/novas-regras.js?v=20 areas/novas.js?v=20 areas/financeiro-regras.js?v=20 areas/financeiro.js?v=20 areas/pecas-regras.js?v=20 areas/oficina-regras.js?v=20 areas/oficina.js?v=20 areas/pecas.js?v=20 areas/crm-regras.js?v=20 areas/crm.js?v=20 areas/fiscal-regras.js?v=20 areas/fiscal.js?v=20 app.js?v=20"></script>
 <script>if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then((r) => r.update()).catch(() => {}); let novo = false; navigator.serviceWorker.addEventListener('controllerchange', () => { if (!novo) { novo = true; location.reload(); } }); }</script>
 </body>
 </html>

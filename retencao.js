@@ -185,7 +185,7 @@
       oficina: [['dia', 'preparo', 'Lançar o preparo das máquinas que chegaram', conta('preparo'), '#patio'], ['semana', 'garantias', 'Mandar ao financeiro as OS de garantia da semana', null, '#garantias']],
       financeiro: [['dia', 'floor', 'Quitar o floor plan das máquinas vendidas', conta('floor'), '#financiamento'], ['semana', 'garantias', 'Cobrar garantias paradas ou perto de 60 dias', conta('garantia'), '#garantias'], ['semana', 'comissoes', 'Lançar comissões das vendas', conta('comissao'), '#relatorio']],
       auditor: [['semana', 'conferir', 'Conferir trocas acima do teto aprovadas', conta('conferir'), '#aprovacoes'], ['semana', 'trilha', 'Ler a trilha do servidor da semana', null, '#atividades']],
-      dono: [['dia', 'prioridades', 'Olhar as 3 prioridades do dia', null, '#hoje'], ['semana', 'relatorio', 'Ler o relatório semanal', null, '#relatorio'], ['semana', 'memoria', 'Ver a memória comercial da revenda', null, '#memoria']]
+      dono: [['dia', 'prioridades', 'Olhar os avisos do dia no portal (todos os sistemas)', null, '#/hoje'], ['semana', 'relatorio', 'Ler o relatório semanal', null, '#relatorio'], ['semana', 'memoria', 'Ver a memória comercial da revenda', null, '#memoria']]
     };
     const out = [];
     Object.entries(R).forEach(([perfil, l]) => l.forEach(([periodo, id, titulo, qtd, ir]) => {

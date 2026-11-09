@@ -269,7 +269,7 @@
     const rs = reservaAtiva(est, i.id, data); if (rs && rs.cliente !== p.cliente) throw new Error('Máquina reservada para outro cliente.');
     return { p, i };
   }
-  // ctx: { F (FINANCEIRO), data, quem, agora, hoje, cfg, conta (para compensar o usado da troca), nomeItem, maquina (id do cadastro comum, ex.: F:<chassi>), trocaId }
+  // ctx: { F (FINANCEIRO), data, quem, agora, hoje, cfg, nomeItem, maquina (id do cadastro comum, ex.: F:<chassi>), trocaId }
   function faturar(est, propostaId, ctx = {}) {
     const F = ctx.F || raiz.FINANCEIRO; if (!F) throw new Error('Financeiro indisponível.');
     const n = garantir(est);
@@ -281,13 +281,14 @@
     const base = { categoria: 'rec-novas', centro: 'cc-novas', loja: p.loja || i.loja || '', cliente: p.cliente, maquina: ctx.maquina || '', venda: id, documento: id, origem: 'venda-nova', competencia: data };
     const lanc = []; let custoPosto = false;
     const receber = (d) => { const ls = F.criar(est, Object.assign({}, base, custoPosto ? {} : { custoVenda: c.custo }, d, { tipo: 'receber' }), quem, agora); custoPosto = true; ls.forEach((l) => lanc.push(l)); return ls; };
-    // usado recebido na troca: entra como receita (preço cheio) e sai como compra de usado (estoque); se houver conta, as duas baixas
-    // no mesmo dia e na mesma conta se anulam no saldo
+    // usado recebido na troca: é parte do pagamento da nova (receita pelo preço cheio na DRE) e entra no estoque de usados (compra, fora da DRE).
+    // As duas pontas nascem quitadas por COMPENSAÇÃO: não passam por banco nem caixa, não mexem no saldo e ficam fora da conciliação.
     if (c.valorTroca > 0) {
-      const [rT] = receber({ descricao: `Usado recebido na troca · venda ${nomeM}`, valor: c.valorTroca, vencimento: data, obs: 'Compensação: o usado da troca é parte do pagamento (não movimenta o banco).' });
+      const comp = { data, forma: F.COMPENSACAO || 'compensacao' };
+      const [rT] = receber({ descricao: `Usado recebido na troca · venda ${nomeM}`, valor: c.valorTroca, vencimento: data, obs: 'Compensação: o usado da troca é parte do pagamento (não passa pelo banco).' });
       const [pT] = F.criar(est, Object.assign({}, base, { tipo: 'pagar', descricao: `Compra do usado na troca · ${p.troca.descricao || 'usado'}`, valor: c.valorTroca, vencimento: data, categoria: 'cus-aquisicao', centro: 'cc-usados', maquina: ctx.trocaId || '', origem: 'troca-nova', obs: 'Compensação com a venda ' + id }), quem, agora);
       lanc.push(pT);
-      if (ctx.conta) { F.baixar(est, rT.id, { data, forma: 'transferencia', conta: ctx.conta }, quem, agora); F.baixar(est, pT.id, { data, forma: 'transferencia', conta: ctx.conta }, quem, agora); }
+      F.baixar(est, rT.id, comp, quem, agora); F.baixar(est, pT.id, comp, quem, agora);
     }
     if (cond.forma === 'avista') { if (c.saldo > 0) receber({ descricao: `Venda de máquina nova · ${nomeM}`, valor: c.saldo, vencimento: ctx.vencimento || data }); }
     else {

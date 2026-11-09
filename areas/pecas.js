@@ -6,7 +6,7 @@
   const P = raiz.PECAS, R = raiz.ANSHUR_AREAS;
   if (!R) return;
   // sem as regras (areas/pecas-regras.js não carregou): fica honesta como "Em breve", sem tela
-  if (!P) { R.registrar({ id: 'pecas', nome: 'Peças e Estoque', curto: 'Peças', ordem: 50, pronta: false, perfis: ['dono', 'gerente', 'oficina', 'financeiro', 'auditor'], descricao: 'Catálogo, SKU, localização, entradas, saídas, inventário e compras.', icone: '<path d="M21 8l-9-5-9 5v8l9 5 9-5zM3 8l9 5 9-5M12 13v8"/>', previsto: ['Catálogo de peças com SKU e localização', 'Entradas, saídas, transferências entre lojas e inventário', 'Fornecedores, compras e estoque mínimo', 'Custos e compras no Financeiro'], hoje: 'Hoje: compras de peças podem ser lançadas como contas a pagar no Financeiro.' }); return; }
+  if (!P) { R.registrar({ id: 'pecas', nome: 'Peças e Estoque', curto: 'Peças', ordem: 50, pronta: false, perfis: ['dono', 'gerente', 'oficina', 'financeiro', 'auditor'], descricao: 'Catálogo, SKU, localização, entradas, saídas, inventário e compras.', icone: '<path d="M21 8l-9-5-9 5v8l9 5 9-5zM3 8l9 5 9-5M12 13v8"/>', previsto: ['Catálogo de peças com SKU e localização', 'Entradas, saídas, transferências entre lojas e inventário', 'Fornecedores, compras e estoque mínimo', 'Custos e compras no Financeiro'], jaExiste: 'Hoje: compras de peças podem ser lançadas como contas a pagar no Financeiro.' }); return; }
   const VER = ['dono', 'gerente', 'oficina', 'financeiro', 'auditor'];
   let U = null;
   const F = () => raiz.FINANCEIRO || null;
@@ -35,10 +35,9 @@
   };
   const cab = (t, s, b = '') => `<div class="titulo"><div><h1>${t}</h1><p>${s}</p></div>${b ? `<div class="fin-acoes">${b}</div>` : ''}</div>`;
   const vazio = (t) => `<p class="vazio">${t}</p>`;
-  // registro: Atividades (ui.log) + trilha do servidor (anshur_eventos), pelo mesmo caminho do Financeiro (N.evento)
+  // registro: Atividades (ui.log); 'pecas' está em CRITICOS (comum.js) e vai para a trilha do servidor, como o Financeiro
   function gravar(texto) {
     U.log('pecas', texto);
-    if (U.K.nuvem && U.K.nuvem.evento) U.K.nuvem.evento('pecas', texto); // 'pecas' ainda não está em CRITICOS (comum.js): envia direto
     U.salvar();
   }
   const tentar = (fn) => { try { return fn(); } catch (e) { U.toast(e.message, true); return null; } };
@@ -460,6 +459,13 @@
     telas: { 'pc-painel': T(telaPainel), 'pc-catalogo': T(telaCatalogo), 'pc-mov': T(telaMov), 'pc-inventario': T(telaInventario), 'pc-compras': T(telaCompras), 'pc-abc': T(telaABC) },
     permissoes: { 'pc-painel': VER, 'pc-catalogo': VER, 'pc-mov': VER, 'pc-inventario': VER, 'pc-compras': VER, 'pc-abc': VER },
     numero: (ui) => { U = ui; P.garantir(ui.estado); const r = P.resumo(ui.estado, { loja: ui.estado.lojaAtual || '', lojas: ui.K.lojasPermitidas }); return { valor: String(r.abaixo), texto: `${r.abaixo === 1 ? 'peça abaixo' : 'peças abaixo'} do mínimo · ${brl(r.valor)} em estoque`, alerta: r.abaixo > 0 }; },
+    // tarefas do dia e rotina: peças abaixo do estoque mínimo
+    hoje: (estado, u, ui) => {
+      if (!['dono', 'gerente', 'oficina', 'financeiro'].includes(u.perfil)) return [];
+      const ab = P.abaixoMinimo(estado, { loja: estado.lojaAtual || '', lojas: ui.K.lojasPermitidas }); if (!ab.length) return [];
+      return [{ id: 'pc-min-' + ab.length, cat: 'pecas', catNome: 'Peças', nivel: 2, valor: ab.reduce((s, x) => s + x.sugerido * (x.custo || 0), 0), titulo: `${ab.length} ${ab.length === 1 ? 'peça está' : 'peças estão'} abaixo do estoque mínimo`, txt: ab.slice(0, 3).map((x) => `${x.peca.descricao} (${x.loja}: tem ${x.saldo}, mínimo ${x.minimo})`).join(' · '), botao: { rotulo: 'Ver o que comprar', ir: '#/pecas/pc-compras' } }];
+    },
+    rotina: (estado) => [{ perfil: 'oficina', periodo: 'semana', id: 'pc-minimo', titulo: 'Pedir as peças abaixo do estoque mínimo', qtd: P.abaixoMinimo(estado, {}).length, ir: '#/pecas/pc-compras' }],
     buscar,
     novo: (ui) => { U = ui; if (!editor()) { ui.toast('Seu perfil não lança peças.', true); return; } ui.abrirCamada('modal', `<h2>Peças</h2><p class="sub">O que você vai lançar?</p><div class="acoes" style="flex-wrap:wrap">${botoes()}<button class="btn btn-linha" type="button" data-pc="peca">${I.mais}<span>Nova peça</span></button></div>`, (c) => ligarBotoes(c)); },
     iniciar: (ui) => { if (ui.OP) return; const antes = P.garantir(ui.estado).semente; semear(ui); if (!antes) ui.salvar(); }

@@ -15,7 +15,11 @@
   let seq = 0;
   const novoId = (pre) => pre + Date.now().toString(36).toUpperCase() + Math.random().toString(36).slice(2, 6).toUpperCase() + (seq++).toString(36);
 
-  const FORMAS = { pix: 'Pix', boleto: 'Boleto', cartao: 'Cartão', transferencia: 'Transferência', dinheiro: 'Dinheiro', cheque: 'Cheque' };
+  const FORMAS = { pix: 'Pix', boleto: 'Boleto', cartao: 'Cartão', transferencia: 'Transferência', dinheiro: 'Dinheiro', cheque: 'Cheque', compensacao: 'Compensação (usado na troca)' };
+  // compensação: o usado da troca paga parte da máquina nova. Não passa por banco nem caixa: fica fora dos saldos, do realizado e da conciliação.
+  const COMPENSACAO = 'compensacao';
+  const ehCompensacao = (l) => !!(l && l.pago && l.pago.forma === COMPENSACAO);
+  const FORMAS_TELA = Object.keys(FORMAS).filter((k) => k !== COMPENSACAO); // a compensação só nasce do faturamento com troca
   // dre: receita | impostos | custo | despesa | financeiro | outras | estoque (compra de estoque: só caixa; na DRE entra o custo do que foi vendido)
   // margem: para onde vai na margem por marca quando pago e ligado a um usado (despesas | comissao | juros)
   const CATEGORIAS_PADRAO = [
@@ -148,7 +152,8 @@
     if (!l) { const v = automaticos(est, ctx || {}).find((x) => x.id === id); if (!v) throw new Error('Lançamento não encontrado.'); l = materializar(est, v); }
     if (l.cancelado) throw new Error('Lançamento cancelado.');
     if (l.pago) throw new Error('Este lançamento já foi baixado.');
-    const c = conta(est, b.conta); if (!c || c.inativa) throw new Error('Escolha a conta ou o caixa.');
+    const comp = b.forma === COMPENSACAO;
+    const c = comp ? null : conta(est, b.conta); if (!comp && (!c || c.inativa)) throw new Error('Escolha a conta ou o caixa.');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(b.data || '')) throw new Error('Data do pagamento inválida.');
     if (!FORMAS[b.forma]) throw new Error('Forma de pagamento inválida.');
     const juros = r2(b.juros || 0), desconto = r2(b.desconto || 0);
@@ -159,7 +164,7 @@
       delete resto.pago; delete resto.conciliado; delete resto.virtual;
       f.lancamentos.push(resto); l.valor = principal;
     }
-    l.pago = { data: b.data, valor: r2(principal + juros - desconto), forma: b.forma, conta: c.id, juros, desconto, por: quem, em: agora };
+    l.pago = { data: b.data, valor: r2(principal + juros - desconto), forma: b.forma, conta: c ? c.id : '', juros, desconto, por: quem, em: agora };
     return l;
   }
   function estornar(est, id) {
@@ -204,7 +209,7 @@
   // movimentos realizados de uma conta (ou de todas): entradas positivas, saídas negativas
   function movimentos(est, { conta: cid = '', de = '', ate = '' } = {}) {
     const f = garantir(est), out = [];
-    f.lancamentos.forEach((l) => { if (l.cancelado || !l.pago || (cid && l.pago.conta !== cid)) return; out.push({ data: l.pago.data, valor: l.tipo === 'receber' ? l.pago.valor : -l.pago.valor, descricao: l.descricao, conta: l.pago.conta, ref: l.id, origem: 'lancamento', conciliado: l.conciliado || '' }); });
+    f.lancamentos.forEach((l) => { if (l.cancelado || !l.pago || ehCompensacao(l) || (cid && l.pago.conta !== cid)) return; out.push({ data: l.pago.data, valor: l.tipo === 'receber' ? l.pago.valor : -l.pago.valor, descricao: l.descricao, conta: l.pago.conta, ref: l.id, origem: 'lancamento', conciliado: l.conciliado || '' }); });
     f.transferencias.forEach((t) => {
       if (!cid || t.de === cid) out.push({ data: t.data, valor: -t.valor, descricao: t.descricao + ' (saída)', conta: t.de, ref: t.id, origem: 'transferencia', conciliado: (t.conciliado || {})[t.de] || '' });
       if (!cid || t.para === cid) out.push({ data: t.data, valor: t.valor, descricao: t.descricao + ' (entrada)', conta: t.para, ref: t.id, origem: 'transferencia', conciliado: (t.conciliado || {})[t.para] || '' });
@@ -251,7 +256,7 @@
     const ok = daLoja(loja, lojas), ini = somarMeses(mesDe(hoje) + '-01', -(meses - 1)), m = new Map();
     for (let i = 0; i < meses; i++) m.set(mesDe(somarMeses(ini, i)), { mes: mesDe(somarMeses(ini, i)), entradas: 0, saidas: 0 });
     garantir(est).lancamentos.forEach((l) => {
-      if (l.cancelado || !l.pago || !ok(l)) return; const o = m.get(mesDe(l.pago.data)); if (!o) return;
+      if (l.cancelado || !l.pago || ehCompensacao(l) || !ok(l)) return; const o = m.get(mesDe(l.pago.data)); if (!o) return;
       if (l.tipo === 'receber') o.entradas = r2(o.entradas + l.pago.valor); else o.saidas = r2(o.saidas + l.pago.valor);
     });
     return [...m.values()].map((o) => Object.assign(o, { resultado: r2(o.entradas - o.saidas) }));
@@ -371,7 +376,7 @@
     const usados = new Set(f.extrato.filter((e) => e.conciliado && e.conciliado.tipo === 'lancamento').map((e) => e.conciliado.id));
     const out = [];
     todos(est, ctx).forEach((l) => {
-      if (l.cancelado || usados.has(l.id) || l.conciliado) return;
+      if (l.cancelado || usados.has(l.id) || l.conciliado || ehCompensacao(l)) return;
       const sinal = l.tipo === 'receber' ? 1 : -1;
       if (l.pago) {
         if (l.pago.conta !== x.conta || r2(sinal * l.pago.valor) !== x.valor) return;
@@ -397,6 +402,7 @@
       let l = f.lancamentos.find((y) => y.id === alvo.id);
       if (!l) { const v = automaticos(est, ctx).find((y) => y.id === alvo.id); if (!v) throw new Error('Lançamento não encontrado.'); l = materializar(est, v); }
       if (l.conciliado) throw new Error('Este lançamento já está conciliado.');
+      if (ehCompensacao(l)) throw new Error('Compensação de usado na troca não passa pelo banco: não se concilia com o extrato.');
       if (!l.pago) baixar(est, l.id, { data: x.data, conta: x.conta, forma: l.tipo === 'receber' ? 'pix' : 'transferencia', ...(Math.abs(x.valor) !== l.valor ? { juros: r2(Math.max(0, Math.abs(x.valor) - l.valor)), desconto: r2(Math.max(0, l.valor - Math.abs(x.valor))) } : {}) }, quem, agora, ctx);
       else if (l.pago.conta !== x.conta) throw new Error('O pagamento foi baixado em outra conta.');
       l.conciliado = x.id;
@@ -462,7 +468,7 @@
   const podeEditar = (perfil) => ['dono', 'financeiro'].includes(perfil);
   const podeVer = (perfil) => ['dono', 'financeiro', 'gerente', 'auditor'].includes(perfil);
 
-  raiz.FINANCEIRO = { FORMAS, CATEGORIAS_PADRAO, CENTROS_PADRAO, NOMES_SIT, LINHAS_DRE, r2, somarDias, somarMeses, mesDe, diasEntre, brl, dataBR, vazio, garantir, categorias, categoria, centros, conta,
+  raiz.FINANCEIRO = { FORMAS, FORMAS_TELA, COMPENSACAO, ehCompensacao, CATEGORIAS_PADRAO, CENTROS_PADRAO, NOMES_SIT, LINHAS_DRE, r2, somarDias, somarMeses, mesDe, diasEntre, brl, dataBR, vazio, garantir, categorias, categoria, centros, conta,
     situacao, valorEfetivo, automaticos, todos, materializar, validar, criar, baixar, estornar, cancelar, parcelar, criarConta, transferir, movimentos, saldoConta, saldos,
     fluxo, realizadoMensal, dre, inadimplencia, linkCobranca, numeroBR, dataExtrato, lerOFX, lerCSV, importarExtrato, sugestoes, conciliar, desconciliar, autoConciliar, lancarDoExtrato,
     comissoes, despesasPorMaquina, resumo, podeEditar, podeVer, daLoja };
