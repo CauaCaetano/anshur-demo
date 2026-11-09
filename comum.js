@@ -12,12 +12,13 @@
   // dois ambientes que nunca se misturam: demonstração (fictício, resetável) e operação (dados da revenda)
   const CHAVES = { demo: 'anshur-demo-v2', op: 'anshur-op-v1' };
   const ambiente = getItem('anshur-ambiente') === 'op' ? 'op' : 'demo';
-  const vazio = () => ({ versao: 3, fechadas: [], avaliacoes: [], precos: {}, vendas: {}, preparos: {}, historico: [], config: {} });
+  const vazio = () => ({ versao: 3, fechadas: [], avaliacoes: [], precos: {}, vendas: {}, preparos: {}, custos: {}, historico: [], config: {} });
   const nuvem = (amb) => amb === 'op' && N && ambiente === 'op';
   let vivo = null; // no ambiente real, o estado carregado do servidor é o único em memória
   const repo = {
     ler: (amb = ambiente) => {
-      if (nuvem(amb)) return vivo || Object.assign(vazio(), JSON.parse(JSON.stringify(N.dados || {})));
+      // com conta: o que o servidor confirmou + as alterações deste aparelho que ainda esperam internet (N.vista)
+      if (nuvem(amb)) return vivo || Object.assign(vazio(), JSON.parse(JSON.stringify(N.vista || N.dados || {})));
       try { return Object.assign(vazio(), JSON.parse(getItem(CHAVES[amb])) || {}); } catch (e) { return vazio(); }
     },
     gravar: (d, amb = ambiente) => (nuvem(amb) ? N.salvar(d) : setItem(CHAVES[amb], JSON.stringify(d))),
@@ -52,6 +53,7 @@
   A.compradores = (A.compradores || []).concat(estado.extras.compradores);
   A.anuncios = (A.anuncios || []).concat(estado.extras.anuncios);
   estado.pendentes = estado.pendentes || [];
+  estado.custos = estado.custos || {};
   A.garantias = (A.garantias || []).concat(estado.extras.garantias);
   A.financiadas = (A.financiadas || []).concat(estado.extras.financiadas);
   // usuários, perfis e trilha de atividades
@@ -98,7 +100,9 @@
 
   function aplicarMovimentos(trocas, est) {
     Object.entries(est.precos || {}).forEach(([id, lista]) => { const t = trocas.find((x) => x.id === id); if (!t) return; t.precos = (t.precos || []).concat(lista); t.anuncio = t.precos[t.precos.length - 1].valor; });
-    Object.entries(est.preparos || {}).forEach(([id, v]) => { const t = trocas.find((x) => x.id === id); if (t) { t.preparo = v.valor; t.preparoRegistrado = v.data; } });
+    Object.entries(est.preparos || {}).forEach(([id, v]) => { const t = trocas.find((x) => x.id === id); if (t) { t.preparo = v.valor; t.preparoRegistrado = v.data; if (v.itens) t.preparoItens = v.itens; } });
+    // custos lançados depois (comissão paga, juros do floor plan): só o que foi registrado, nada estimado
+    Object.entries(est.custos || {}).forEach(([id, v]) => { const t = trocas.find((x) => x.id === id); if (t) t.custos = Object.assign({}, t.custos, v); });
     Object.entries(est.vendas || {}).forEach(([id, v]) => { const t = trocas.find((x) => x.id === id); if (t) { t.vendido = v.valor; t.saida = v.data; t.diasPatio = diasEntre(t.entrada, v.data); } });
   }
 
@@ -145,8 +149,10 @@
   };
 
   // fechar troca: grava o valor pago separado do recomendado e congela a avaliação daquele dia
+  // com conta, duas pessoas podem fechar troca sem internet ao mesmo tempo: o id leva um sufixo aleatório para não colidir
+  const sufixoUnico = () => (N && ambiente === 'op' ? Math.random().toString(36).slice(2, 6).toUpperCase() : '');
   function fecharTroca(est, maq, rec, valorPago, dataTroca, extra = {}) {
-    const id = 'D' + String(est.fechadas.length + 1).padStart(3, '0') + (ambiente === 'op' ? 'R' : '');
+    const id = 'D' + String(est.fechadas.length + 1).padStart(3, '0') + (ambiente === 'op' ? 'R' : '') + sufixoUnico();
     const anuncio = Math.round(rec.venda * 1.08 / 1000) * 1000;
     const t = { ...maq, id, pago: Math.round(valorPago), preparo: rec.preparo, preparoEst: rec.preparo, vendido: null, entrada: dataTroca, saida: null, diasPatio: null, anuncio,
       precos: [{ data: dataTroca, valor: anuncio, motivo: 'Anúncio inicial' }], idAgro: false, manutencoes: [], fotos: [], ...extra,
@@ -156,10 +162,73 @@
   }
   function registrarPreparo(est, id, valor, dataReg) { est.preparos[id] = { valor: Math.round(valor), data: dataReg }; }
   function registrarVenda(est, id, valor, dataVenda) { est.vendas[id] = { valor: Math.round(valor), data: dataVenda }; }
+  // comissão e juros do floor plan de uma operação: só entram valores informados (vazio = não registrado)
+  function registrarCustos(est, id, { comissao, juros } = {}, quem = '', dataReg = hojeISO()) {
+    est.custos = est.custos || {};
+    const c = Object.assign({}, est.custos[id]);
+    if (typeof comissao === 'number' && isFinite(comissao) && comissao >= 0) c.comissao = Math.round(comissao);
+    if (typeof juros === 'number' && isFinite(juros) && juros >= 0) c.juros = Math.round(juros);
+    c.data = dataReg; if (quem) c.por = quem;
+    est.custos[id] = c;
+    return c;
+  }
+
+  // ---------- margem líquida por operação concluída (relatório por marca e por tipo) ----------
+  // receita = venda; custos = aquisição (pago na troca) + preparo registrado + juros do floor plan registrados + comissão registrada.
+  // "real" quando preparo e comissão estão registrados; "estimada" quando falta algum (a margem usa só o que existe e pode ser menor).
+  // Juros do floor plan só entram quando registrados (muito usado não passa por floor plan), sem deixar a operação estimada.
+  const mesDe = (iso) => String(iso || '').slice(0, 7);
+  function margemOperacao(t) {
+    const faltando = [];
+    let preparo = 0, pecas = null, maoDeObra = null, horasOficina = null, preparoPrevisto = null;
+    if (t.preparoRegistrado) {
+      preparo = t.preparo || 0;
+      if (Array.isArray(t.preparoItens) && t.preparoItens.length) {
+        pecas = t.preparoItens.reduce((s, it) => s + (+it.pecas || 0), 0);
+        horasOficina = t.preparoItens.reduce((s, it) => s + (+it.horas || 0), 0);
+        maoDeObra = Math.max(0, preparo - pecas);
+      }
+    } else if (t.previsto || t.origem === 'Importada' || t.preparoInformado === false || typeof t.preparo !== 'number') {
+      faltando.push('preparo'); preparoPrevisto = t.preparoEst || (t.previsto && t.previsto.preparo) || null;
+    } else preparo = t.preparo;
+    const cu = t.custos || {};
+    const comissao = typeof cu.comissao === 'number' ? cu.comissao : 0;
+    if (typeof cu.comissao !== 'number') faltando.push('comissão');
+    const juros = typeof cu.juros === 'number' ? cu.juros : 0;
+    const receita = t.vendido, aquisicao = t.pago;
+    const margem = receita - aquisicao - preparo - juros - comissao;
+    return { id: t.id, mes: mesDe(t.saida), saida: t.saida, marca: t.marca || '—', tipo: t.tipo, modelo: t.modelo, ano: t.ano, loja: t.loja || '', vendedor: t.vendedor || '',
+      receita, aquisicao, preparo, pecas, maoDeObra, horasOficina, preparoPrevisto, juros, jurosRegistrado: typeof cu.juros === 'number', comissao,
+      margem, pct: receita ? margem / receita : NaN, faltando, status: faltando.length ? 'estimada' : 'real' };
+  }
+  function somar(lista) {
+    const s = { n: 0, nReal: 0, nEst: 0, receita: 0, aquisicao: 0, preparo: 0, juros: 0, comissao: 0, margem: 0, faltaPreparo: 0, faltaComissao: 0 };
+    lista.forEach((o) => {
+      s.n++; if (o.status === 'real') s.nReal++; else s.nEst++;
+      ['receita', 'aquisicao', 'preparo', 'juros', 'comissao', 'margem'].forEach((k) => { s[k] += o[k]; });
+      if (o.faltando.includes('preparo')) s.faltaPreparo++;
+      if (o.faltando.includes('comissão')) s.faltaComissao++;
+    });
+    s.pct = s.receita ? s.margem / s.receita : NaN;
+    s.status = !s.n ? '' : s.nEst ? 'estimada' : 'real';
+    return s;
+  }
+  // de/ate: 'AAAA-MM' (meses inclusivos, pela data da venda); loja: uma loja; lojas: lojas que a pessoa pode ver
+  function relatorioMargem(trocas, { de = '', ate = '', loja = '', lojas = null, agrupar = 'marca' } = {}) {
+    const ops = (trocas || []).filter((t) => t.vendido && t.saida && (!de || mesDe(t.saida) >= de) && (!ate || mesDe(t.saida) <= ate)
+      && (loja ? t.loja === loja : (!lojas || !lojas.length || lojas.includes(t.loja)))).map(margemOperacao)
+      .sort((a, b) => a.saida.localeCompare(b.saida) || String(a.id).localeCompare(String(b.id)));
+    const chave = (o) => (agrupar === 'tipo' ? o.tipo : o.marca);
+    const por = (f) => { const m = new Map(); ops.forEach((o) => { const k = f(o); if (!m.has(k)) m.set(k, []); m.get(k).push(o); }); return m; };
+    const grupos = [...por(chave)].map(([k, l]) => Object.assign({ chave: k }, somar(l))).sort((a, b) => b.margem - a.margem);
+    const meses = [...por((o) => o.mes + '|' + chave(o))].map(([k, l]) => { const [mes, c] = k.split('|'); return Object.assign({ mes, chave: c }, somar(l)); })
+      .sort((a, b) => a.mes.localeCompare(b.mes) || b.margem - a.margem);
+    return { operacoes: ops, grupos, meses, total: somar(ops), agrupar };
+  }
 
   // recarregar só depois de terminar de enviar ao servidor
   const recarregar = () => (N && ambiente === 'op' ? N.recarregar() : location.reload());
   raiz.COMUM = { A, ambiente, nuvem: N && ambiente === 'op' ? N : null, lojasPermitidas, lembrarLoja, recarregar, repo, estado, cfg, PADRAO, PERFIS, usuarioAtual, registrar, real, mil, pct, hojeISO, diasEntre, diasDesde, data, esc, NOMES, FICHA, logo, C,
-    fecharTroca, registrarPreparo, registrarVenda, aplicarMovimentos,
+    fecharTroca, registrarPreparo, registrarVenda, registrarCustos, aplicarMovimentos, margemOperacao, relatorioMargem,
     gravar: (d) => repo.gravar(d), ler: () => repo.ler(), restaurar: () => { repo.apagar('demo'); delItem('anshur-demo-v1'); } };
 })(typeof window !== 'undefined' ? window : globalThis);

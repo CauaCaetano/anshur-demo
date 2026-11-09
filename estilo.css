@@ -636,3 +636,22 @@ body.so-leitura .aprov .acoes, body.so-leitura .aprov button { display: none !im
 @keyframes folha-sobe { from { transform: translateY(40%); opacity: 0; } to { transform: none; opacity: 1; } }
 @media (max-width: 560px) { .cabecalho { gap: 8px; } .cabecalho #instalar-btn { display: none; } .marca-movel .logo-img { width: 104px; } .cabecalho .sino { width: 40px; height: 40px; } .cabecalho .cab-nova { min-width: 44px; min-height: 40px; padding: 0 10px; } .cabecalho .avatar { width: 40px; height: 40px; } }
 @media (max-width: 959px) { .cabecalho .marca-movel { margin-right: auto; } }
+/* relatório de margem por marca */
+.relatorio-margem .tabela td, .relatorio-margem .tabela th { white-space: nowrap; }
+.relatorio-margem .tabela td.maq { white-space: normal; min-width: 180px; }
+.relatorio-margem .mg-total td { border-top: 2px solid var(--linha); }
+.relatorio-margem .mg-falta { display: block; font-size: 12px; margin-top: 2px; white-space: normal; }
+@page margem { size: A4 landscape; margin: 12mm; }
+@media print {
+  .abas-modo, .filtros-margem, .sem-impressao, .nv-faixa { display: none !important; }
+  .relatorio-margem { page: margem; }
+  .relatorio-margem .tabela-wrap { overflow: visible !important; }
+  .relatorio-margem .tabela { font-size: 10.5px; }
+  .relatorio-margem .tabela td, .relatorio-margem .tabela th { padding: 4px 6px; }
+  .relatorio-margem tr { break-inside: avoid; }
+  .relatorio-margem h2 { break-after: avoid; }
+}
+/* itens do menu que o perfil não pode abrir ficam escondidos (o display:flex do .menu a anulava o hidden) */
+.menu a[hidden], .menu-grupo[hidden] { display: none !important; }
+@media print { .casca { display: block !important; } .principal { padding: 0 !important; } main { max-width: none !important; } }
+@media print { main:has(.relatorio-margem) > .titulo { display: none !important; } }

@@ -79,6 +79,13 @@
   }
   for (let i = 0; i < 52; i++) nova(true);
   for (let i = 0; i < 9; i++) nova(false);
+  // custos lançados depois da venda (sem sorteio, para não mudar os números acima): em 2 de cada 3 vendas a comissão
+  // foi registrada; em algumas, o usado ficou no floor plan da revenda e os juros também foram lançados
+  TROCAS.filter((t) => t.vendido).forEach((t, i) => {
+    if (i % 3 === 2) return;
+    t.custos = { comissao: Math.round(t.vendido * 0.015 / 100) * 100 };
+    if (i % 4 === 0 && t.diasPatio > 60) t.custos.juros = Math.round(t.pago * 0.011 * (t.diasPatio - 60) / 30 / 100) * 100;
+  });
 
   // ---- garantias: serviços feitos na oficina em garantia e o que o fabricante pagou ----
   const GARANTIAS = [];

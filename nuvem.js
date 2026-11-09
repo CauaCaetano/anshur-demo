@@ -1,6 +1,8 @@
 // Conta e servidor do ambiente real (Supabase). A demonstração não usa nada daqui: segue 100% no navegador.
 // Fluxo do ambiente real: entrar → escolher (ou criar) a revenda → carregar o estado do servidor → abrir o app.
-// Salva com espera curta e número de versão (concorrência otimista). Sem internet, abre a última cópia só para leitura.
+// Cada gravação vira operações pequenas com id numa fila guardada no aparelho (revenda + pessoa); a fila é enviada com
+// número de versão e, em conflito, reaplicada sobre a versão nova do servidor. Sem internet, abre a última cópia e continua
+// consultando e cadastrando; o que for feito espera a internet voltar.
 (function (raiz) {
   'use strict';
   // ---------- partes puras (testadas em testes.js) ----------
@@ -75,7 +77,76 @@
     const achou = T.find(([re]) => re.test(m));
     return achou ? achou[1] : 'Não foi possível concluir. Tente de novo.';
   }
-  const PURO = { mesclar, temDados, mensagem, chaveTroca };
+  // ---------- fila de alterações (modo offline do pátio) ----------
+  // Cada gravação do app vira uma lista de operações pequenas, com id, calculadas pela diferença entre o que o app
+  // tinha e o que tem agora. As operações são reaplicadas sobre a versão ATUAL do servidor: inserir/atualizar um item
+  // pelo id, tirar um item pelo id, gravar uma chave de mapa, anexar um preço. Reaplicar a mesma operação não duplica
+  // nada (idempotente) e o que outra pessoa salvou nos outros itens continua lá.
+  const LISTAS_ID = ['avaliacoes', 'fechadas', 'historico', 'documentos', 'atividades', 'pendentes', 'usuarios', 'modelosExtra'];
+  const EXTRAS = ['garantias', 'financiadas', 'compradores', 'anuncios'];
+  const MAPAS_OP = ['precos', 'vendas', 'preparos', 'resolvidos', 'retratos', 'custos'];
+  const js = (x) => JSON.stringify(x);
+  const copia = (x) => (x === undefined ? undefined : JSON.parse(JSON.stringify(x)));
+  let seqOp = 0;
+  const novoId = () => Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8) + (seqOp++).toString(36);
+  function diferenca(antes, depois, lote) {
+    const a = antes || {}, d = depois || {}, ops = [], lt = lote || novoId();
+    const add = (o) => ops.push(Object.assign({ oid: novoId(), lote: lt }, o));
+    const listas = (la, ld, nome) => {
+      la = Array.isArray(la) ? la : []; ld = Array.isArray(ld) ? ld : [];
+      const ma = new Map(la.map((x) => [idDe(x), x])), vistos = new Set();
+      // atividades novas entram no começo da lista: gera do mais antigo para o mais novo
+      (nome === 'atividades' ? ld.slice().reverse() : ld).forEach((x) => {
+        const id = idDe(x); vistos.add(id);
+        if (!ma.has(id) || js(ma.get(id)) !== js(x)) add({ t: 'item', l: nome, id, v: copia(x) });
+      });
+      ma.forEach((x, id) => { if (!vistos.has(id)) add({ t: 'tirar', l: nome, id }); });
+    };
+    LISTAS_ID.forEach((k) => { if (a[k] !== undefined || d[k] !== undefined) listas(a[k], d[k], k); });
+    const ea = a.extras || {}, ed = d.extras || {};
+    EXTRAS.forEach((k) => { if (ea[k] !== undefined || ed[k] !== undefined) listas(ea[k], ed[k], 'extras.' + k); });
+    new Set([...Object.keys(ea), ...Object.keys(ed)]).forEach((k) => { if (!EXTRAS.includes(k) && js(ea[k]) !== js(ed[k])) add({ t: 'campo', c: 'extras.' + k, v: copia(ed[k]) }); });
+    MAPAS_OP.forEach((m) => {
+      const ma = (a[m] && typeof a[m] === 'object') ? a[m] : {}, md = (d[m] && typeof d[m] === 'object') ? d[m] : {};
+      Object.keys(md).forEach((k) => {
+        const va = ma[k], vd = md[k];
+        if (js(va) === js(vd)) return;
+        // preços: o histórico só cresce; anexar não apaga o preço que outra pessoa lançou na mesma máquina
+        if (m === 'precos' && Array.isArray(vd) && (va === undefined || (Array.isArray(va) && vd.length > va.length && js(vd.slice(0, va.length)) === js(va)))) {
+          vd.slice(va ? va.length : 0).forEach((v) => add({ t: 'anexar', m, k, v: copia(v) }));
+        } else add({ t: 'chave', m, k, v: copia(vd) });
+      });
+      Object.keys(ma).forEach((k) => { if (!(k in md)) add({ t: 'apagar', m, k }); });
+    });
+    const fixos = new Set([...LISTAS_ID, ...MAPAS_OP, 'extras']);
+    new Set([...Object.keys(a), ...Object.keys(d)]).forEach((k) => { if (!fixos.has(k) && js(a[k]) !== js(d[k])) add({ t: 'campo', c: k, v: copia(d[k]) }); });
+    return ops;
+  }
+  function aplicarOps(base, ops) {
+    const r = copia(base || {}) || {};
+    const lista = (nome) => {
+      if (nome.startsWith('extras.')) { const k = nome.slice(7); r.extras = r.extras && typeof r.extras === 'object' ? r.extras : {}; if (!Array.isArray(r.extras[k])) r.extras[k] = []; return r.extras[k]; }
+      if (!Array.isArray(r[nome])) r[nome] = [];
+      return r[nome];
+    };
+    const mapa = (m) => { if (!r[m] || typeof r[m] !== 'object' || Array.isArray(r[m])) r[m] = {}; return r[m]; };
+    (ops || []).forEach((o) => {
+      if (o.t === 'item') { const L = lista(o.l), i = L.findIndex((x) => idDe(x) === o.id); if (i >= 0) L[i] = copia(o.v); else if (o.l === 'atividades') L.unshift(copia(o.v)); else L.push(copia(o.v)); }
+      else if (o.t === 'tirar') { const L = lista(o.l); for (let i = L.length - 1; i >= 0; i--) if (idDe(L[i]) === o.id) L.splice(i, 1); }
+      else if (o.t === 'chave') mapa(o.m)[o.k] = copia(o.v);
+      else if (o.t === 'apagar') { if (r[o.m] && typeof r[o.m] === 'object') delete r[o.m][o.k]; }
+      else if (o.t === 'anexar') { const M = mapa(o.m); if (!Array.isArray(M[o.k])) M[o.k] = []; if (!M[o.k].some((x) => js(x) === js(o.v))) M[o.k].push(copia(o.v)); }
+      else if (o.t === 'campo') {
+        const alvo = o.c.startsWith('extras.') ? (r.extras = r.extras && typeof r.extras === 'object' ? r.extras : {}) : r, k = o.c.startsWith('extras.') ? o.c.slice(7) : o.c;
+        if (o.v === undefined) delete alvo[k]; else alvo[k] = copia(o.v);
+      }
+    });
+    if (Array.isArray(r.atividades) && r.atividades.length > 600) r.atividades.length = 600;
+    return r;
+  }
+  // quantas alterações (gravações do app) ainda esperam o servidor
+  const alteracoes = (fila) => new Set((fila || []).map((o) => o.lote)).size;
+  const PURO = { mesclar, temDados, mensagem, chaveTroca, diferenca, aplicarOps, alteracoes };
   raiz.NUVEM_PURO = PURO;
   if (typeof module !== 'undefined' && module.exports) module.exports = PURO;
   if (typeof document === 'undefined') return;
@@ -135,7 +206,8 @@
   .nv-giro{width:22px;height:22px;border:3px solid rgba(17,24,32,.15);border-top-color:#C1A36A;border-radius:50%;animation:nvg 1s linear infinite;margin:0 auto 12px}
   @keyframes nvg{to{transform:rotate(360deg)}}
   .nv-faixa{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:70;background:#111820;color:#F4F0E8;font:600 13px/1.3 Inter,system-ui,sans-serif;padding:8px 14px;border-radius:999px;box-shadow:0 10px 30px -12px rgba(0,0,0,.5);max-width:calc(100% - 32px);text-align:center}
-  .nv-faixa.erro{background:#9E3F3B}.nv-faixa[hidden]{display:none}
+  .nv-faixa.erro{background:#9E3F3B}.nv-faixa.espera{background:#7A6131}.nv-faixa[hidden]{display:none}
+  .nv-faixa-bt{margin-left:10px;background:#F4F0E8;color:#111820;border:0;border-radius:999px;padding:4px 10px;font:inherit;font-size:12px;cursor:pointer}
   @media (max-width:900px){.nv-faixa{bottom:84px}}
   @media (prefers-reduced-motion:reduce){.nv-giro{animation:none}}`;
   document.head.appendChild(css);
@@ -165,6 +237,11 @@
       s.onload = () => ok(); s.onerror = () => erro(new Error('Failed to fetch'));
       document.head.appendChild(s);
     });
+  }
+
+  function criarCliente() {
+    sb = raiz.supabase.createClient(CFG.url, CFG.chave, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storageKey: 'anshur-auth' } });
+    N.sb = sb;
   }
 
   // ---------- telas de conta ----------
@@ -354,77 +431,154 @@
     };
   }
 
+  // cópia do aparelho: só o que o servidor CONFIRMOU (dados + versão). O que ainda não foi confirmado fica na fila.
   function gravarCache() {
     ls.set(CHAVE_CACHE, JSON.stringify({ usuario: N.usuario.id, email: N.usuario.email, revenda: N.revenda, eu: N.eu, membros: N.membros, dados: N.dados, versao: N.versao, quando: new Date().toISOString() }));
   }
 
-  // sem internet: abre a última cópia desta conta neste aparelho, só para leitura
+  // sem internet: abre a última cópia desta conta neste aparelho; consulta e cadastro continuam e vão para a fila
   function abrirOffline() {
     let c = null; try { c = JSON.parse(ls.get(CHAVE_CACHE)); } catch (e) { c = null; }
     let sessao = null; try { sessao = JSON.parse(ls.get('anshur-auth')); } catch (e) { sessao = null; }
     const uid = sessao && (sessao.user ? sessao.user.id : sessao.currentSession && sessao.currentSession.user && sessao.currentSession.user.id);
     if (!c || !uid || c.usuario !== uid) { telaErro('Sem internet, e não há uma cópia desta conta neste aparelho. Conecte-se e tente de novo.'); return; }
     Object.assign(N, { revenda: c.revenda, eu: c.eu, membros: c.membros || [], dados: c.dados, versao: c.versao, usuario: { id: c.usuario, email: c.email } });
-    N.offline = true; N.somenteLeitura = true;
-    N.motivoLeitura = `Sem internet: só leitura (cópia de ${new Date(c.quando).toLocaleString('pt-BR')}).`;
+    N.offline = true; N.copiaDe = c.quando; semConexao = true;
+    N.somenteLeitura = (c.eu && c.eu.perfil === 'auditor') || (c.revenda && c.revenda.plano === 'suspenso');
+    N.motivoLeitura = !N.somenteLeitura ? '' : c.eu && c.eu.perfil === 'auditor' ? 'Perfil de auditor: só leitura.' : 'Conta suspensa: só leitura.';
     iniciar();
   }
 
-  // ---------- faixa de situação (salvando, salvo, sem internet, só leitura) ----------
+  // ---------- faixa de situação (enviando, salvo no servidor, esperando internet, só leitura) ----------
   let faixa = null, faixaTimer = null;
-  function situacao(texto, tipo = '', fixo = false) {
-    if (!faixa) { faixa = document.createElement('div'); faixa.className = 'nv-faixa'; faixa.setAttribute('role', 'status'); faixa.setAttribute('aria-live', 'polite'); document.body.appendChild(faixa); }
+  function situacao(texto, tipo = '', fixo = false, acao = null) {
+    if (!faixa) { faixa = document.createElement('div'); faixa.className = 'nv-faixa'; faixa.id = 'nv-faixa'; faixa.setAttribute('role', 'status'); faixa.setAttribute('aria-live', 'polite'); document.body.appendChild(faixa); }
     faixa.textContent = texto; faixa.className = 'nv-faixa' + (tipo ? ' ' + tipo : ''); faixa.hidden = !texto;
+    if (acao) { const b = document.createElement('button'); b.type = 'button'; b.className = 'nv-faixa-bt'; b.textContent = acao.rotulo; b.onclick = acao.fn; faixa.appendChild(b); }
     clearTimeout(faixaTimer); if (!fixo && texto) faixaTimer = setTimeout(() => { faixa.hidden = true; }, 2500);
   }
 
-  // ---------- salvar: espera curta, um envio por vez, versão esperada ----------
-  let pendente = null, timer = null, enviando = null, tentativas = 0;
+  // ---------- fila de alterações: guardada no aparelho por revenda + pessoa, enviada quando há internet ----------
+  let fila = [], vista = {}, filaNoAparelho = true, timer = null, sincronizando = null, deNovo = false, tentativas = 0, semConexao = false;
+  const chaveFila = () => 'anshur-fila:' + N.revenda.id + ':' + N.usuario.id;
+  const semRede = () => !navigator.onLine || semConexao;
+  function lerFila() { try { const f = JSON.parse(ls.get(chaveFila())); return Array.isArray(f && f.ops) ? f.ops : []; } catch (e) { return []; } }
+  function gravarFila() {
+    if (!fila.length) { ls.del(chaveFila()); filaNoAparelho = true; return true; }
+    filaNoAparelho = ls.set(chaveFila(), JSON.stringify({ ops: fila, quando: new Date().toISOString() }));
+    return filaNoAparelho;
+  }
+  // o app abre com o que o servidor confirmou + o que ainda está na fila deste aparelho
+  function prepararVista() { fila = lerFila(); N.vista = fila.length ? aplicarOps(N.dados, fila) : N.dados; vista = copia(N.vista) || {}; }
+  N.marcarVista = (d) => { vista = copia(d) || {}; };
+  N.pendentes = () => alteracoes(fila);
+  N.semInternet = () => semRede();
+  const avisar = () => { try { window.dispatchEvent(new CustomEvent('anshur:nuvem', { detail: { pendentes: alteracoes(fila), offline: semRede() } })); } catch (e) { /* sem evento */ } };
+  function mostrarFila() {
+    const n = alteracoes(fila);
+    N.offline = semRede();
+    if (n && semRede()) situacao(`${n} ${n === 1 ? 'alteração esperando' : 'alterações esperando'} internet · guardada${n === 1 ? '' : 's'} neste aparelho`, 'espera', true);
+    else if (n) situacao(`Enviando ${n} ${n === 1 ? 'alteração' : 'alterações'}…`, '', true);
+    else if (semRede()) situacao(N.somenteLeitura ? N.motivoLeitura : 'Sem internet: o que você cadastrar fica guardado neste aparelho e é enviado quando a internet voltar.', 'espera', true);
+    avisar();
+  }
+  // nunca diz "salvo" antes da resposta do servidor: aqui só entra na fila
   N.salvar = (d) => {
-    if (N.somenteLeitura) { situacao(N.motivoLeitura || 'Só leitura.', 'erro', N.offline); return false; }
-    pendente = d; clearTimeout(timer); timer = setTimeout(enviar, 1200);
-    situacao('Salvando…', '', true);
+    if (N.somenteLeitura) { situacao(N.motivoLeitura || 'Só leitura.', 'erro', true); return false; }
+    const ops = diferenca(vista, d);
+    vista = copia(d) || {};
+    if (!ops.length) return true;
+    fila.push(...ops);
+    if (!gravarFila()) situacao('Sem espaço neste aparelho para guardar as alterações. Não feche o Anshur até a internet voltar.', 'erro', true);
+    else mostrarFila();
+    clearTimeout(timer); timer = null;
+    if (navigator.onLine) timer = setTimeout(sincronizar, semConexao ? 3000 : 1200);
     return true;
   };
-  async function enviar() {
-    clearTimeout(timer);
-    if (enviando) { await enviando; if (pendente) return enviar(); return; }
-    if (!pendente) return;
-    const dados = JSON.parse(JSON.stringify(pendente)); pendente = null;
-    enviando = (async () => {
-      const { data, error } = await sb.rpc('anshur_salvar', { p_revenda: N.revenda.id, p_dados: dados, p_versao_esperada: N.versao });
-      if (!error) { N.versao = data; N.dados = dados; tentativas = 0; gravarCache(); if (!pendente) situacao('Salvo'); return; }
-      const m = String(error.message || '');
-      if (/anshur_conflito/.test(m)) { conflito(); return; }
-      if (/anshur_(somente_leitura|sem_acesso|suspensa)/.test(m)) { N.somenteLeitura = true; N.motivoLeitura = mensagem(error); situacao(N.motivoLeitura, 'erro', true); return; }
-      if (/anshur_grande_demais|anshur_dados_invalidos/.test(m)) { situacao(mensagem(error), 'erro', true); return; }
-      // falha de rede: guarda e tenta de novo
-      if (!pendente) pendente = dados;
-      tentativas++;
-      situacao('Sem conexão: alterações ainda não enviadas. Não feche o Anshur.', 'erro', true);
-      timer = setTimeout(enviar, Math.min(30000, 3000 * tentativas));
+  async function conectar() {
+    if (!sb) { await carregarLib(); criarCliente(); }
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) throw new Error('sem_sessao');
+  }
+  async function buscarServidor() {
+    const { data, error } = await sb.from('anshur_estado').select('dados,versao').eq('revenda', N.revenda.id).maybeSingle();
+    if (error || !data) return false;
+    N.dados = data.dados || {}; N.versao = data.versao; return true;
+  }
+  function falhaRede() {
+    tentativas++; semConexao = true; mostrarFila();
+    clearTimeout(timer); timer = navigator.onLine ? setTimeout(() => { semConexao = false; sincronizar(); }, Math.min(30000, 3000 * tentativas)) : null;
+  }
+  // envia a fila: aplica as operações sobre a versão do servidor; em conflito, busca a versão nova e reaplica
+  async function sincronizar() {
+    clearTimeout(timer); timer = null;
+    if (sincronizando) { deNovo = true; return sincronizando; }
+    if (!fila.length || N.somenteLeitura) { mostrarFila(); return; }
+    if (!navigator.onLine) { semConexao = true; mostrarFila(); return; }
+    let juntou = false;
+    sincronizando = (async () => {
+      try { await conectar(); } catch (e) {
+        if (String(e && e.message) === 'sem_sessao') { situacao('Sessão vencida: entre de novo para enviar as alterações guardadas neste aparelho.', 'erro', true, { rotulo: 'Entrar', fn: () => location.reload() }); return; }
+        falhaRede(); return;
+      }
+      for (let volta = 0; volta < 6; volta++) {
+        const lote = fila.slice(), dados = aplicarOps(N.dados, lote);
+        let resp; try { resp = await sb.rpc('anshur_salvar', { p_revenda: N.revenda.id, p_dados: dados, p_versao_esperada: N.versao }); } catch (e) { resp = { error: e }; }
+        const { data, error } = resp;
+        if (!error) {
+          N.dados = dados; N.versao = data; semConexao = false; tentativas = 0;
+          const enviados = new Set(lote.map((o) => o.oid)); fila = fila.filter((o) => !enviados.has(o.oid));
+          gravarCache(); gravarFila();
+          if (fila.length) { deNovo = true; return; }
+          N.offline = false;
+          enviarEventosGuardados();
+          if (juntou) situacao('Salvo no servidor, junto com o que outra pessoa salvou ao mesmo tempo.', '', true, { rotulo: 'Atualizar a tela', fn: () => location.reload() });
+          else situacao('Salvo no servidor');
+          avisar();
+          return;
+        }
+        const m = String(error.message || error || '');
+        if (/anshur_conflito/.test(m)) {
+          let ok = false; try { ok = await buscarServidor(); } catch (e) { ok = false; }
+          if (!ok) { falhaRede(); return; }
+          juntou = true; continue;
+        }
+        if (/anshur_(somente_leitura|sem_acesso|suspensa)/.test(m)) { N.somenteLeitura = true; N.motivoLeitura = mensagem(error); situacao(N.motivoLeitura + ' As alterações guardadas não foram enviadas.', 'erro', true); return; }
+        if (/anshur_grande_demais|anshur_dados_invalidos/.test(m)) { situacao(mensagem(error), 'erro', true); return; }
+        falhaRede(); return;
+      }
+      situacao('Muitas pessoas salvando ao mesmo tempo. Tentando de novo…', 'erro', true);
+      timer = setTimeout(sincronizar, 4000);
     })();
-    await enviando; enviando = null;
-    if (pendente && !timer) timer = setTimeout(enviar, 400);
+    try { await sincronizando; } finally { sincronizando = null; }
+    if (deNovo && fila.length && !semRede()) { deNovo = false; return sincronizar(); }
+    deNovo = false;
   }
-  function conflito() {
-    pendente = null; clearTimeout(timer);
-    tela.hidden = false;
-    caixa(`<h1 id="nv-t">Os dados mudaram</h1><p>Outra pessoa da revenda salvou alterações enquanto você trabalhava. Para não apagar o que ela fez, vamos abrir a versão mais nova. Confira e refaça a sua última alteração, se ela não aparecer.</p>
-      <button class="nv-bt" type="button" id="nv-rec">Abrir a versão mais nova</button>`);
-    tela.querySelector('#nv-rec').onclick = () => location.reload();
-  }
-  // termina de salvar antes de recarregar a página
-  N.descarregar = async () => { if (pendente || enviando) { situacao('Salvando…', '', true); await enviar(); if (enviando) await enviando; } return !pendente; };
+  // termina de enviar antes de recarregar a página (sem internet, a fila já está guardada no aparelho)
+  N.descarregar = async () => { if (fila.length && !semRede()) { clearTimeout(timer); await sincronizar(); } return !fila.length; };
   N.recarregar = async () => { await N.descarregar(); location.reload(); };
-  window.addEventListener('beforeunload', (e) => { if (pendente || enviando) { e.preventDefault(); e.returnValue = ''; } });
-  window.addEventListener('online', () => { if (N.offline) situacao('Internet de volta. Recarregue para editar.', '', true); else if (pendente) enviar(); });
-  window.addEventListener('offline', () => { if (!N.offline) situacao('Sem internet: o que você mudar fica esperando para ser enviado.', 'erro', true); });
+  window.addEventListener('beforeunload', (e) => { if (fila.length && !filaNoAparelho) { e.preventDefault(); e.returnValue = ''; } });
+  window.addEventListener('online', () => { if (!N.revenda) return; semConexao = false; N.offline = false; tentativas = 0; if (fila.length) sincronizar(); else { situacao('Internet de volta.'); avisar(); } });
+  window.addEventListener('offline', () => { if (!N.revenda) return; semConexao = true; mostrarFila(); });
 
   // ---------- auditoria no servidor (atividades críticas) ----------
+  // sem internet, o evento espera no aparelho e vai para a trilha depois que a fila for salva no servidor
+  const chaveEventos = () => 'anshur-eventos:' + N.revenda.id + ':' + N.usuario.id;
+  function guardarEvento(tipo, texto, jaMarcado) {
+    let l = []; try { l = JSON.parse(ls.get(chaveEventos())) || []; } catch (e) { l = []; }
+    l.push({ tipo, texto: jaMarcado ? texto : String(texto).slice(0, 440) + ' (feito sem internet em ' + new Date().toLocaleString('pt-BR') + ')' });
+    ls.set(chaveEventos(), JSON.stringify(l.slice(-200)));
+  }
+  async function enviarEventosGuardados() {
+    let l = []; try { l = JSON.parse(ls.get(chaveEventos())) || []; } catch (e) { l = []; }
+    if (!l.length || !sb) return;
+    ls.del(chaveEventos());
+    for (const ev of l) { try { const { error } = await sb.rpc('anshur_registrar_evento', { p_revenda: N.revenda.id, p_tipo: ev.tipo, p_texto: ev.texto.slice(0, 500) }); if (error) throw error; } catch (e) { guardarEvento(ev.tipo, ev.texto, true); } }
+  }
   function evento(tipo, texto) {
-    if (!sb || N.offline || !N.revenda) return;
-    sb.rpc('anshur_registrar_evento', { p_revenda: N.revenda.id, p_tipo: tipo, p_texto: String(texto).slice(0, 500) }).then(() => {}, () => {});
+    if (!N.revenda) return;
+    if (!sb || semRede()) { guardarEvento(tipo, texto); return; }
+    sb.rpc('anshur_registrar_evento', { p_revenda: N.revenda.id, p_tipo: tipo, p_texto: String(texto).slice(0, 500) }).then((r) => { if (r && r.error && /fetch|network/i.test(String(r.error.message))) guardarEvento(tipo, texto); }, () => guardarEvento(tipo, texto));
   }
   N.evento = evento;
 
@@ -482,10 +636,12 @@
     }
     const { error } = await sb.rpc('anshur_excluir_revenda', { p_revenda: N.revenda.id, p_confirmacao: confirmacao });
     if (error) throw new Error(mensagem(error));
+    fila = []; ls.del(chaveFila()); ls.del(chaveEventos());
     ls.del(CHAVE_CACHE); ls.del(CHAVE_REVENDA);
   };
   async function sair() {
     await N.descarregar().catch(() => {});
+    if (fila.length && !confirm(`${alteracoes(fila)} alterações ainda não foram enviadas ao servidor. Elas continuam guardadas neste aparelho e são enviadas quando você entrar de novo com internet. Sair mesmo assim?`)) return;
     ls.del(CHAVE_CACHE); ls.del(CHAVE_REVENDA);
     try { await sb.auth.signOut(); } catch (e) { /* sai mesmo sem rede */ }
     ls.del('anshur-auth');
@@ -496,17 +652,24 @@
 
   function iniciar() {
     tela.hidden = true; tela.innerHTML = '';
+    prepararVista();
     raiz.ANSHUR_NUVEM = N;
-    if (N.somenteLeitura) situacao(N.motivoLeitura, N.offline ? 'erro' : '', true);
+    if (N.somenteLeitura) situacao(N.motivoLeitura + (fila.length ? ` ${alteracoes(fila)} alterações guardadas neste aparelho não podem ser enviadas.` : ''), N.offline ? 'erro' : '', true);
+    else if (N.offline) {
+      if (fila.length) mostrarFila();
+      else situacao(`Sem internet: usando a cópia deste aparelho (${new Date(N.copiaDe).toLocaleString('pt-BR')}). O que você cadastrar fica guardado e é enviado quando a internet voltar.`, 'espera', true);
+    }
     carregarApp();
+    // abriu com alterações guardadas de antes (aba fechada sem internet): envia agora
+    if (fila.length && !N.somenteLeitura && navigator.onLine) setTimeout(sincronizar, 600);
+    else if (!N.offline && sb) setTimeout(enviarEventosGuardados, 1500);
   }
 
   // ---------- partida ----------
   (async () => {
     carregando('Conectando…');
     try { await carregarLib(); } catch (e) { abrirOffline(); return; }
-    sb = raiz.supabase.createClient(CFG.url, CFG.chave, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storageKey: 'anshur-auth' } });
-    N.sb = sb;
+    criarCliente();
     if (recuperando) {
       sb.auth.onAuthStateChange((ev) => { if (ev === 'PASSWORD_RECOVERY') telaNovaSenha(); });
       const { data: { session } } = await sb.auth.getSession();

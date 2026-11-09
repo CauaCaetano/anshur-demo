@@ -15,7 +15,9 @@
   document.addEventListener('click', (e) => { if (!menuPerfil.hidden && !menuPerfil.contains(e.target)) { menuPerfil.hidden = true; btnPerfil.setAttribute('aria-expanded', 'false'); } });
   const OP = K.ambiente === 'op';
   const NV = K.nuvem; // conta no servidor (só no ambiente real)
-  $('.selo-demo').textContent = OP ? (NV && NV.offline ? 'Sem internet · só leitura' : 'Minha revenda') : 'Dados demonstrativos';
+  const seloNuvem = () => { if (!NV) return; const n = NV.pendentes(); $('.selo-demo').textContent = NV.semInternet() ? 'Sem internet' + (n ? ` · ${n} esperando` : '') : n ? `Enviando ${n}…` : 'Minha revenda'; };
+  $('.selo-demo').textContent = OP ? (NV && NV.offline ? 'Sem internet' : 'Minha revenda') : 'Dados demonstrativos';
+  if (NV) { seloNuvem(); window.addEventListener('anshur:nuvem', seloNuvem); }
   $('.lateral-rodape').textContent = OP ? (NV ? 'Dados da sua revenda, guardados na conta da revenda.' : 'Dados reais da sua revenda, guardados só neste navegador.') : 'Dados demonstrativos de uma revenda fictícia.';
   const ehDono = () => K.usuarioAtual().perfil === 'dono';
   menuPerfil.innerHTML = `<p><b>${esc(K.usuarioAtual().nome)}</b><span>${K.PERFIS[K.usuarioAtual().perfil]} · ${esc(A.revenda.nome)}${OP ? ' · dados reais' : ''}${NV ? '<br>' + esc(NV.usuario.email || '') : ''}</span></p>
@@ -37,7 +39,7 @@
         <li>Cada pessoa entra com e-mail e senha próprios. O perfil (dono, gerente, vendedor, oficina, financeiro, auditor) é definido pelo dono e conferido pelo servidor.</li>
         <li>Trocas fechadas, aprovações, preços, vendas, convites e exclusões também vão para uma trilha no servidor que ninguém da revenda consegue alterar ou apagar.</li>
         <li>Documentos ficam numa pasta privada da revenda (até 10 MB cada); o link para abrir um original vale 2 minutos.</li>
-        <li>Sem internet, o Anshur abre a última cópia deste aparelho só para leitura.</li>
+        <li>Sem internet, o Anshur abre a última cópia deste aparelho: dá para consultar o pátio e cadastrar avaliações. O que for feito fica guardado no aparelho e é enviado quando a internet voltar; troca acima da alçada vira pedido de aprovação.</li>
         <li>O dono baixa uma cópia completa quando quiser (Configurações) e pode pedir a exclusão de tudo pelo menu do perfil.</li>
       </ul>` : `<ul style="margin:0;padding-left:20px;display:grid;gap:8px;font-size:16px">
         <li><b>Nesta versão, nada sai do seu computador.</b> Planilhas importadas, avaliações e trocas ficam guardadas só neste navegador.</li>
@@ -88,6 +90,10 @@
 
   // ---------- utilidades de interface ----------
   function toast(msg, erro) {
+    if (NV && !erro && NV.pendentes()) {
+      msg = String(msg).replace(/\b([Ss])alv(o|a|os|as)\b/g, (x, s1, f) => (s1 === 'S' ? 'G' : 'g') + 'uardad' + f);
+      if (/guardad|registrad|aplicad|lançad|enviad|marcad|adicionad|atualizad/i.test(msg)) msg += NV.semInternet() ? ' Fica neste aparelho e vai para o servidor quando a internet voltar.' : ' Enviando ao servidor…';
+    }
     const t = document.createElement('div'); t.className = 'toast' + (erro ? ' erro' : ''); t.setAttribute('role', erro ? 'alert' : 'status'); t.textContent = msg;
     $('#toasts').appendChild(t); setTimeout(() => { t.classList.add('saindo'); setTimeout(() => t.remove(), 220); }, 3200);
   }
@@ -286,6 +292,15 @@
   const anoAtual = new Date().getFullYear();
   const av = { passo: 1, tipo: 'trator', marca: 'Massey Ferguson', modelo: 'MF 4709', ano: anoAtual - 5, horas: 3900, local: 'Orlândia, SP', obs: '',
     ficha: { motor: 4, transmissao: 4, hidraulico: 3, pneus: 2, cabine: 4, lataria: 3 }, fotos: [], verif: { horimetro: false, notas: false, chassi: false }, declarado: '', fipe: '', anuncios: ['', '', ''] };
+  const AV0 = JSON.parse(JSON.stringify(av));
+  const chaveRascunho = () => (NV ? `anshur-rascunho:${NV.revenda.id}:${NV.usuario.id}` : 'anshur-rascunho-' + K.ambiente);
+  let rascunhoDe = null, rascunhoTimer = null;
+  try { const r = JSON.parse(localStorage.getItem(chaveRascunho())); if (r && r.av) { Object.assign(av, r.av); rascunhoDe = r.quando; } } catch (e) { /* sem rascunho */ }
+  // só guarda quando a avaliação mudou desde o último rascunho ou registro (cliques que não mudam nada não criam rascunho)
+  let rascunhoUltimo = JSON.stringify(av);
+  function guardarRascunho() { clearTimeout(rascunhoTimer); rascunhoTimer = setTimeout(() => { const j = JSON.stringify(av); if (j === rascunhoUltimo) return; rascunhoUltimo = j; try { rascunhoDe = new Date().toISOString(); localStorage.setItem(chaveRascunho(), JSON.stringify({ av, quando: rascunhoDe })); } catch (e) { /* sem espaço: segue sem rascunho */ } }, 250); }
+  function limparRascunho(zerar) { clearTimeout(rascunhoTimer); rascunhoDe = null; try { localStorage.removeItem(chaveRascunho()); } catch (e) { /* sem */ } if (zerar) Object.assign(av, JSON.parse(JSON.stringify(AV0))); rascunhoUltimo = JSON.stringify(av); }
+  ['input', 'change', 'click'].forEach((ev) => tela.addEventListener(ev, (e) => { if (e.target.closest && e.target.closest('#passo') && (location.hash || '') === '#avaliar') guardarRascunho(); }));
   const condDe = (f) => Math.round(FICHA.reduce((s, [k]) => s + f[k], 0) / FICHA.length * 20);
   const maqAv = () => ({ tipo: av.tipo, marca: av.marca, modelo: av.modelo, ano: av.ano, horas: av.horas, cond: condDe(av.ficha), ficha: { ...av.ficha } });
   const num = (s) => { const v = parseFloat(String(s).replace(/[^\d,.-]/g, '').replace(/\./g, '').replace(',', '.')); return isFinite(v) ? v : 0; };
@@ -295,11 +310,13 @@
     tela.innerHTML = `
       <div class="titulo"><div><h1>Avaliar troca</h1><p>Quanto vale pagar no usado que o cliente oferece, com base nas trocas que a ${esc(A.revenda.nome)} já vendeu.</p></div>${botaoAdicionar([{ nome: 'Preencher com documento', desc: 'Foto da nota ou do CRV da máquina', acao: () => { location.hash = '#documentos'; } }, { nome: 'Novo modelo no catálogo', desc: 'Modelo que ainda não está na lista', acao: () => { location.hash = '#config'; } }])}</div>
       <nav class="etapas" aria-label="Etapas da avaliação">${nomesPasso.map((n, i) => `<button type="button" data-p="${i + 1}" ${av.passo === i + 1 ? 'aria-current="step"' : ''} class="${av.passo > i + 1 ? 'feita' : ''}">${n}</button>`).join('')}</nav>
+      ${rascunhoDe ? `<p class="conta" id="rascunho-aviso">Rascunho guardado neste aparelho (${new Date(rascunhoDe).toLocaleString('pt-BR')}). <button class="link" type="button" id="rascunho-zerar">Começar do zero</button></p>` : ''}
       <div id="passo"></div>
       ${estado.avaliacoes.length ? `<section class="painel bloco"><div class="painel-cab"><h2>Avaliações registradas</h2><p>${estado.avaliacoes.length} nesta demonstração</p></div>
         <div class="tabela-wrap"><table class="tabela"><thead><tr><th>Data</th><th>Máquina</th><th class="n">Valor máximo</th><th class="n">Venda estimada</th></tr></thead><tbody>
         ${estado.avaliacoes.slice().reverse().map((a) => `<tr><td>${data(a.data)}</td><td class="maq"><b>${esc(a.maq.marca + ' ' + a.maq.modelo)}</b><span>${a.maq.ano} · ${a.maq.horas.toLocaleString('pt-BR')} h</span></td><td class="n">${mil(a.teto)}</td><td class="n">${mil(a.venda)}</td></tr>`).join('')}</tbody></table></div></section>` : ''}`;
     $$('.etapas button', tela).forEach((b) => b.onclick = () => irPasso(+b.dataset.p));
+    const zr = $('#rascunho-zerar'); if (zr) zr.onclick = () => { limparRascunho(true); telaAvaliar(); };
     desenharPasso();
   }
   function irPasso(p) {
@@ -369,7 +386,7 @@
         img.onload = () => {
           const cv = document.createElement('canvas'), k = Math.min(1, 640 / Math.max(img.width, img.height));
           cv.width = img.width * k; cv.height = img.height * k; cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
-          av.fotos[+inp.dataset.i] = cv.toDataURL('image/jpeg', 0.72); URL.revokeObjectURL(url);
+          av.fotos[+inp.dataset.i] = cv.toDataURL('image/jpeg', 0.72); guardarRascunho(); URL.revokeObjectURL(url);
           const lab = inp.parentNode; lab.classList.add('tem'); lab.style.backgroundImage = `url(${av.fotos[+inp.dataset.i]})`;
           toast('Foto adicionada.');
         };
@@ -458,7 +475,7 @@
     $('#registrar').onclick = (e) => {
       const b = e.currentTarget; b.classList.add('carregando');
       // a avaliação congela os números e as premissas do dia: não é recalculada quando o modelo muda
-      tirarRetrato(maq, r, { decisao: 'Avaliação registrada' }).then((rt) => { estado.avaliacoes.push({ retrato: rt.id, id: 'AV' + Date.now(), data: hojeISO(), maq, teto: r.teto, venda: r.venda, preparo: r.preparo, faixa: r.faixa, confianca: r.confianca, amostras: r.base, mape: r.qualidade ? r.qualidade.mape : null, premissas: { margemAlvo: r.margem, jurosMes: K.cfg.jurosMes } }); log('avaliacao', `Avaliação registrada: ${maq.marca} ${maq.modelo} ${maq.ano}, máximo ${real(r.teto)}`); salvar(); b.classList.remove('carregando'); toast('Avaliação registrada com retrato imutável.'); telaAvaliar(); });
+      tirarRetrato(maq, r, { decisao: 'Avaliação registrada' }).then((rt) => { estado.avaliacoes.push({ retrato: rt.id, id: 'AV' + Date.now(), data: hojeISO(), maq, teto: r.teto, venda: r.venda, preparo: r.preparo, faixa: r.faixa, confianca: r.confianca, amostras: r.base, mape: r.qualidade ? r.qualidade.mape : null, premissas: { margemAlvo: r.margem, jurosMes: K.cfg.jurosMes } }); log('avaliacao', `Avaliação registrada: ${maq.marca} ${maq.modelo} ${maq.ano}, máximo ${real(r.teto)}`); salvar(); limparRascunho(); b.classList.remove('carregando'); toast('Avaliação registrada com retrato imutável.'); telaAvaliar(); });
     };
     $('#premissas').onclick = abrirPremissas;
     $('#fechar-troca').onclick = () => abrirCamada('modal', `<h2>Fechar troca</h2><p class="sub">Registre o valor efetivamente negociado. Ele pode ser diferente do valor máximo recomendado.</p>
@@ -487,13 +504,15 @@
         if (!(v > 0)) { inp.focus(); toast('Informe o valor pago na troca.', true); return; }
         const acima = v > r.teto, aprov = $('#t-aprov', c).value.trim(), mot = $('#t-mot', c).value.trim();
         const nivel = nivelExigido(maq.tipo, v - r.teto);
+        // sem internet, a aprovação acima da alçada não vale: a troca vira pedido e só conta quando aprovada com internet
+        const semRedeAprov = acima && nivel !== 'livre' && NV && NV.semInternet();
         if (acima && !mot) { $('#t-mot', c).focus(); toast('Acima do recomendado: informe o motivo.', true); return; }
-        if (acima && nivel !== 'livre' && podeLiberar(nivel) && !aprov) { $('#t-aprov', c).focus(); toast('Informe quem aprovou.', true); return; }
-        if (acima && !podeLiberar(nivel)) {
+        if (acima && nivel !== 'livre' && podeLiberar(nivel) && !aprov && !semRedeAprov) { $('#t-aprov', c).focus(); toast('Informe quem aprovou.', true); return; }
+        if (acima && (!podeLiberar(nivel) || semRedeAprov)) {
           const rt = await tirarRetrato(maq, r, { valorPago: Math.round(v), decisao: 'Pedido de aprovação (' + NOME_NIVEL[nivel] + ')', motivo: mot });
-          const ped = { id: 'P' + Date.now(), nivel, retrato: rt.id, quando: new Date().toISOString(), por: eu().nome, maq, rec: { teto: r.teto, venda: r.venda, preparo: r.preparo, dias: r.dias, margem: r.margem, margemSobreVenda: r.margemSobreVenda, confianca: r.confianca, doTipo: r.doTipo, qualidade: r.qualidade ? { mape: r.qualidade.mape } : null }, valor: Math.round(v), data: dt, motivo: mot, status: 'pendente', extra: { vendedor: $('#t-vend', c).value, negociacao: av.nova || null, origem: av.local || 'Troca registrada', fotos: av.fotos.filter(Boolean), verif: { ...av.verif } } };
-          estado.pendentes.push(ped); log('aprovacao', `Pedido de aprovação: ${maq.marca} ${maq.modelo} por ${real(v)} (máximo ${real(r.teto)})`); salvar(); atualizarSino();
-          fecharCamada(true); toast(nivel === 'dono' ? 'Pedido enviado ao dono: para este tipo de máquina, só ele libera.' : 'Pedido enviado ao gerente. A troca só entra no pátio depois da aprovação.'); location.hash = '#aprovacoes'; return;
+          const ped = { id: 'P' + Date.now() + Math.random().toString(36).slice(2, 5), nivel, semInternet: !!semRedeAprov, retrato: rt.id, quando: new Date().toISOString(), por: eu().nome, maq, rec: { teto: r.teto, venda: r.venda, preparo: r.preparo, dias: r.dias, margem: r.margem, margemSobreVenda: r.margemSobreVenda, confianca: r.confianca, doTipo: r.doTipo, qualidade: r.qualidade ? { mape: r.qualidade.mape } : null }, valor: Math.round(v), data: dt, motivo: mot, status: 'pendente', extra: { vendedor: $('#t-vend', c).value, negociacao: av.nova || null, origem: av.local || 'Troca registrada', fotos: av.fotos.filter(Boolean), verif: { ...av.verif } } };
+          estado.pendentes.push(ped); log('aprovacao', `Pedido de aprovação: ${maq.marca} ${maq.modelo} por ${real(v)} (máximo ${real(r.teto)})${semRedeAprov ? ', feito sem internet' : ''}`); salvar(); limparRascunho(); atualizarSino();
+          fecharCamada(true); toast(semRedeAprov ? 'Sem internet: a troca virou pedido de aprovação (pendente). Ela só entra no pátio depois de aprovada com internet.' : nivel === 'dono' ? 'Pedido enviado ao dono: para este tipo de máquina, só ele libera.' : 'Pedido enviado ao gerente. A troca só entra no pátio depois da aprovação.'); location.hash = '#aprovacoes'; return;
         }
         const b = e.currentTarget; b.classList.add('carregando');
         const rtF = await tirarRetrato(maq, r, { valorPago: Math.round(v), decisao: acima ? (nivel === 'livre' ? 'Acima do teto, dentro da alçada do vendedor' : 'Acima do teto, aprovada por ' + aprov) : 'Dentro do valor máximo', motivo: mot });
@@ -501,7 +520,7 @@
           const t = K.fecharTroca(estado, maq, r, v, dt, { retrato: rtF.id, vendedor: $('#t-vend', c).value, negociacao: av.nova || null, aprovacao: acima ? { por: nivel === 'livre' ? eu().nome + ' (alçada do vendedor)' : aprov, motivo: mot, excesso: v - r.teto, data: hojeISO() } : null, origem: av.local || 'Troca registrada',
             manutencoes: av.declarado ? [{ servico: av.declarado, horas: av.horas, comNota: av.verif.notas }] : [], fotos: av.fotos.filter(Boolean), verif: { ...av.verif } });
           const id = t.id;
-          A.trocas.push({ ...t }); log('troca', `Troca fechada: ${t.marca} ${t.modelo} por ${real(t.pago)} (máximo recomendado ${real(r.teto)})${t.aprovacao ? `, acima do teto, aprovada por ${t.aprovacao.por}` : ''}`, { ref: t.id }); salvar(); cacheLimpa();
+          A.trocas.push({ ...t }); limparRascunho(); log('troca', `Troca fechada: ${t.marca} ${t.modelo} por ${real(t.pago)} (máximo recomendado ${real(r.teto)})${t.aprovacao ? `, acima do teto, aprovada por ${t.aprovacao.por}` : ''}`, { ref: t.id }); salvar(); cacheLimpa();
           fecharCamada(true);
           abrirCamada('modal', `<h2>Troca registrada</h2><p class="sub">${esc(t.marca + ' ' + t.modelo)} entrou no pátio por ${real(t.pago)}. O passaporte foi criado e a visão geral já foi atualizada.</p>
             <div class="acoes"><a class="btn btn-ouro" href="passaporte.html?id=${id}">Abrir passaporte</a><a class="btn btn-linha" href="#patio" id="ir-patio">Ver no pátio</a></div>`, (cc) => { $('#ir-patio', cc).onclick = () => fecharCamada(true); });
@@ -585,6 +604,8 @@
         <div class="campos">
           <div class="campo"><label for="g-venda">Valor da venda</label><input id="g-venda" inputmode="numeric" placeholder="R$"></div>
           <div class="campo"><label for="g-data">Data da venda</label><input id="g-data" type="date" value="${hojeISO()}" min="${t.entrada}" max="${hojeISO()}"></div>
+          <div class="campo"><label for="g-com">Comissão paga (R$, se já souber)</label><input id="g-com" inputmode="numeric" placeholder="Deixe vazio se não souber"></div>
+          <div class="campo"><label for="g-jur">Juros do floor plan (R$, se houver)</label><input id="g-jur" inputmode="numeric" placeholder="Deixe vazio se não houver"></div>
         </div>
         <div class="acoes" style="margin-top:12px"><button class="btn btn-ouro" type="button" id="g-vender">Registrar venda</button></div>
       </section>
@@ -627,9 +648,12 @@
         const v = num($('#g-venda', c).value), dv = $('#g-data', c).value;
         if (!(v > 0)) { $('#g-venda', c).focus(); toast('Informe o valor da venda.', true); return; }
         if (!dv || dv < t.entrada) { toast('A data da venda não pode ser antes da troca.', true); return; }
-        const res = v - t.pago - t.preparo;
+        const res = v - t.pago - t.preparo, comS = $('#g-com', c).value.trim(), jurS = $('#g-jur', c).value.trim();
         confirmar('Registrar venda?', `${t.marca} ${t.modelo} vendida por ${real(v)} em ${data(dv)}. Resultado bruto: ${real(res)} (${pct(res / v)}). A máquina sai do pátio.`, 'Registrar venda', () => {
-          K.registrarVenda(estado, t.id, v, dv); t.vendido = Math.round(v); t.saida = dv; t.diasPatio = diasEntre(t.entrada, dv); log('venda', `Venda registrada: ${t.marca} ${t.modelo} por ${real(v)}`, { ref: t.id }); salvar(); cacheLimpa();
+          K.registrarVenda(estado, t.id, v, dv); t.vendido = Math.round(v); t.saida = dv; t.diasPatio = diasEntre(t.entrada, dv);
+          const cs = {}; if (comS) cs.comissao = num(comS); if (jurS) cs.juros = num(jurS);
+          if (Object.keys(cs).length) t.custos = Object.assign({}, t.custos, K.registrarCustos(estado, t.id, cs, eu().nome));
+          log('venda', `Venda registrada: ${t.marca} ${t.modelo} por ${real(v)}`, { ref: t.id }); salvar(); cacheLimpa();
           toast('Venda registrada. Veja o previsto x realizado em Inteligência de trocas.'); rota();
         });
       };
@@ -1137,11 +1161,11 @@
   ];
   function criarMaquina(v, extra = {}) {
     const est = 3, cond = 70;
-    const id = 'M' + String(estado.fechadas.length + 1).padStart(3, '0') + (OP ? 'R' : '');
+    const id = 'M' + String(estado.fechadas.length + 1).padStart(3, '0') + (OP ? 'R' : '') + (NV ? Math.random().toString(36).slice(2, 6).toUpperCase() : '');
     const t = { id, tipo: v.tipo, marca: v.marca, modelo: v.modelo, ano: +v.ano, horas: +v.horas || 0, cond, ficha: { motor: est, transmissao: est, hidraulico: est, pneus: est, cabine: est, lataria: est },
       pago: Math.round(v.pago), preparo: Math.round(v.preparo || 0), preparoEst: null, vendido: v.vendido ? Math.round(v.vendido) : null, entrada: v.entrada, saida: v.saida || null,
       diasPatio: v.saida ? diasEntre(v.entrada, v.saida) : null, anuncio: Math.round(v.anuncio || v.pago * 1.15), precos: [{ data: v.entrada, valor: Math.round(v.anuncio || v.pago * 1.15), motivo: 'Anúncio inicial' }],
-      vendedor: v.vendedor || eu().nome, origem: v.origem || 'Cadastro manual', idAgro: false, manutencoes: [], fotos: [], chassi: v.chassi || '', ...extra };
+      vendedor: v.vendedor || eu().nome, origem: v.origem || 'Cadastro manual', idAgro: false, manutencoes: [], fotos: [], chassi: v.chassi || '', preparoInformado: v.preparo !== '' && v.preparo != null, ...extra };
     if (v.referencia) t.referencia = v.referencia;
     if (!M.catalogo(t) && v.referencia) A.modelos.push({ tipo: t.tipo, marca: t.marca, modelo: t.modelo, base: v.referencia, hAno: 800, importado: true });
     estado.fechadas.push(t); A.trocas.push({ ...t }); return t;
@@ -1490,6 +1514,7 @@
     return { vend, entr, venda, res, margem: venda ? res / venda : NaN, acima, garRec, atv, aval: estado.avaliacoes.filter((a) => dentro(a.data)).length, comprado: entr.reduce((s, t) => s + t.pago, 0), dias: vend.length ? vend.reduce((s, t) => s + (t.diasPatio || 0), 0) / vend.length : NaN };
   }
   function telaRelatorios() {
+    if (periodo === 'margem') return telaMargem();
     const atual = janela(periodo), ant = janela(periodo, 1), m = metricas(atual), p = metricas(ant);
     const nomeP = { diario: 'Diário', semanal: 'Semanal', mensal: 'Mensal' }[periodo];
     const delta = (a, b, inverso) => { if (!isFinite(a) || !isFinite(b) || b === 0) return '<span class="sub">sem comparação</span>'; const d = (a - b) / Math.abs(b); const bom = inverso ? d < 0 : d > 0; return `<span class="${bom ? 'pos' : 'neg'}">${d > 0 ? '▲' : '▼'} ${pct(Math.abs(d), 0)}</span> <span class="sub">vs período anterior</span>`; };
@@ -1499,7 +1524,7 @@
     tela.innerHTML = `
       <div class="titulo"><div><h1>Relatórios</h1><p>${nomeP}: ${data(atual[0])}${atual[0] !== atual[1] ? ' a ' + data(atual[1]) : ''}, comparado com ${data(ant[0])}${ant[0] !== ant[1] ? ' a ' + data(ant[1]) : ''}.</p></div>
         <div class="acoes"><button class="btn btn-linha" type="button" id="r-csv">Exportar CSV</button><button class="btn btn-linha" type="button" onclick="print()">Imprimir ou PDF</button>${botaoAdicionar([{ nome: 'Anotação no relatório', desc: 'Fica no histórico de atividades do período', acao: () => formulario('Adicionar anotação', [{ k: 'texto', r: 'Anotação', obr: true, inteiro: true }], {}, (v) => { log('anotacao', v.texto); salvar(); fecharCamada(true); toast('Anotação registrada.'); rota(); }) }])}</div></div>
-      <div class="abas-modo" role="group" aria-label="Período">${[['diario', 'Diário'], ['semanal', 'Semanal'], ['mensal', 'Mensal']].map(([k, n]) => `<button type="button" data-per="${k}" aria-pressed="${periodo === k}">${n}</button>`).join('')}</div>
+      ${abasRel()}
       <article class="relatorio" style="max-width:none">
         <img class="logo-img" src="logo/anshur-logo.png?v=5" alt="Anshur" width="190" height="48"><p class="sub" style="margin-top:6px">${esc(A.revenda.nome)} · relatório ${nomeP.toLowerCase()} · emitido em ${new Date().toLocaleString('pt-BR')} por ${esc(eu().nome)}</p>
         <div class="kpis" style="margin-top:18px">
@@ -1518,6 +1543,94 @@
         <p class="nota-rodape">Cada número vem dos registros do sistema. Valores estimados são estimativas. ${OP ? '' : 'Revenda e dados fictícios.'}</p></article>`;
     $$('[data-per]', tela).forEach((b) => b.onclick = () => { periodo = b.dataset.per; telaRelatorios(); });
     $('#r-csv').onclick = () => baixarCSV(`anshur-relatorio-${periodo}-${hojeISO()}.csv`, [['Indicador', 'Período atual', 'Período anterior'], ['Usados vendidos', m.vend.length, p.vend.length], ['Resultado bruto', Math.round(m.res), Math.round(p.res)], ['Margem realizada', isFinite(m.margem) ? (m.margem * 100).toFixed(1) + '%' : '', isFinite(p.margem) ? (p.margem * 100).toFixed(1) + '%' : ''], ['Pago acima do recomendado', Math.round(m.acima), Math.round(p.acima)], ['Trocas que entraram', m.entr.length, p.entr.length], ['Faturamento com usados', Math.round(m.venda), Math.round(p.venda)], ['Garantias recebidas', Math.round(m.garRec), Math.round(p.garRec)]]);
+  }
+
+  const abasRel = () => `<div class="abas-modo" role="group" aria-label="Tipo de relatório">${[['diario', 'Diário'], ['semanal', 'Semanal'], ['mensal', 'Mensal'], ['margem', 'Margem por marca']].map(([k, n]) => `<button type="button" data-per="${k}" aria-pressed="${periodo === k}">${n}</button>`).join('')}</div>`;
+
+  // ---------- RELATÓRIO DE MARGEM LÍQUIDA POR MARCA (e por tipo) ----------
+  // Só operações concluídas (vendidas). Real = preparo e comissão registrados; estimada = falta algum (sinalizado). Nada é inventado.
+  const fm = { de: '', ate: '', loja: null, agrupar: 'marca' };
+  const nomeMes = (m) => { const [a, b] = m.split('-'); return new Date(+a, +b - 1, 15).toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' }).replace('.', ''); };
+  const podeLancarCustos = () => ['dono', 'gerente', 'financeiro'].includes(eu().perfil) && !(NV && NV.somenteLeitura);
+  const pctCSV = (v) => (isFinite(v) ? (v * 100).toFixed(1).replace('.', ',') : '');
+  function telaMargem() {
+    const lojasVer = K.lojasPermitidas || estado.lojas;
+    if (fm.loja === null) fm.loja = estado.lojaAtual && lojasVer.includes(estado.lojaAtual) ? estado.lojaAtual : '';
+    if (fm.loja && !lojasVer.includes(fm.loja)) fm.loja = '';
+    const base = A.todasTrocas || A.trocas, mesHoje = hojeISO().slice(0, 7);
+    const vendMeses = base.filter((t) => t.vendido && t.saida).map((t) => t.saida.slice(0, 7));
+    const primeiro = vendMeses.length ? vendMeses.reduce((a, b) => (a < b ? a : b)) : mesHoje;
+    const meses = []; for (let [a, m] = primeiro.split('-').map(Number); `${a}-${String(m).padStart(2, '0')}` <= mesHoje; m === 12 ? (m = 1, a++) : m++) meses.push(`${a}-${String(m).padStart(2, '0')}`);
+    if (!fm.ate || !meses.includes(fm.ate)) fm.ate = mesHoje;
+    if (!fm.de || !meses.includes(fm.de)) { const d = new Date(mesHoje + '-15T12:00:00'); d.setMonth(d.getMonth() - 11); fm.de = d.toISOString().slice(0, 7) < primeiro ? primeiro : d.toISOString().slice(0, 7); }
+    if (fm.de > fm.ate) [fm.de, fm.ate] = [fm.ate, fm.de];
+    const r = K.relatorioMargem(base, { de: fm.de, ate: fm.ate, loja: fm.loja, lojas: K.lojasPermitidas, agrupar: fm.agrupar });
+    const nomeG = fm.agrupar === 'tipo' ? 'Tipo' : 'Marca', rotG = (c) => (fm.agrupar === 'tipo' ? NOMES[c] || c : c);
+    const pc = (v) => (isFinite(v) ? pct(v) : '—'), neg = (v) => (v < 0 ? 'neg' : '');
+    const sitG = (x) => (x.status === 'real' ? '<span class="tag comprovado">Real</span>' : `<span class="tag declarado">Estimada</span><span class="sub mg-falta">${[x.faltaPreparo ? `${x.faltaPreparo} sem preparo` : '', x.faltaComissao ? `${x.faltaComissao} sem comissão` : ''].filter(Boolean).join(' · ')}</span>`);
+    const sitO = (o) => (o.status === 'real' ? '<span class="tag comprovado">Real</span>' : `<span class="tag declarado">Estimada</span><span class="sub mg-falta">falta ${o.faltando.join(' e ')}${o.preparoPrevisto ? ` (preparo previsto ${real(o.preparoPrevisto)}, não somado)` : ''}</span>`);
+    const lancar = podeLancarCustos();
+    const periodoTxt = fm.de === fm.ate ? nomeMes(fm.de) : `${nomeMes(fm.de)} a ${nomeMes(fm.ate)}`;
+    const opt = (lista, sel) => lista.map(([v, n]) => `<option value="${esc(v)}" ${v === sel ? 'selected' : ''}>${esc(n)}</option>`).join('');
+    const mesesOpt = meses.slice().reverse().map((m) => [m, nomeMes(m)]);
+    const linhaNum = (x) => `<td class="n">${real(x.receita)}</td><td class="n">${real(x.aquisicao)}</td><td class="n">${real(x.preparo)}</td><td class="n">${real(x.juros)}</td><td class="n">${real(x.comissao)}</td><td class="n forte ${neg(x.margem)}">${real(x.margem)}</td><td class="n ${neg(x.margem)}">${pc(x.pct)}</td>`;
+    const cab = `<th class="n">Receita</th><th class="n">Aquisição</th><th class="n">Preparo</th><th class="n">Juros floor plan</th><th class="n">Comissão</th><th class="n">Margem líquida</th><th class="n">%</th>`;
+    tela.innerHTML = `
+      <div class="titulo"><div><h1>Relatórios</h1><p>Margem líquida por ${nomeG.toLowerCase()} das operações concluídas (vendidas), mês a mês.</p></div>
+        <div class="acoes"><button class="btn btn-linha" type="button" id="mg-csv">Exportar CSV</button><button class="btn btn-linha" type="button" id="mg-print">Imprimir ou PDF</button></div></div>
+      ${abasRel()}
+      <div class="campos filtros-margem" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:16px">
+        <div class="campo"><label for="mg-de">De</label><select id="mg-de">${opt(mesesOpt, fm.de)}</select></div>
+        <div class="campo"><label for="mg-ate">Até</label><select id="mg-ate">${opt(mesesOpt, fm.ate)}</select></div>
+        ${lojasVer.length ? `<div class="campo"><label for="mg-loja">Loja</label><select id="mg-loja">${opt([['', K.lojasPermitidas ? 'Minhas lojas' : 'Todas as lojas']].concat(lojasVer.map((l) => [l, l])), fm.loja)}</select></div>` : ''}
+        <div class="campo"><label for="mg-agr">Agrupar por</label><select id="mg-agr">${opt([['marca', 'Marca'], ['tipo', 'Tipo de máquina']], fm.agrupar)}</select></div>
+      </div>
+      <article class="relatorio relatorio-margem" style="max-width:none">
+        <img class="logo-img" src="logo/anshur-logo.png?v=5" alt="Anshur" width="190" height="48">
+        <p class="sub" style="margin-top:6px">${esc(A.revenda.nome)} · ${fm.loja ? 'loja ' + esc(fm.loja) : K.lojasPermitidas ? 'lojas ' + esc(K.lojasPermitidas.join(', ')) : 'todas as lojas'} · ${esc(periodoTxt)} · emitido em ${new Date().toLocaleString('pt-BR')} por ${esc(eu().nome)}</p>
+        <h2 style="margin-top:14px">Margem líquida por ${nomeG.toLowerCase()}</h2>
+        <div class="numeros"><div><span>Operações concluídas</span><b>${r.total.n} <small class="sub">(${r.total.nReal} reais · ${r.total.nEst} estimadas)</small></b></div><div><span>Receita (vendas)</span><b>${mil(r.total.receita)}</b></div>
+          <div><span>Custos registrados</span><b>${mil(r.total.aquisicao + r.total.preparo + r.total.juros + r.total.comissao)}</b></div><div><span>Margem líquida</span><b class="${neg(r.total.margem)}">${mil(r.total.margem)}</b></div><div><span>Margem líquida %</span><b class="${neg(r.total.margem)}">${pc(r.total.pct)}</b></div></div>
+        ${r.total.nEst ? `<p class="conta">${r.total.nEst} de ${r.total.n} operações estão com margem <b>estimada</b>: faltam custos registrados (${[r.total.faltaPreparo ? `preparo em ${r.total.faltaPreparo}` : '', r.total.faltaComissao ? `comissão em ${r.total.faltaComissao}` : ''].filter(Boolean).join(', ')}). O Anshur não inventa custo: a margem dessas operações usa só o que foi registrado e pode ser menor.${lancar ? ' Lance os custos em cada operação, abaixo.' : ''}</p>` : ''}
+        ${!r.total.n ? '<p class="conta">Nenhuma operação concluída (vendida) neste período e nesta loja.</p>' : `
+        <div class="tabela-wrap"><table class="tabela" id="mg-grupos"><thead><tr><th>${nomeG}</th><th class="n">Vendas</th>${cab}<th>Situação</th></tr></thead><tbody>
+          ${r.grupos.map((g) => `<tr><td><b>${esc(rotG(g.chave))}</b></td><td class="n">${g.n}</td>${linhaNum(g)}<td>${sitG(g)}</td></tr>`).join('')}
+          <tr class="mg-total"><td><b>Total</b></td><td class="n"><b>${r.total.n}</b></td>${linhaNum(r.total)}<td>${sitG(r.total)}</td></tr></tbody></table></div>
+        <h2>Mês a mês</h2>
+        <div class="tabela-wrap"><table class="tabela" id="mg-meses"><thead><tr><th>Mês</th><th>${nomeG}</th><th class="n">Vendas</th><th class="n">Receita</th><th class="n">Margem líquida</th><th class="n">%</th><th>Situação</th></tr></thead><tbody>
+          ${r.meses.map((x) => `<tr><td>${esc(nomeMes(x.mes))}</td><td>${esc(rotG(x.chave))}</td><td class="n">${x.n}</td><td class="n">${real(x.receita)}</td><td class="n forte ${neg(x.margem)}">${real(x.margem)}</td><td class="n ${neg(x.margem)}">${pc(x.pct)}</td><td>${x.status === 'real' ? '<span class="tag comprovado">Real</span>' : '<span class="tag declarado">Estimada</span>'}</td></tr>`).join('')}</tbody></table></div>
+        <h2>Operações</h2>
+        <div class="tabela-wrap"><table class="tabela" id="mg-ops"><thead><tr><th>Venda</th><th>Máquina</th>${lojasVer.length ? '<th>Loja</th>' : ''}${cab}<th>Situação</th>${lancar ? '<th class="sem-impressao"></th>' : ''}</tr></thead><tbody>
+          ${r.operacoes.map((o) => `<tr data-op="${esc(o.id)}"><td>${data(o.saida)}</td><td class="maq"><span><b>${esc(o.marca + ' ' + o.modelo)}</b><span>${esc(NOMES[o.tipo] || o.tipo)} · ${o.ano || ''}${o.pecas != null ? ` · peças ${real(o.pecas)}, mão de obra ${real(o.maoDeObra)} (${(o.horasOficina || 0).toLocaleString('pt-BR')} h)` : ''}</span></span></td>${lojasVer.length ? `<td>${esc(o.loja || '—')}</td>` : ''}${linhaNum(o)}<td>${sitO(o)}</td>${lancar ? `<td class="sem-impressao"><button class="link" type="button" data-custos="${esc(o.id)}">Lançar custos</button></td>` : ''}</tr>`).join('')}</tbody></table></div>`}
+        <p class="nota-rodape">Margem líquida = venda − valor pago na troca − preparo (peças e horas) − juros do floor plan − comissão. Real: preparo e comissão registrados. Estimada: falta algum desses custos; a margem mostrada usa só os custos registrados e pode ser menor. Juros do floor plan entram quando registrados (usado fora do floor plan não tem juros). Só operações vendidas, pela data da venda. ${OP ? '' : 'Revenda e dados fictícios.'}</p>
+      </article>`;
+    $$('[data-per]', tela).forEach((b) => b.onclick = () => { periodo = b.dataset.per; telaRelatorios(); });
+    $('#mg-de').onchange = (e) => { fm.de = e.target.value; telaMargem(); };
+    $('#mg-ate').onchange = (e) => { fm.ate = e.target.value; telaMargem(); };
+    const sl = $('#mg-loja'); if (sl) sl.onchange = (e) => { fm.loja = e.target.value; telaMargem(); };
+    $('#mg-agr').onchange = (e) => { fm.agrupar = e.target.value; telaMargem(); };
+    $('#mg-print').onclick = () => print();
+    $('#mg-csv').onclick = () => {
+      const L = [['Mês', 'Data da venda', 'Operação', 'Tipo', 'Marca', 'Modelo', 'Ano', 'Loja', 'Receita', 'Aquisição', 'Preparo', 'Peças', 'Mão de obra', 'Juros floor plan', 'Comissão', 'Margem líquida', 'Margem %', 'Situação', 'Custos faltando']]
+        .concat(r.operacoes.map((o) => [o.mes, o.saida, o.id, NOMES[o.tipo] || o.tipo, o.marca, o.modelo, o.ano, o.loja, o.receita, o.aquisicao, o.preparo, o.pecas ?? '', o.maoDeObra ?? '', o.juros, o.comissao, o.margem, pctCSV(o.pct), o.status === 'real' ? 'Real' : 'Estimada', o.faltando.join(', ')]))
+        .concat([[], [nomeG, 'Vendas', 'Reais', 'Estimadas', 'Receita', 'Aquisição', 'Preparo', 'Juros floor plan', 'Comissão', 'Margem líquida', 'Margem %']])
+        .concat(r.grupos.concat([Object.assign({ chave: 'Total' }, r.total)]).map((g) => [rotG(g.chave), g.n, g.nReal, g.nEst, g.receita, g.aquisicao, g.preparo, g.juros, g.comissao, g.margem, pctCSV(g.pct)]));
+      baixarCSV(`anshur-margem-por-${fm.agrupar}-${fm.de}-a-${fm.ate}${fm.loja ? '-' + fm.loja.replace(/\W+/g, '-') : ''}.csv`, L);
+    };
+    $$('[data-custos]', tela).forEach((b) => b.onclick = () => {
+      const t = base.find((x) => x.id === b.dataset.custos); if (!t) return;
+      const o = K.margemOperacao(t), cu = t.custos || {};
+      const campos = [{ k: 'comissao', r: 'Comissão paga (R$)', num: true, ph: 'Vazio = não registrada' }, { k: 'juros', r: 'Juros do floor plan (R$)', num: true, ph: 'Vazio = sem juros registrados' }]
+        .concat(o.faltando.includes('preparo') ? [{ k: 'preparo', r: 'Preparo total: peças + mão de obra (R$)', num: true, ph: o.preparoPrevisto ? 'Previsto: ' + real(o.preparoPrevisto) : 'Vazio = não registrado' }] : []);
+      formulario(`Custos da venda: ${t.marca} ${t.modelo}`, campos, { comissao: cu.comissao ?? '', juros: cu.juros ?? '' }, (v) => {
+        const cs = {}; if (v.comissao !== '') cs.comissao = v.comissao; if (v.juros !== '') cs.juros = v.juros;
+        if (!Object.keys(cs).length && (v.preparo === '' || v.preparo === undefined)) { toast('Informe pelo menos um custo.', true); return; }
+        if (Object.keys(cs).length) t.custos = Object.assign({}, t.custos, K.registrarCustos(estado, t.id, cs, eu().nome));
+        if (v.preparo !== '' && v.preparo !== undefined) { K.registrarPreparo(estado, t.id, v.preparo, hojeISO()); t.preparo = Math.round(v.preparo); t.preparoRegistrado = hojeISO(); }
+        log('venda', `Custos lançados: ${t.marca} ${t.modelo}${cs.comissao != null ? ', comissão ' + real(cs.comissao) : ''}${cs.juros != null ? ', juros ' + real(cs.juros) : ''}${v.preparo !== '' && v.preparo !== undefined ? ', preparo ' + real(v.preparo) : ''}`, { ref: t.id });
+        salvar(); cacheLimpa(); fecharCamada(true); toast('Custos lançados.'); telaMargem();
+      }, 'Só o que foi realmente pago. Campo vazio continua como não registrado.');
+    });
   }
 
   // ---------- auditoria ----------
@@ -1673,7 +1786,8 @@
   function telaAprovacoes() {
     const l = estado.pendentes.slice().reverse();
     tela.innerHTML = `<div class="titulo"><div><h1>Aprovações</h1><p>Trocas que o vendedor quer fechar acima do valor máximo. Só entram no pátio depois que um gerente ou o dono aprovar.</p></div></div>
-      <section class="painel">${l.length ? l.map((p) => `<div class="aprov ${p.status}"><div><b>${esc(p.maq.marca + ' ' + p.maq.modelo)} · ${p.maq.ano} · ${p.maq.horas.toLocaleString('pt-BR')} h</b>
+      ${NV && NV.semInternet() ? '<p class="conta">Sem internet: os pedidos aparecem, mas aprovar ou recusar só funciona com internet.</p>' : ''}
+      <section class="painel">${l.length ? l.map((p) => `<div class="aprov ${p.status}"><div><b>${esc(p.maq.marca + ' ' + p.maq.modelo)} · ${p.maq.ano} · ${p.maq.horas.toLocaleString('pt-BR')} h</b>${p.semInternet ? ' <span class="tag declarado">Feito sem internet</span>' : ''}
         <span>Pedido por ${esc(p.por)} em ${new Date(p.quando).toLocaleString('pt-BR')} · quer pagar <b class="neg">${real(p.valor)}</b>, máximo recomendado ${real(p.rec.teto)} (<b class="neg">+${real(p.valor - p.rec.teto)}</b>)</span>
         <span>Motivo: ${esc(p.motivo || '—')}</span>${p.status !== 'pendente' ? `<span>${p.status === 'aprovada' ? 'Aprovada' : 'Recusada'} por ${esc(p.decisao.por)} em ${new Date(p.decisao.quando).toLocaleString('pt-BR')}</span>` : ''}</div>
         ${p.retrato ? `<button class="link" type="button" data-rt="${p.retrato}">Ver retrato da avaliação</button>` : ''}
@@ -1684,13 +1798,16 @@
   }
   async function decidir(id, aprova) {
     const p = estado.pendentes.find((x) => x.id === id); if (!p || !podeLiberar(p.nivel || 'gerente')) return;
+    if (NV && NV.semInternet()) { toast('Aprovar ou recusar só com internet: a troca só conta depois que a decisão é salva no servidor.', true); return; }
     if (aprova && !(await confirmaPin())) return;
     p.status = aprova ? 'aprovada' : 'recusada'; p.decisao = { por: eu().nome, quando: new Date().toISOString() };
     if (aprova) {
       const t = K.fecharTroca(estado, p.maq, p.rec, p.valor, p.data, { ...p.extra, retrato: p.retrato, aprovacao: { por: eu().nome, motivo: p.motivo, excesso: p.valor - p.rec.teto, data: hojeISO() } });
       A.trocas.push({ ...t }); log('aprovacao', `Troca acima do teto aprovada: ${t.marca} ${t.modelo} por ${real(t.pago)} (pedido de ${p.por})`, { ref: t.id });
     } else log('aprovacao', `Troca acima do teto recusada: ${p.maq.marca} ${p.maq.modelo} (pedido de ${p.por})`);
-    salvar(); cacheLimpa(); atualizarSino(); toast(aprova ? 'Aprovada: a máquina entrou no pátio.' : 'Recusada. O vendedor vê a decisão.'); rota();
+    salvar(); cacheLimpa(); atualizarSino();
+    if (NV) { const ok = await NV.descarregar(); if (!ok) { toast('A decisão ainda não chegou ao servidor: fica guardada neste aparelho e é enviada quando a conexão voltar.', true); rota(); return; } }
+    toast(aprova ? 'Aprovada: a máquina entrou no pátio.' : 'Recusada. O vendedor vê a decisão.'); rota();
   }
 
   // ---------- troca em grãos (barter) ----------
@@ -1704,12 +1821,14 @@
   }
   function ligarBarter(raiz, valor, id) {
     const g = $('#' + id + '-g', raiz), p = $('#' + id + '-p', raiz), r = $('#' + id + '-r', raiz); if (!g) return;
-    const calc = () => {
-      const preco = num(p.value) || GRAOS[g.value].preco; estado.barter = { grao: g.value, preco }; salvar();
+    const calc = (gravar = true) => {
+      const preco = num(p.value) || GRAOS[g.value].preco;
+      // só grava quando a pessoa muda o grão ou o preço (abrir a tela não é alteração)
+      if (gravar && JSON.stringify(estado.barter) !== JSON.stringify({ grao: g.value, preco })) { estado.barter = { grao: g.value, preco }; salvar(); }
       const un = g.value === 'cana' ? 'toneladas' : 'sacas', q = valor / preco;
       r.innerHTML = `<div><span>Valor máximo em ${un}</span><b>${Math.round(q).toLocaleString('pt-BR')}</b></div><div><span>Se o grão cair 10%, a troca vale</span><b class="neg">${real(q * preco * 0.9)}</b></div><div><span>Se o grão subir 10%, a troca vale</span><b class="pos">${real(q * preco * 1.1)}</b></div>`;
     };
-    g.onchange = () => { p.value = String(GRAOS[g.value].preco).replace('.', ','); calc(); }; p.oninput = calc; calc();
+    g.onchange = () => { p.value = String(GRAOS[g.value].preco).replace('.', ','); calc(); }; p.oninput = () => calc(); calc(false);
   }
 
   // ---------- exportar a troca para o sistema da revenda ----------
@@ -1965,5 +2084,7 @@
     window.addEventListener('hashchange', () => setTimeout(marcar, 50)); setTimeout(marcar, 300);
   })();
   window.addEventListener('resize', moverIndicador);
+  // com conta: o que o app ajustou só para abrir (padrões, lojas, perfis do servidor) não vira alteração a enviar
+  if (NV && NV.marcarVista) NV.marcarVista(estado);
   rota();
 })();
