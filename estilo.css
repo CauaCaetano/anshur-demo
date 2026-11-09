@@ -616,7 +616,7 @@ body.so-leitura .aprov .acoes, body.so-leitura .aprov button { display: none !im
 @media (max-width: 959px) {
   .menu { overflow: visible; }
   .menu a, .menu a[data-aba="passaportes"] { display: none; flex: 1 1 0; min-width: 0; }
-  .menu a[data-aba="visao"], .menu a[data-aba="avaliar"], .menu a[data-aba="patio"], .menu a[data-aba="aprovacoes"] { display: flex; }
+  .menu a[data-aba="hoje"], .menu a[data-aba="avaliar"], .menu a[data-aba="patio"], .menu a[data-aba="aprovacoes"] { display: flex; }
   .menu-indicador { display: none; }
   .menu a[aria-current="page"] { color: #fff; box-shadow: inset 0 2px 0 var(--ouro); }
   .menu-mais { display: flex; flex: 1 1 0; flex-direction: column; align-items: center; gap: 3px; padding: 8px 2px 9px; background: none; border: 0; color: #B8B1A3; font: 500 12.5px Inter, sans-serif; cursor: pointer; order: 99; }
@@ -655,3 +655,53 @@ body.so-leitura .aprov .acoes, body.so-leitura .aprov button { display: none !im
 .menu a[hidden], .menu-grupo[hidden] { display: none !important; }
 @media print { .casca { display: block !important; } .principal { padding: 0 !important; } main { max-width: none !important; } }
 @media print { main:has(.relatorio-margem) > .titulo { display: none !important; } }
+
+/* ---------- V9: Hoje, rotina, memória, histórico, fotos guiadas e IA ---------- */
+.conf.moderada { background: #f0e3c7; color: #7a5a1e; }
+.prioridades { display: grid; gap: 14px; margin-bottom: 18px; }
+@media (min-width: 1100px) { .prioridades { grid-template-columns: repeat(3, 1fr); } }
+.prio { display: grid; grid-template-columns: auto 1fr; gap: 14px; background: #fff; border: 1px solid var(--borda, #E5DFD3); border-radius: 14px; padding: 18px; box-shadow: var(--sombra, none); min-width: 0; }
+.prio > div { min-width: 0; }
+.prio.n1 { border-top: 4px solid var(--ouro); } .prio.n2 { border-top: 4px solid #71877B; } .prio.n3 { border-top: 4px solid #D9D2C3; }
+.prio-n { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; background: var(--obsidiana); color: var(--marfim); font-weight: 700; font-size: 18px; }
+.prio-n .ico { width: 22px; height: 22px; }
+.prio h2 { font-size: 19px; line-height: 1.3; margin: 4px 0 6px; overflow-wrap: anywhere; }
+.prio p { color: var(--cinza); font-size: 15px; margin: 0; }
+.prio .acoes { margin-top: 12px; flex-wrap: wrap; }
+.prio .cat { display: inline-block; font-size: 12px; font-weight: 700; color: var(--ouro-texto); background: #F4ECDA; border-radius: 6px; padding: 2px 8px; }
+.grupo-acao { font-size: 15px; margin: 14px 0 6px; }
+.acoes-dia { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.acoes-dia li { display: grid; grid-template-columns: 1fr; gap: 8px; align-items: center; padding: 12px 14px; border-radius: 10px; background: #FBF9F4; border: 1px solid var(--linha); }
+@media (min-width: 720px) { .acoes-dia li { grid-template-columns: 1fr auto; } }
+.acoes-dia li b { display: block; } .acoes-dia li span { color: var(--cinza); font-size: 14px; }
+.acoes-dia li.n1 { border-left: 4px solid var(--ouro); }
+.rotina { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 10px; }
+.rotina li { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--linha); background: #fff; }
+.rotina li.ok { background: #F1F5F2; }
+.rotina .pilula { background: #F4ECDA; color: var(--ouro-texto); font-weight: 700; font-size: 12.5px; padding: 1px 8px; border-radius: 999px; }
+.fotos.fotos-guiadas { grid-template-columns: repeat(2, 1fr); margin-top: 12px; }
+@media (min-width: 640px) { .fotos.fotos-guiadas { grid-template-columns: repeat(4, 1fr); } }
+@media (min-width: 1100px) { .fotos.fotos-guiadas { grid-template-columns: repeat(5, 1fr); } }
+.fotos-guiadas .foto { aspect-ratio: 4 / 3; display: flex; flex-direction: column; justify-content: flex-end; align-items: stretch; text-align: left; padding: 0; }
+.fotos-guiadas .foto-nome { font-weight: 700; color: var(--creme); font-size: 13.5px; padding: 6px 8px 0; }
+.fotos-guiadas .foto-dica { font-size: 12px; color: var(--cinza); padding: 0 8px 8px; line-height: 1.3; }
+.fotos-guiadas .foto.tem .foto-nome { color: #fff; background: linear-gradient(transparent, rgba(17, 24, 32, .75)); padding: 18px 8px 8px; }
+.fotos-guiadas .foto.tem .foto-dica { display: none; }
+.ia-caixa { margin-top: 16px; padding: 14px; border-radius: 12px; background: #FBF7EE; border: 1px solid #EADFC6; }
+.ia-caixa h3 { font-size: 16px; margin: 0 0 4px; }
+.ia-caixa .acoes { margin-top: 10px; align-items: center; }
+.ia-linha { margin: 6px 0 0; font-size: 13.5px; }
+.ia-linha.ia-nada { color: var(--cinza); font-style: italic; }
+.ia-linha.ia-feita { color: var(--verde-claro); }
+.ia-linha.ia-pendente { display: grid; gap: 6px; padding: 8px 10px; border-radius: 8px; background: #FBF7EE; border: 1px dashed var(--ouro); }
+.ia-bts { display: flex; flex-wrap: wrap; gap: 6px; }
+.ia-bts .btn { min-height: 36px; padding: 6px 12px; font-size: 13.5px; }
+.ia-avarias { margin-top: 14px; display: grid; gap: 4px; }
+.ia-avarias .ia-linha { display: grid; gap: 6px; }
+@media (min-width: 720px) { .ia-avarias .ia-linha { grid-template-columns: 1fr auto; align-items: center; } }
+.filtros-hist { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 14px; }
+@media (min-width: 960px) { .filtros-hist { grid-template-columns: repeat(6, 1fr); } }
+.linha-tempo.hv li.ev-venda::before { background: #3E6B57; } .linha-tempo.hv li.ev-aprovacao::before { background: #B5534F; }
+.linha-tempo.hv li.ev-avaliacao::before { background: #71877B; } .linha-tempo.hv li.ev-negociacao::before { background: #202D35; } .linha-tempo.hv li.ev-decisao::before { background: #E2D6BF; }
+.previa-email { margin-top: 12px; padding: 16px; border: 1px solid var(--linha); border-radius: 10px; background: #fff; max-height: 60vh; overflow: auto; }
+@media print { .prioridades .acoes, .acoes-dia .btn { display: none; } }

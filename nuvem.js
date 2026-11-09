@@ -7,7 +7,7 @@
   'use strict';
   // ---------- partes puras (testadas em testes.js) ----------
   const LISTAS = ['avaliacoes', 'documentos', 'atividades', 'pendentes', 'modelosExtra'];
-  const MAPAS = ['precos', 'vendas', 'preparos', 'resolvidos', 'config'];
+  const MAPAS = ['precos', 'vendas', 'preparos', 'resolvidos', 'config', 'rituais'];
   const chaveTroca = (t) => [t.tipo, t.modelo, t.ano, t.horas, t.pago, t.vendido || '', t.entrada || ''].join('|');
   const idDe = (x) => (x && (x.id || x.modelo)) || JSON.stringify(x);
   // junta os dados deste navegador com os da conta sem duplicar: o servidor vence quando o mesmo item existe nos dois
@@ -84,7 +84,7 @@
   // nada (idempotente) e o que outra pessoa salvou nos outros itens continua lá.
   const LISTAS_ID = ['avaliacoes', 'fechadas', 'historico', 'documentos', 'atividades', 'pendentes', 'usuarios', 'modelosExtra'];
   const EXTRAS = ['garantias', 'financiadas', 'compradores', 'anuncios'];
-  const MAPAS_OP = ['precos', 'vendas', 'preparos', 'resolvidos', 'retratos', 'custos'];
+  const MAPAS_OP = ['precos', 'vendas', 'preparos', 'resolvidos', 'retratos', 'custos', 'rituais'];
   const js = (x) => JSON.stringify(x);
   const copia = (x) => (x === undefined ? undefined : JSON.parse(JSON.stringify(x)));
   let seqOp = 0;
@@ -609,6 +609,30 @@
   };
   N.restaurarCopia = async (dia) => { await N.descarregar(); const { error } = await sb.rpc('anshur_restaurar_copia', { p_revenda: N.revenda.id, p_dia: dia }); if (error) throw new Error(mensagem(error)); };
   N.renomear = async (nome, cidade) => { const { error } = await sb.rpc('anshur_renomear_revenda', { p_revenda: N.revenda.id, p_nome: nome, p_cidade: cidade || null }); if (error) throw new Error(mensagem(error)); N.revenda.nome = nome; N.revenda.cidade = cidade; gravarCache(); };
+
+  // ---------- IA das fotos e IA própria da revenda (Edge Function anshur-ia; a chave nunca volta ao navegador) ----------
+  N.ia = async (acao, corpo = {}) => {
+    if (!sb) { await carregarLib(); criarCliente(); }
+    const { data, error } = await sb.functions.invoke('anshur-ia', { body: Object.assign({}, corpo, { acao, revenda: N.revenda.id }) });
+    if (error) {
+      let m = ''; try { const j = await error.context.json(); m = j && j.erro; } catch (e) { /* sem corpo */ }
+      throw new Error(m || (/fetch|network/i.test(String(error.message)) ? 'Sem conexão com o servidor.' : 'A IA não respondeu agora. Tente de novo.'));
+    }
+    if (data && data.erro) throw new Error(data.erro);
+    return data || {};
+  };
+  // ---------- avisos por e-mail (só o dono muda; destinatários são da equipe) ----------
+  N.avisos = async () => {
+    const { data, error } = await sb.from('anshur_avisos').select('frequencia,destinatarios,atualizado').eq('revenda', N.revenda.id).maybeSingle();
+    if (error) throw new Error(mensagem(error));
+    return data;
+  };
+  N.salvarAvisos = async (frequencia, destinatarios) => { const { error } = await sb.rpc('anshur_salvar_avisos', { p_revenda: N.revenda.id, p_frequencia: frequencia, p_destinatarios: destinatarios }); if (error) throw new Error(mensagem(error)); };
+  N.envios = async () => {
+    const { data, error } = await sb.from('anshur_avisos_envios').select('dia,usuario,itens,status,enviado').eq('revenda', N.revenda.id).order('enviado', { ascending: false }).limit(20);
+    if (error) throw new Error(mensagem(error));
+    return data || [];
+  };
 
   // ---------- documentos (Storage privado, pasta = id da revenda) ----------
   const nomeSeguro = (s) => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9._-]+/g, '-').slice(-80);

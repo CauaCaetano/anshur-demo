@@ -291,7 +291,7 @@
   // ---------- AVALIAR ----------
   const anoAtual = new Date().getFullYear();
   const av = { passo: 1, tipo: 'trator', marca: 'Massey Ferguson', modelo: 'MF 4709', ano: anoAtual - 5, horas: 3900, local: 'Orlândia, SP', obs: '',
-    ficha: { motor: 4, transmissao: 4, hidraulico: 3, pneus: 2, cabine: 4, lataria: 3 }, fotos: [], verif: { horimetro: false, notas: false, chassi: false }, declarado: '', fipe: '', anuncios: ['', '', ''] };
+    ficha: { motor: 4, transmissao: 4, hidraulico: 3, pneus: 2, cabine: 4, lataria: 3 }, fotos: [], verif: { horimetro: false, notas: false, chassi: false }, declarado: '', fipe: '', anuncios: ['', '', ''], ia: null };
   const AV0 = JSON.parse(JSON.stringify(av));
   const chaveRascunho = () => (NV ? `anshur-rascunho:${NV.revenda.id}:${NV.usuario.id}` : 'anshur-rascunho-' + K.ambiente);
   let rascunhoDe = null, rascunhoTimer = null;
@@ -299,28 +299,34 @@
   // só guarda quando a avaliação mudou desde o último rascunho ou registro (cliques que não mudam nada não criam rascunho)
   let rascunhoUltimo = JSON.stringify(av);
   function guardarRascunho() { clearTimeout(rascunhoTimer); rascunhoTimer = setTimeout(() => { const j = JSON.stringify(av); if (j === rascunhoUltimo) return; rascunhoUltimo = j; try { rascunhoDe = new Date().toISOString(); localStorage.setItem(chaveRascunho(), JSON.stringify({ av, quando: rascunhoDe })); } catch (e) { /* sem espaço: segue sem rascunho */ } }, 250); }
-  function limparRascunho(zerar) { clearTimeout(rascunhoTimer); rascunhoDe = null; try { localStorage.removeItem(chaveRascunho()); } catch (e) { /* sem */ } if (zerar) Object.assign(av, JSON.parse(JSON.stringify(AV0))); rascunhoUltimo = JSON.stringify(av); }
+  function limparRascunho(zerar) { clearTimeout(rascunhoTimer); rascunhoDe = null; try { localStorage.removeItem(chaveRascunho()); } catch (e) { /* sem */ } if (zerar) { Object.assign(av, JSON.parse(JSON.stringify(AV0))); fotosGrandes = {}; } rascunhoUltimo = JSON.stringify(av); }
+  // fotos em 1280 px só na memória desta tela (vão para a IA e, com conta e internet, para a pasta privada da revenda);
+  // no rascunho e nos dados ficam miniaturas leves
+  let fotosGrandes = {};
+  const RT = window.RETENCAO;
   ['input', 'change', 'click'].forEach((ev) => tela.addEventListener(ev, (e) => { if (e.target.closest && e.target.closest('#passo') && (location.hash || '') === '#avaliar') guardarRascunho(); }));
   const condDe = (f) => Math.round(FICHA.reduce((s, [k]) => s + f[k], 0) / FICHA.length * 20);
   const maqAv = () => ({ tipo: av.tipo, marca: av.marca, modelo: av.modelo, ano: av.ano, horas: av.horas, cond: condDe(av.ficha), ficha: { ...av.ficha } });
   const num = (s) => { const v = parseFloat(String(s).replace(/[^\d,.-]/g, '').replace(/\./g, '').replace(',', '.')); return isFinite(v) ? v : 0; };
 
   function telaAvaliar() {
-    const nomesPasso = ['Identificação', 'Inspeção', 'Evidências', 'Resultado'];
+    const nomesPasso = ['Identificação', 'Fotos', 'Inspeção', 'Resultado'];
     tela.innerHTML = `
       <div class="titulo"><div><h1>Avaliar troca</h1><p>Quanto vale pagar no usado que o cliente oferece, com base nas trocas que a ${esc(A.revenda.nome)} já vendeu.</p></div>${botaoAdicionar([{ nome: 'Preencher com documento', desc: 'Foto da nota ou do CRV da máquina', acao: () => { location.hash = '#documentos'; } }, { nome: 'Novo modelo no catálogo', desc: 'Modelo que ainda não está na lista', acao: () => { location.hash = '#config'; } }])}</div>
       <nav class="etapas" aria-label="Etapas da avaliação">${nomesPasso.map((n, i) => `<button type="button" data-p="${i + 1}" ${av.passo === i + 1 ? 'aria-current="step"' : ''} class="${av.passo > i + 1 ? 'feita' : ''}">${n}</button>`).join('')}</nav>
       ${rascunhoDe ? `<p class="conta" id="rascunho-aviso">Rascunho guardado neste aparelho (${new Date(rascunhoDe).toLocaleString('pt-BR')}). <button class="link" type="button" id="rascunho-zerar">Começar do zero</button></p>` : ''}
       <div id="passo"></div>
       ${estado.avaliacoes.length ? `<section class="painel bloco"><div class="painel-cab"><h2>Avaliações registradas</h2><p>${estado.avaliacoes.length} nesta demonstração</p></div>
-        <div class="tabela-wrap"><table class="tabela"><thead><tr><th>Data</th><th>Máquina</th><th class="n">Valor máximo</th><th class="n">Venda estimada</th></tr></thead><tbody>
-        ${estado.avaliacoes.slice().reverse().map((a) => `<tr><td>${data(a.data)}</td><td class="maq"><b>${esc(a.maq.marca + ' ' + a.maq.modelo)}</b><span>${a.maq.ano} · ${a.maq.horas.toLocaleString('pt-BR')} h</span></td><td class="n">${mil(a.teto)}</td><td class="n">${mil(a.venda)}</td></tr>`).join('')}</tbody></table></div></section>` : ''}`;
+        <div class="tabela-wrap"><table class="tabela"><thead><tr><th>Data</th><th>Máquina</th><th class="n">Valor máximo</th><th class="n">Venda estimada</th><th>Situação</th></tr></thead><tbody>
+        ${estado.avaliacoes.slice().reverse().map((a) => `<tr><td>${data(a.data)}</td><td class="maq"><b>${esc(a.maq.marca + ' ' + a.maq.modelo)}</b><span>${a.maq.ano} · ${a.maq.horas.toLocaleString('pt-BR')} h</span></td><td class="n">${mil(a.teto)}</td><td class="n">${mil(a.venda)}</td><td>${{ troca: 'Virou troca', desistiu: 'Cliente desistiu' }[a.status] || (a.status === 'aberta' ? 'Em negociação' : '—')}${a.ia ? ' <span class="tag comprovado">IA revisada</span>' : ''}</td></tr>`).join('')}</tbody></table></div></section>` : ''}`;
     $$('.etapas button', tela).forEach((b) => b.onclick = () => irPasso(+b.dataset.p));
     const zr = $('#rascunho-zerar'); if (zr) zr.onclick = () => { limparRascunho(true); telaAvaliar(); };
     desenharPasso();
   }
   function irPasso(p) {
     if (p > 1 && !(av.horas > 0)) { av.passo = 1; desenharPasso(); toast('Informe as horas do horímetro para continuar.', true); return; }
+    // nada da IA entra no resultado sem o avaliador decidir item a item
+    if (p > 3 && iaPendentes() > 0) { toast(`Revise as ${iaPendentes()} sugestões da IA (aceitar ou manter a sua nota) antes do resultado.`, true); p = 3; }
     av.passo = p;
     $$('.etapas button', tela).forEach((b) => { const n = +b.dataset.p; b.classList.toggle('feita', n < p); if (n === p) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current'); });
     desenharPasso(); window.scrollTo({ top: 0, behavior: reduzido ? 'auto' : 'smooth' });
@@ -346,14 +352,14 @@
         <div class="campo"><label for="f-nova">Máquina nova desta negociação</label><select id="f-nova"><option value="">Nenhuma / não financiada</option>${(A.financiadas || []).filter((f) => !f.venda).map((f) => `<option value="${f.chassi}" ${av.nova === f.chassi ? 'selected' : ''}>${esc(f.marca + ' ' + f.modelo)} · ${f.chassi}</option>`).join('')}</select></div>
         <div class="campo inteiro"><label for="f-obs">Informações adicionais</label><textarea id="f-obs" rows="2" placeholder="Ex.: piloto automático, pneus novos há 1 safra">${esc(av.obs)}</textarea></div>
       </div>${navPasso()}</section>`;
-    if (av.passo === 2) { const c = condDe(av.ficha); h = `<section class="painel passo"><div class="painel-cab"><h2>Inspeção</h2><p>Nota de 1 (ruim) a 5 (ótimo)</p></div>
-        <p class="ajuda">Na versão da revenda, a IA lê as fotos e sugere as notas; o avaliador confere e corrige.</p>
-        ${FICHA.map(([k, n, d]) => `<div class="criterio"><div><b id="r-${k}">${n}</b><p>${d}</p></div><div class="notas" role="group" aria-labelledby="r-${k}">${[1, 2, 3, 4, 5].map((v) => `<button type="button" data-k="${k}" data-v="${v}" aria-pressed="${av.ficha[k] === v}">${v}</button>`).join('')}</div></div>`).join('')}
-        <div style="margin-top:16px"><span class="rot-campo">Nota geral</span> <b id="nota-geral">${c}/100</b><div class="medidor"><i id="medidor" style="width:${c}%"></i></div></div>${navPasso()}</section>`; }
-    if (av.passo === 3) h = `<section class="painel passo"><h2>Documentação e evidências</h2>
-        <div class="fotos" style="margin-top:14px">${['Frente', 'Lateral', 'Horímetro', 'Pneus'].map((n, i) => `<label class="foto ${av.fotos[i] ? 'tem' : ''}" style="${av.fotos[i] ? `background-image:url(${av.fotos[i]})` : ''}">${n}<input type="file" accept="image/*" capture="environment" data-i="${i}" aria-label="Foto: ${n}"></label>`).join('')}</div>
-        <p class="ajuda" style="margin-top:6px">As fotos ficam só neste aparelho.</p>
-        <div class="campos" style="margin-top:18px">
+    if (av.passo === 2) h = passoFotos();
+    if (av.passo === 3) { const c = condDe(av.ficha); h = `<section class="painel passo"><div class="painel-cab"><h2>Inspeção</h2><p>Nota de 1 (ruim) a 5 (ótimo)</p></div>
+        ${av.ia ? `<p class="conta ia-aviso">${av.ia.exemplo ? '<span class="tag declarado">Exemplo</span> ' : ''}A IA olhou ${av.ia.nFotos} fotos e <b>sugeriu</b> notas. Quem decide é você: aceite ou mantenha a sua nota em cada item${iaPendentes() ? ` (<b id="ia-falta">${iaPendentes()} para revisar</b>)` : ' (tudo revisado)'}.</p>` : '<p class="ajuda">Tire as fotos guiadas no passo anterior e a IA sugere as notas; você confere e decide item a item.</p>'}
+        ${FICHA.map(([k, n, d]) => `<div class="criterio"><div><b id="r-${k}">${n}</b><p>${d}</p>${linhaIA(k)}</div><div class="notas" role="group" aria-labelledby="r-${k}">${[1, 2, 3, 4, 5].map((v) => `<button type="button" data-k="${k}" data-v="${v}" aria-pressed="${av.ficha[k] === v}">${v}</button>`).join('')}</div></div>`).join('')}
+        ${avariasIA()}
+        <div style="margin-top:16px"><span class="rot-campo">Nota geral</span> <b id="nota-geral">${c}/100</b><div class="medidor"><i id="medidor" style="width:${c}%"></i></div></div>
+        <h2 style="margin-top:22px">Documentação e evidências</h2>
+        <div class="campos" style="margin-top:14px">
           <div class="campo inteiro"><span class="rot-campo">Verificado pela revenda</span><div class="checks">
             <label class="check"><input type="checkbox" data-v="horimetro" ${av.verif.horimetro ? 'checked' : ''}> Horímetro conferido com foto</label>
             <label class="check"><input type="checkbox" data-v="notas" ${av.verif.notas ? 'checked' : ''}> Notas ou ordens de serviço entregues</label>
@@ -361,12 +367,12 @@
           <div class="campo inteiro"><label for="f-decl">Declarado pelo cliente (ainda sem comprovante)</label><textarea id="f-decl" rows="2" placeholder="Ex.: motor retificado em 2023, sempre revisado na concessionária">${esc(av.declarado)}</textarea></div>
           <div class="campo"><label for="f-fipe">Tabela Fipe desta máquina (opcional)</label><input id="f-fipe" inputmode="numeric" placeholder="R$" value="${esc(av.fipe)}"></div>
           <div class="campo"><span class="rot-campo">Anúncios parecidos (opcional)</span><div style="display:flex;gap:6px">${av.anuncios.map((a, i) => `<input aria-label="Preço do anúncio ${i + 1}" data-an="${i}" inputmode="numeric" placeholder="R$" value="${esc(a)}" style="min-height:42px;padding:9px;border-radius:6px;border:1px solid rgba(17,24,32,.16);background:var(--marinho);width:100%">`).join('')}</div></div>
-        </div>${navPasso()}</section>`;
+        </div>${navPasso()}</section>`; }
     if (av.passo === 4) h = `<div class="passo" id="resultado"></div>`;
     caixa.innerHTML = h;
     $$('[data-ir]', caixa).forEach((b) => b.onclick = () => irPasso(av.passo + +b.dataset.ir));
     if (av.passo === 1) {
-      $('#f-tipo').onchange = (e) => { av.tipo = e.target.value; desenharPasso(); };
+      $('#f-tipo').onchange = (e) => { const tinha = av.fotos.some(Boolean) || av.ia; av.tipo = e.target.value; if (tinha) { av.fotos = []; av.ia = null; fotosGrandes = {}; toast('Tipo trocado: as fotos guiadas e as sugestões da IA foram zeradas (a lista de fotos muda por tipo).'); } desenharPasso(); };
       $('#f-marca').onchange = (e) => { av.marca = e.target.value; desenharPasso(); };
       $('#f-modelo').onchange = (e) => { av.modelo = e.target.value; };
       $('#f-ano').onchange = (e) => { av.ano = +e.target.value; };
@@ -375,31 +381,136 @@
       $('#f-nova').onchange = (e) => { av.nova = e.target.value; };
       $('#f-obs').oninput = (e) => { av.obs = e.target.value; };
     }
-    if (av.passo === 2) $$('.notas button', caixa).forEach((b) => b.onclick = () => {
-      av.ficha[b.dataset.k] = +b.dataset.v; $$('button', b.parentNode).forEach((x) => x.setAttribute('aria-pressed', x === b));
-      const c = condDe(av.ficha); $('#nota-geral').textContent = c + '/100'; $('#medidor').style.width = c + '%';
-    });
+    if (av.passo === 2) ligarFotos(caixa);
     if (av.passo === 3) {
-      $$('input[type=file]', caixa).forEach((inp) => inp.onchange = () => {
-        const arq = inp.files[0]; if (!arq) return;
-        const img = new Image(), url = URL.createObjectURL(arq);
-        img.onload = () => {
-          const cv = document.createElement('canvas'), k = Math.min(1, 640 / Math.max(img.width, img.height));
-          cv.width = img.width * k; cv.height = img.height * k; cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
-          av.fotos[+inp.dataset.i] = cv.toDataURL('image/jpeg', 0.72); guardarRascunho(); URL.revokeObjectURL(url);
-          const lab = inp.parentNode; lab.classList.add('tem'); lab.style.backgroundImage = `url(${av.fotos[+inp.dataset.i]})`;
-          toast('Foto adicionada.');
-        };
-        img.onerror = () => toast('Não foi possível ler essa imagem.', true);
-        img.src = url;
+      $$('.notas button', caixa).forEach((b) => b.onclick = () => {
+        const k = b.dataset.k, v = +b.dataset.v;
+        av.ficha[k] = v; $$('button', b.parentNode).forEach((x) => x.setAttribute('aria-pressed', x === b));
+        // escolher uma nota com sugestão pendente é a decisão do avaliador sobre aquele item
+        const s = av.ia && av.ia.sugestao.itens[k];
+        if (s && s.nota && !av.ia.decisoes[k]) { av.ia.decisoes[k] = { sugerida: s.nota, final: v, acao: v === s.nota ? 'aceitou' : 'alterou' }; desenharPasso(); return; }
+        const c = condDe(av.ficha); $('#nota-geral').textContent = c + '/100'; $('#medidor').style.width = c + '%';
       });
-      $$('[data-v]', caixa).forEach((c) => c.onchange = () => { av.verif[c.dataset.v] = c.checked; });
+      $$('[data-ia-aceita]', caixa).forEach((b) => b.onclick = () => { const k = b.dataset.iaAceita, s = av.ia.sugestao.itens[k]; av.ficha[k] = s.nota; av.ia.decisoes[k] = { sugerida: s.nota, final: s.nota, acao: 'aceitou' }; guardarRascunho(); desenharPasso(); });
+      $$('[data-ia-mantem]', caixa).forEach((b) => b.onclick = () => { const k = b.dataset.iaMantem, s = av.ia.sugestao.itens[k]; av.ia.decisoes[k] = { sugerida: s.nota, final: av.ficha[k], acao: 'manteve' }; guardarRascunho(); desenharPasso(); });
+      $$('[data-ia-rever]', caixa).forEach((b) => b.onclick = () => { delete av.ia.decisoes[b.dataset.iaRever]; guardarRascunho(); desenharPasso(); });
+      $$('[data-avaria]', caixa).forEach((b) => b.onclick = () => { av.ia.avariasDec[+b.dataset.avaria] = b.dataset.conf === '1' ? 'confirmada' : 'descartada'; guardarRascunho(); desenharPasso(); });
+      $$('input[data-v]', caixa).forEach((c) => c.onchange = () => { av.verif[c.dataset.v] = c.checked; });
       $('#f-decl').oninput = (e) => { av.declarado = e.target.value; };
       $('#f-fipe').oninput = (e) => { av.fipe = e.target.value; };
       $$('[data-an]', caixa).forEach((i) => i.oninput = () => { av.anuncios[+i.dataset.an] = i.value; });
     }
     if (av.passo === 4) desenharResultado();
   }
+
+  // ---------- AVALIAÇÃO FOTOGRÁFICA COM IA (a IA sugere; o avaliador decide item a item) ----------
+  const NOME_ITEM = Object.fromEntries(FICHA.map(([k, n]) => [k, n]));
+  function passoFotos() {
+    const ang = RT.angulosDe(av.tipo), n = ang.filter((a, i) => av.fotos[i]).length;
+    return `<section class="painel passo"><div class="painel-cab"><h2>Fotos guiadas · ${NOMES[av.tipo]}</h2><p><b id="fotos-n">${n}</b> de ${ang.length} fotos</p></div>
+      <p class="ajuda">Siga a lista: cada foto ajuda a avaliar um item da ficha. O ideal é tirar todas (de 10 a 15); com 3 ou mais a IA já sugere as notas. As fotos são reduzidas no aparelho (1280 px) antes de qualquer envio.</p>
+      <div class="fotos fotos-guiadas">${ang.map((a, i) => `<label class="foto ${av.fotos[i] ? 'tem' : ''}" style="${av.fotos[i] ? `background-image:url(${av.fotos[i]})` : ''}"><span class="foto-nome">${esc(a.nome)}</span><span class="foto-dica">${esc(a.dica)}</span><input type="file" accept="image/*" capture="environment" data-i="${i}" aria-label="Foto: ${esc(a.nome)}. ${esc(a.dica)}"></label>`).join('')}</div>
+      <div class="ia-caixa" id="ia-caixa">${blocoIA(n)}</div>${navPasso()}</section>`;
+  }
+  function blocoIA(n) {
+    const quem = OP ? (NV ? 'IA definida pelo dono em Configurações (padrão: IA da Blue Rose, Gemini grátis, 30 análises por dia)' : 'IA disponível na conta da revenda') : 'Na demonstração a análise mostra um <b>exemplo fixo</b>: nenhuma foto sai deste aparelho';
+    if (av.ia) {
+      const s = av.ia.sugestao, falt = s.faltando || [], ang = RT.angulosDe(av.tipo);
+      return `<h3>${av.ia.exemplo ? '<span class="tag declarado">Exemplo</span> ' : ''}Sugestões da IA prontas</h3>
+        <p class="sub">Analisou ${av.ia.nFotos} fotos em ${new Date(av.ia.quando).toLocaleString('pt-BR')}${av.ia.provedor ? ' · ' + esc(av.ia.provedor === 'blue_rose' ? 'IA da Blue Rose' : av.ia.provedor === 'exemplo' ? 'exemplo da demonstração' : 'IA própria da revenda') : ''}. Nada foi aplicado: revise item a item na Inspeção.</p>
+        ${(s.avarias || []).length ? `<p style="margin-top:8px"><b>${s.avarias.length} ${s.avarias.length === 1 ? 'possível avaria vista' : 'possíveis avarias vistas'}</b> (confira na Inspeção).</p>` : ''}
+        ${falt.length ? `<p class="sub" style="margin-top:6px"><b>Fotos faltando ou sem nitidez:</b> ${falt.map((f) => esc(((ang.find((a) => a.id === f.angulo) || {}).nome || f.angulo) + ' (' + f.motivo + ')')).join('; ')}</p>` : ''}
+        ${s.observacao ? `<p class="sub" style="margin-top:6px">${esc(s.observacao)}</p>` : ''}
+        <div class="acoes"><button class="btn btn-ouro" type="button" data-ir="1">Revisar na Inspeção</button><button class="btn btn-linha" type="button" id="ia-analisar">Analisar de novo</button></div>`;
+    }
+    return `<h3>Avaliação das fotos com IA</h3><p class="sub">${quem}. A IA sugere nota por item, possíveis avarias e fotos faltando; não inventa defeito (diz "não dá para ver") e não salva nada sem a sua revisão.</p>
+      <div class="acoes"><button class="btn btn-ouro" type="button" id="ia-analisar" ${n >= 3 ? '' : 'disabled'}>Analisar ${n} ${n === 1 ? 'foto' : 'fotos'} com IA</button>${n < 3 ? '<span class="sub">Tire pelo menos 3 fotos.</span>' : ''}</div>`;
+  }
+  const comprimir = (arq, lado, q) => new Promise((ok, erro) => {
+    const img = new Image(), url = URL.createObjectURL(arq);
+    img.onload = () => { const cv = document.createElement('canvas'), k = Math.min(1, lado / Math.max(img.width, img.height)); cv.width = Math.round(img.width * k); cv.height = Math.round(img.height * k); cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height); URL.revokeObjectURL(url); ok(cv.toDataURL('image/jpeg', q)); };
+    img.onerror = () => { URL.revokeObjectURL(url); erro(new Error('imagem')); }; img.src = url;
+  });
+  function ligarFotos(caixa) {
+    const ang = RT.angulosDe(av.tipo);
+    $$('input[type=file]', caixa).forEach((inp) => inp.onchange = async () => {
+      const arq = inp.files[0]; if (!arq) return; const i = +inp.dataset.i;
+      try {
+        const [grande, mini] = await Promise.all([comprimir(arq, 1280, 0.7), comprimir(arq, 480, 0.62)]);
+        fotosGrandes[ang[i].id] = grande; av.fotos[i] = mini; guardarRascunho();
+        const lab = inp.parentNode; lab.classList.add('tem'); lab.style.backgroundImage = `url(${mini})`;
+        const n = ang.filter((a, j) => av.fotos[j]).length; $('#fotos-n').textContent = n;
+        if (!av.ia) { $('#ia-caixa').innerHTML = blocoIA(n); ligarIA(caixa); }
+        toast(`Foto adicionada: ${ang[i].nome}.`);
+      } catch (e) { toast('Não foi possível ler essa imagem.', true); }
+    });
+    ligarIA(caixa);
+  }
+  function ligarIA(caixa) {
+    const b = $('#ia-analisar', caixa); if (b) b.onclick = () => analisarIA(b);
+    $$('#ia-caixa [data-ir]', caixa).forEach((x) => x.onclick = () => irPasso(av.passo + +x.dataset.ir));
+  }
+  // exemplo da demonstração: fixo, marcado "Exemplo", sem enviar foto a lugar nenhum
+  function exemploIA() {
+    const ang = RT.angulosDe(av.tipo), tem = new Set(ang.filter((a, i) => av.fotos[i]).map((a) => a.id));
+    const viu = (k) => ang.some((a) => tem.has(a.id) && a.itens.includes(k));
+    const base = { motor: [3, 'Mangueiras ressecadas e resto de óleo perto da bomba injetora (foto Motor).'], transmissao: [4, 'Sem vazamento visível na caixa (foto Transmissão).'], hidraulico: [3, 'Engate traseiro com folga aparente e mangueira remendada (foto Hidráulico).'], pneus: [2, 'Garras dos pneus traseiros gastas, cerca de 30% de vida (foto Pneus traseiros).'], cabine: [4, 'Painel inteiro e bancos em bom estado (foto Cabine).'], lataria: [3, 'Ferrugem leve no para-lama esquerdo e repintura no capô (foto Lateral esquerda).'] };
+    const itens = {}; Object.keys(base).forEach((k) => { itens[k] = viu(k) ? { nota: base[k][0], justificativa: base[k][1] } : { nota: null, justificativa: 'Não dá para ver: falta a foto deste item.' }; });
+    return { itens, avarias: viu('pneus') ? [{ descricao: 'Desgaste forte nas garras dos pneus traseiros', foto: 'pneus-tras', gravidade: 'moderada' }] : [], faltando: ang.filter((a) => !tem.has(a.id)).slice(0, 6).map((a) => ({ angulo: a.id, motivo: 'foto não tirada' })), observacao: 'Exemplo fixo da demonstração: na conta da revenda a IA olha as fotos de verdade.' };
+  }
+  async function analisarIA(b) {
+    const ang = RT.angulosDe(av.tipo), idx = ang.map((a, i) => i).filter((i) => av.fotos[i]);
+    if (idx.length < 3) { toast('Tire pelo menos 3 fotos.', true); return; }
+    let sugestao, provedor = 'exemplo', modelo = '';
+    if (!NV) sugestao = exemploIA();
+    else {
+      if (NV.semInternet()) { toast('Sem internet: a IA analisa quando a conexão voltar. Você pode seguir e dar as notas à mão.', true); return; }
+      b.disabled = true; b.textContent = 'Analisando as fotos…';
+      try {
+        const fotos = idx.map((i) => ({ angulo: ang[i].id, mime: 'image/jpeg', dados: String(fotosGrandes[ang[i].id] || av.fotos[i]).split(',')[1] }));
+        const r = await NV.ia('analisar', { tipo: av.tipo, maquina: { tipo: av.tipo, marca: av.marca, modelo: av.modelo, ano: av.ano, horas: av.horas }, fotos });
+        sugestao = RT.limparSugestao(r.sugestao, ang.map((a) => a.id)); provedor = r.provedor; modelo = r.modelo;
+        if (r.restantes != null) toast(`Análise pronta. Restam ${r.restantes} análises grátis hoje.`);
+      } catch (e) { b.disabled = false; b.textContent = 'Analisar com IA'; toast(e.message, true); return; }
+    }
+    av.ia = { quando: new Date().toISOString(), exemplo: !NV, provedor, modelo, nFotos: idx.length, sugestao, decisoes: {}, avariasDec: {} };
+    // itens sem nota sugerida ("não dá para ver") não pedem decisão: ficam com a nota do avaliador
+    guardarRascunho(); desenharPasso();
+    if (!NV) toast('Exemplo pronto (demonstração). Revise na Inspeção.');
+  }
+  const iaPendentes = () => { if (!av.ia) return 0; const s = av.ia.sugestao; return Object.keys(s.itens).filter((k) => s.itens[k].nota && !av.ia.decisoes[k]).length + (s.avarias || []).filter((x, i) => !av.ia.avariasDec[i]).length; };
+  function linhaIA(k) {
+    if (!av.ia) return ''; const s = av.ia.sugestao.itens[k]; if (!s) return '';
+    if (!s.nota) return `<p class="ia-linha ia-nada">IA: ${esc(s.justificativa || 'não dá para ver nas fotos')}</p>`;
+    const d = av.ia.decisoes[k];
+    if (d) return `<p class="ia-linha ia-feita">IA sugeriu ${d.sugerida} · você ${d.acao === 'aceitou' ? 'aceitou' : d.acao === 'manteve' ? 'manteve ' + d.final : 'escolheu ' + d.final} <button class="link" type="button" data-ia-rever="${k}">rever</button></p>`;
+    return `<div class="ia-linha ia-pendente"><span><b>IA sugere ${s.nota}</b> · ${esc(s.justificativa)}</span><span class="ia-bts"><button class="btn btn-linha" type="button" data-ia-aceita="${k}">Aceitar ${s.nota}</button><button class="btn btn-linha" type="button" data-ia-mantem="${k}">Manter ${av.ficha[k]}</button></span></div>`;
+  }
+  function avariasIA() {
+    if (!av.ia || !(av.ia.sugestao.avarias || []).length) return '';
+    const ang = RT.angulosDe(av.tipo);
+    return `<div class="ia-avarias"><b>Possíveis avarias vistas pela IA</b>${av.ia.sugestao.avarias.map((x, i) => { const d = av.ia.avariasDec[i]; return `<div class="ia-linha ${d ? 'ia-feita' : 'ia-pendente'}"><span>${esc(x.descricao)} <span class="sub">· ${esc(x.gravidade)}${x.foto ? ' · foto ' + esc((ang.find((a) => a.id === x.foto) || {}).nome || x.foto) : ''}</span></span>${d ? `<span>${d === 'confirmada' ? 'Você confirmou' : 'Você descartou'}</span>` : `<span class="ia-bts"><button class="btn btn-linha" type="button" data-avaria="${i}" data-conf="1">Confere</button><button class="btn btn-linha" type="button" data-avaria="${i}" data-conf="0">Não confere</button></span>`}</div>`; }).join('')}</div>`;
+  }
+  // o que a IA sugeriu e o que o avaliador decidiu (vai para a avaliação, o retrato e a trilha do servidor)
+  function resumoIA() {
+    if (!av.ia) return null;
+    const s = av.ia.sugestao, d = av.ia.decisoes, ks = Object.keys(d);
+    const n = (a) => ks.filter((k) => d[k].acao === a).length;
+    const av_ = (s.avarias || []).map((x, i) => ({ descricao: x.descricao, decisao: av.ia.avariasDec[i] || 'sem revisão' }));
+    const texto = `${av.ia.exemplo ? 'EXEMPLO (demonstração): ' : ''}IA sugeriu ${Object.entries(s.itens).map(([k, v]) => `${NOME_ITEM[k]} ${v.nota || '—'}`).join(', ')}; o avaliador aceitou ${n('aceitou')}, alterou ${n('alterou')}, manteve ${n('manteve')}${ks.filter((k) => d[k].acao !== 'aceitou').length ? ' (' + ks.filter((k) => d[k].acao !== 'aceitou').map((k) => `${NOME_ITEM[k]}: ${d[k].sugerida}→${d[k].final}`).join(', ') + ')' : ''}${av_.length ? `; avarias: ${av_.filter((x) => x.decisao === 'confirmada').length} confirmadas, ${av_.filter((x) => x.decisao === 'descartada').length} descartadas` : ''}.`;
+    return { quando: av.ia.quando, exemplo: !!av.ia.exemplo, provedor: av.ia.provedor, modelo: av.ia.modelo, fotos: av.ia.nFotos, decisoes: d, avarias: av_, faltando: (s.faltando || []).map((f) => f.angulo), resumo: texto };
+  }
+  // com conta e internet, as fotos em 1280 px vão para a pasta privada da revenda (no JSON ficam só miniaturas)
+  async function subirFotos(id, grandes, tipo) {
+    if (!NV || NV.semInternet() || !NV.subirDoc) return [];
+    const ang = RT.angulosDe(tipo), out = [];
+    for (const a of ang) {
+      const d = grandes[a.id]; if (!d) continue;
+      try { const bin = atob(d.split(',')[1]), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i); out.push({ angulo: a.id, caminho: await NV.subirDoc(id + '-foto', new File([u8], a.id + '.jpg', { type: 'image/jpeg' })) }); } catch (e) { /* segue: a miniatura fica nos dados */ }
+    }
+    return out;
+  }
+  const zerarFotosIA = () => { av.fotos = []; av.ia = null; fotosGrandes = {}; };
 
   function desenharResultado() {
     const maq = maqAv(), r = M.avaliar(maq), caixa = $('#resultado');
@@ -475,7 +586,8 @@
     $('#registrar').onclick = (e) => {
       const b = e.currentTarget; b.classList.add('carregando');
       // a avaliação congela os números e as premissas do dia: não é recalculada quando o modelo muda
-      tirarRetrato(maq, r, { decisao: 'Avaliação registrada' }).then((rt) => { estado.avaliacoes.push({ retrato: rt.id, id: 'AV' + Date.now(), data: hojeISO(), maq, teto: r.teto, venda: r.venda, preparo: r.preparo, faixa: r.faixa, confianca: r.confianca, amostras: r.base, mape: r.qualidade ? r.qualidade.mape : null, premissas: { margemAlvo: r.margem, jurosMes: K.cfg.jurosMes } }); log('avaliacao', `Avaliação registrada: ${maq.marca} ${maq.modelo} ${maq.ano}, máximo ${real(r.teto)}`); salvar(); limparRascunho(); b.classList.remove('carregando'); toast('Avaliação registrada com retrato imutável.'); telaAvaliar(); });
+      const ia = resumoIA();
+      tirarRetrato(maq, r, { decisao: 'Avaliação registrada', ia: ia ? ia.resumo : null }).then((rt) => { const id = 'AV' + Date.now(); estado.avaliacoes.push({ retrato: rt.id, id, data: hojeISO(), por: eu().nome, loja: estado.lojaAtual || '', status: 'aberta', maq, teto: r.teto, venda: r.venda, preparo: r.preparo, faixa: r.faixa, confianca: r.confianca, amostras: r.base, mape: r.qualidade ? r.qualidade.mape : null, premissas: { margemAlvo: r.margem, jurosMes: K.cfg.jurosMes }, ...(ia ? { ia } : {}), fotos: av.fotos.filter(Boolean).length }); log('avaliacao', `Avaliação registrada: ${maq.marca} ${maq.modelo} ${maq.ano}, máximo ${real(r.teto)}`); if (ia) log('ia', `Avaliação ${maq.marca} ${maq.modelo}: ${ia.resumo}`, { ref: id }); salvar(); zerarFotosIA(); limparRascunho(); b.classList.remove('carregando'); toast('Avaliação registrada com retrato imutável.'); telaAvaliar(); });
     };
     $('#premissas').onclick = abrirPremissas;
     $('#fechar-troca').onclick = () => abrirCamada('modal', `<h2>Fechar troca</h2><p class="sub">Registre o valor efetivamente negociado. Ele pode ser diferente do valor máximo recomendado.</p>
@@ -510,17 +622,17 @@
         if (acima && nivel !== 'livre' && podeLiberar(nivel) && !aprov && !semRedeAprov) { $('#t-aprov', c).focus(); toast('Informe quem aprovou.', true); return; }
         if (acima && (!podeLiberar(nivel) || semRedeAprov)) {
           const rt = await tirarRetrato(maq, r, { valorPago: Math.round(v), decisao: 'Pedido de aprovação (' + NOME_NIVEL[nivel] + ')', motivo: mot });
-          const ped = { id: 'P' + Date.now() + Math.random().toString(36).slice(2, 5), nivel, semInternet: !!semRedeAprov, retrato: rt.id, quando: new Date().toISOString(), por: eu().nome, maq, rec: { teto: r.teto, venda: r.venda, preparo: r.preparo, dias: r.dias, margem: r.margem, margemSobreVenda: r.margemSobreVenda, confianca: r.confianca, doTipo: r.doTipo, qualidade: r.qualidade ? { mape: r.qualidade.mape } : null }, valor: Math.round(v), data: dt, motivo: mot, status: 'pendente', extra: { vendedor: $('#t-vend', c).value, negociacao: av.nova || null, origem: av.local || 'Troca registrada', fotos: av.fotos.filter(Boolean), verif: { ...av.verif } } };
-          estado.pendentes.push(ped); log('aprovacao', `Pedido de aprovação: ${maq.marca} ${maq.modelo} por ${real(v)} (máximo ${real(r.teto)})${semRedeAprov ? ', feito sem internet' : ''}`); salvar(); limparRascunho(); atualizarSino();
+          const ped = { id: 'P' + Date.now() + Math.random().toString(36).slice(2, 5), nivel, semInternet: !!semRedeAprov, retrato: rt.id, quando: new Date().toISOString(), por: eu().nome, maq, rec: { teto: r.teto, venda: r.venda, preparo: r.preparo, dias: r.dias, margem: r.margem, margemSobreVenda: r.margemSobreVenda, confianca: r.confianca, doTipo: r.doTipo, qualidade: r.qualidade ? { mape: r.qualidade.mape } : null }, valor: Math.round(v), data: dt, motivo: mot, status: 'pendente', extra: { vendedor: $('#t-vend', c).value, negociacao: av.nova || null, origem: av.local || 'Troca registrada', fotos: av.fotos.filter(Boolean).slice(0, 4), verif: { ...av.verif }, ...(resumoIA() ? { ia: resumoIA() } : {}) } };
+          estado.pendentes.push(ped); log('aprovacao', `Pedido de aprovação: ${maq.marca} ${maq.modelo} por ${real(v)} (máximo ${real(r.teto)})${semRedeAprov ? ', feito sem internet' : ''}`); if (resumoIA()) log('ia', `Pedido ${maq.marca} ${maq.modelo}: ${resumoIA().resumo}`); salvar(); zerarFotosIA(); limparRascunho(); atualizarSino();
           fecharCamada(true); toast(semRedeAprov ? 'Sem internet: a troca virou pedido de aprovação (pendente). Ela só entra no pátio depois de aprovada com internet.' : nivel === 'dono' ? 'Pedido enviado ao dono: para este tipo de máquina, só ele libera.' : 'Pedido enviado ao gerente. A troca só entra no pátio depois da aprovação.'); location.hash = '#aprovacoes'; return;
         }
         const b = e.currentTarget; b.classList.add('carregando');
         const rtF = await tirarRetrato(maq, r, { valorPago: Math.round(v), decisao: acima ? (nivel === 'livre' ? 'Acima do teto, dentro da alçada do vendedor' : 'Acima do teto, aprovada por ' + aprov) : 'Dentro do valor máximo', motivo: mot });
         setTimeout(() => {
           const t = K.fecharTroca(estado, maq, r, v, dt, { retrato: rtF.id, vendedor: $('#t-vend', c).value, negociacao: av.nova || null, aprovacao: acima ? { por: nivel === 'livre' ? eu().nome + ' (alçada do vendedor)' : aprov, motivo: mot, excesso: v - r.teto, data: hojeISO() } : null, origem: av.local || 'Troca registrada',
-            manutencoes: av.declarado ? [{ servico: av.declarado, horas: av.horas, comNota: av.verif.notas }] : [], fotos: av.fotos.filter(Boolean), verif: { ...av.verif } });
+            manutencoes: av.declarado ? [{ servico: av.declarado, horas: av.horas, comNota: av.verif.notas }] : [], fotos: av.fotos.filter(Boolean).slice(0, 4), verif: { ...av.verif }, ...(resumoIA() ? { ia: resumoIA() } : {}) });
           const id = t.id;
-          A.trocas.push({ ...t }); limparRascunho(); log('troca', `Troca fechada: ${t.marca} ${t.modelo} por ${real(t.pago)} (máximo recomendado ${real(r.teto)})${t.aprovacao ? `, acima do teto, aprovada por ${t.aprovacao.por}` : ''}`, { ref: t.id }); salvar(); cacheLimpa();
+          A.trocas.push({ ...t }); const iaT = resumoIA(); if (iaT) log('ia', `Troca ${t.marca} ${t.modelo}: ${iaT.resumo}`, { ref: t.id }); const subir = subirFotos(t.id, { ...fotosGrandes }, av.tipo); zerarFotosIA(); limparRascunho(); subir.then((l) => { if (!l.length) return; const f = estado.fechadas.find((x) => x.id === id); if (f) { f.fotosArq = l; salvar(); } }); log('troca', `Troca fechada: ${t.marca} ${t.modelo} por ${real(t.pago)} (máximo recomendado ${real(r.teto)})${t.aprovacao ? `, acima do teto, aprovada por ${t.aprovacao.por}` : ''}`, { ref: t.id }); salvar(); cacheLimpa();
           fecharCamada(true);
           abrirCamada('modal', `<h2>Troca registrada</h2><p class="sub">${esc(t.marca + ' ' + t.modelo)} entrou no pátio por ${real(t.pago)}. O passaporte foi criado e a visão geral já foi atualizada.</p>
             <div class="acoes"><a class="btn btn-ouro" href="passaporte.html?id=${id}">Abrir passaporte</a><a class="btn btn-linha" href="#patio" id="ir-patio">Ver no pátio</a></div>`, (cc) => { $('#ir-patio', cc).onclick = () => fecharCamada(true); });
@@ -1106,12 +1218,12 @@
   const fotoMini = (t, cls = 'maq-foto') => { const f = F.de(t); const src = f.propria ? f.u : F.mini(f.u); return `<img class="${cls}" src="${src}" alt="" loading="lazy" onerror="this.outerHTML='<span class=&quot;maq-ico&quot;>${ICO[t.tipo] ? '' : ''}</span>'">`; };
   const eu = () => K.usuarioAtual();
   const PERM = {
-    dono: ['visao', 'avaliar', 'patio', 'trocas', 'teste', 'passaportes', 'vendedores', 'garantias', 'financiamento', 'relatorio', 'documentos', 'atividades', 'usuarios', 'config', 'compradores', 'mercado', 'aprovacoes'],
-    gerente: ['visao', 'avaliar', 'patio', 'trocas', 'teste', 'passaportes', 'vendedores', 'garantias', 'financiamento', 'relatorio', 'documentos', 'atividades', 'compradores', 'mercado', 'aprovacoes'],
-    vendedor: ['visao', 'avaliar', 'patio', 'passaportes', 'documentos', 'compradores', 'mercado', 'aprovacoes'],
-    oficina: ['patio', 'passaportes', 'garantias', 'documentos'],
-    financeiro: ['visao', 'patio', 'trocas', 'garantias', 'financiamento', 'relatorio', 'documentos', 'atividades'],
-    auditor: ['visao', 'patio', 'trocas', 'vendedores', 'garantias', 'financiamento', 'relatorio', 'atividades', 'aprovacoes']
+    dono: ['hoje', 'visao', 'avaliar', 'patio', 'trocas', 'teste', 'passaportes', 'vendedores', 'garantias', 'financiamento', 'relatorio', 'documentos', 'atividades', 'usuarios', 'config', 'compradores', 'mercado', 'aprovacoes', 'rotina', 'memoria', 'historico'],
+    gerente: ['hoje', 'visao', 'avaliar', 'patio', 'trocas', 'teste', 'passaportes', 'vendedores', 'garantias', 'financiamento', 'relatorio', 'documentos', 'atividades', 'compradores', 'mercado', 'aprovacoes', 'rotina', 'memoria', 'historico'],
+    vendedor: ['hoje', 'visao', 'avaliar', 'patio', 'passaportes', 'documentos', 'compradores', 'mercado', 'aprovacoes', 'rotina', 'memoria'],
+    oficina: ['hoje', 'patio', 'passaportes', 'garantias', 'documentos', 'rotina'],
+    financeiro: ['hoje', 'visao', 'patio', 'trocas', 'garantias', 'financiamento', 'relatorio', 'documentos', 'atividades', 'rotina', 'memoria', 'historico'],
+    auditor: ['hoje', 'visao', 'patio', 'trocas', 'vendedores', 'garantias', 'financiamento', 'relatorio', 'atividades', 'aprovacoes', 'rotina', 'memoria', 'historico']
   };
   const pode = (aba) => aba === 'perfil' || (PERM[eu().perfil] || PERM.dono).includes(aba);
   const podeAprovar = () => ['dono', 'gerente'].includes(eu().perfil);
@@ -1431,7 +1543,7 @@
             <div><span>Desconto por troca acima</span><b>${pct(K.cfg.descontoAcima, 0)}</b></div><div><span>Hora da oficina</span><b>${real(K.cfg.valorHora)}</b></div><div><span>Base do custo</span><b>${K.cfg.baseJuros === 'total' ? 'Pago + preparo' : 'Valor pago'}</b></div></div>
           <div class="acoes"><button class="btn btn-linha" type="button" id="c-prem">Alterar regras</button></div></section>
       </div>
-      ${blocoLojas()}${blocoLGPD()}
+      ${blocoIAConfig()}${blocoAvisos()}${blocoLojas()}${blocoLGPD()}
       <section class="painel bloco"><h2>${ICO.alvo}Alçadas de aprovação por tipo de máquina</h2><p class="sub" style="margin:6px 0 12px">Quanto acima do valor máximo cada um pode liberar. Acima da alçada do gerente, só o dono libera. Zero = qualquer valor acima precisa de aprovação.</p>
         <div class="tabela-wrap"><table class="tabela grande"><thead><tr><th>Tipo</th><th class="n">Vendedor libera até (R$)</th><th class="n">Gerente libera até (R$)</th><th>Acima disso</th></tr></thead><tbody>
         ${Object.entries(alcadas()).map(([k, a]) => `<tr><td><b>${NOMES[k]}</b></td><td class="n"><input class="campo-in" style="max-width:150px;text-align:right" data-alc="${k}|vendedor" inputmode="numeric" value="${a.vendedor.toLocaleString('pt-BR')}"></td><td class="n"><input class="campo-in" style="max-width:150px;text-align:right" data-alc="${k}|gerente" inputmode="numeric" value="${a.gerente.toLocaleString('pt-BR')}"></td><td>Só o dono</td></tr>`).join('')}</tbody></table></div>
@@ -1446,7 +1558,7 @@
       ${K.nuvem && !K.nuvem.offline && ['dono', 'gerente', 'auditor'].includes(eu().perfil) ? '<section class="painel bloco" id="c-copias"><h2>Cópias diárias no servidor</h2><p class="sub">Carregando…</p></section>' : ''}
       </div>`;
     $('#c-salvar').onclick = () => { if (K.nuvem && $('#c-nome').value.trim().length >= 2 && ['dono', 'gerente'].includes(eu().perfil)) K.nuvem.renomear($('#c-nome').value.trim(), $('#c-cid').value.trim()).catch((e) => toast(e.message, true)); estado.nomeRevenda = $('#c-nome').value.trim(); estado.cnpj = $('#c-cnpj').value.trim(); estado.cidadeRevenda = $('#c-cid').value.trim(); estado.marcasRevenda = $('#c-marcas').value.trim(); salvar(); log('config', 'Dados da revenda atualizados'); toast('Dados da revenda salvos.'); setTimeout(() => K.recarregar(), 600); };
-    $('#c-prem').onclick = abrirPremissas; ligarLGPD(); ligarLojas();
+    $('#c-prem').onclick = abrirPremissas; ligarLGPD(); ligarLojas(); ligarIAConfig(); ligarAvisos();
     $('#c-alc').onclick = () => { const n = {}; $$('[data-alc]', tela).forEach((i) => { const [k, q] = i.dataset.alc.split('|'); n[k] = n[k] || {}; n[k][q] = Math.max(0, num(i.value) || 0); }); Object.values(n).forEach((a) => { if (a.gerente < a.vendedor) a.gerente = a.vendedor; }); estado.alcadas = n; log('config', 'Alçadas de aprovação alteradas'); salvar(); toast('Alçadas salvas.'); rota(); };
     $('#c-modelo').onclick = () => formulario('Adicionar modelo ao catálogo', [{ k: 'tipo', r: 'Categoria', tipo: 'select', ops: Object.entries(NOMES) }, { k: 'marca', r: 'Fabricante', lista: 'dl-marca', obr: true }, { k: 'modelo', r: 'Modelo', lista: 'dl-modelo', obr: true }, { k: 'base', r: 'Referência de preço seminovo (R$)', num: true, obr: true }], { tipo: 'trator' }, (v) => {
       A.modelos.push({ tipo: v.tipo, marca: v.marca, modelo: v.modelo, base: v.base, hAno: { trator: 750, colhedora: 2600, pulverizador: 820, plantadeira: 270 }[v.tipo], importado: true });
@@ -1876,6 +1988,7 @@
         <div><span>Venda estimada</span><b>${real(c.recomendacao.vendaEstimada)}</b></div><div><span>Qualidade da estimativa</span><b>${esc(c.recomendacao.qualidade)}</b></div><div><span>Margem-alvo do dia</span><b>${pct(c.premissas.margemAlvo, 0)}</b></div>
         ${c.valorPago != null ? `<div><span>Valor pago</span><b class="${c.valorPago > c.recomendacao.valorMaximo ? 'neg' : 'pos'}">${real(c.valorPago)}</b></div>` : ''}${c.decisao ? `<div><span>Decisão</span><b>${esc(c.decisao)}</b></div>` : ''}</div>
       ${(c.horimetro || []).length || c.mercado != null || (c.alertasMostrados || []).length ? `<h3 style="margin-top:14px">Alertas que o sistema mostrou</h3><ul>${[...(c.horimetro || []), ...(c.mercado != null && c.mercado < -0.05 ? [`Mercado caindo ${pct(-c.mercado)} em 2 meses`] : []), ...(c.alertasMostrados || [])].map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
+      ${c.ia ? `<h3 style="margin-top:14px">IA nas fotos</h3><p>${esc(c.ia)}</p>` : ''}
       <p class="codigo">Código de verificação (SHA-256): <code>${rt.hash}</code></p></div>
       <div class="acoes"><button class="btn btn-ouro" type="button" onclick="print()">Imprimir ou salvar PDF</button></div>`);
   }
@@ -1931,8 +2044,8 @@
       <div class="grade-2 bloco">
         <section class="painel"><h2>${ICO.alerta}Notificações que você quer receber</h2>
           <div class="checks" style="margin-top:12px">${Object.keys(pref).map((k) => `<label class="check"><input type="checkbox" data-pref="${k}" ${pref[k] ? 'checked' : ''}> ${k}</label>`).join('')}</div>
-          <label class="check" style="margin-top:14px"><input type="checkbox" id="pf-resumo" ${u.resumo ? 'checked' : ''}> Resumo do dia por e-mail às 7h</label>
-          <p class="nota-rodape">O envio por e-mail e WhatsApp entra na versão com servidor; hoje as notificações aparecem no sino.</p>
+          <input type="checkbox" id="pf-resumo" hidden ${u.resumo ? 'checked' : ''}>
+          <p class="nota-rodape">Estas escolhas valem para o sino. O aviso por e-mail (dias úteis às 7h, só quando há algo para fazer) é ligado pelo dono em Configurações › Avisos.</p>
           <div class="acoes"><button class="btn btn-linha" type="button" id="pf-notif">Salvar preferências</button></div></section>
         <section class="painel"><h2>${ICO.alvo}Segurança</h2>
           ${['dono', 'gerente'].includes(u.perfil) ? `<p class="sub" style="margin:6px 0 12px">Com um PIN, ninguém aprova troca acima do teto usando o seu nome sem saber o código.</p>
@@ -2041,8 +2154,267 @@
     });
   }
 
+  // =====================================================================================
+  // V9: hábito e valor acumulado (ético): Central "Hoje", rotina por perfil, memória comercial,
+  // histórico vivo, IA própria da revenda e avisos por e-mail. Nada prende dados: exportação continua livre.
+  // =====================================================================================
+  const PERFIL_NOME = (p) => K.PERFIS[p] || p;
+  const primeiroNome = (u) => { if (u.apelido) return u.apelido; const l = String(u.nome || '').split(' ').filter(Boolean); return l.slice(0, /^(seu|dona|dr|dra|sr|sra)\.?$/i.test(l[0] || '') ? 2 : 1).join(' '); };
+  const mesCurto = (m) => { const [a, b] = m.split('-'); return new Date(+a, +b - 1, 15).toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '') + '/' + a.slice(2); };
+  function ctxDia(perfil = eu().perfil) {
+    const loja = estado.lojaAtual || '';
+    const rascunho = rascunhoDe && av.horas && ['vendedor', 'gerente', 'dono'].includes(perfil) ? `${av.marca} ${av.modelo} ${av.ano} · passo ${av.passo} de 4 · guardada ${new Date(rascunhoDe).toLocaleString('pt-BR')}` : null;
+    return { hoje: hojeISO(), perfil, nome: eu().nome, trocas: A.trocas, avaliacoes: estado.avaliacoes.filter((a) => !loja || !a.loja || a.loja === loja), pendentes: estado.pendentes,
+      garantias: A.garantias, financiadas: A.financiadas, compradores: A.compradores, revenda: A.revenda.nome, podeLiberar, janela: 7, rascunho, margemDe: (t) => infoPatio(t).margem, feitos: estado.rituais || {} };
+  }
+  const CAT_NOME = { aprovar: 'Aprovação', pedido: 'Seu pedido', avaliacao: 'Avaliação', rascunho: 'Avaliação', comprador: 'Comprador', faixa: 'Pátio', margem: 'Margem', preparo: 'Oficina', garantia: 'Garantia', floor: 'Floor plan', comissao: 'Financeiro', conferir: 'Auditoria' };
+  function botaoAcao(a, cls = 'btn-ouro') {
+    const b = a.botao || {};
+    if (b.href) return `<a class="btn ${cls}" href="${esc(b.href)}" target="_blank" rel="noopener" data-whats="${esc(a.id)}">${esc(b.rotulo)}</a>`;
+    if (b.ir) return `<a class="btn ${cls}" href="${b.ir}">${esc(b.rotulo)}</a>`;
+    return `<button class="btn ${cls}" type="button" data-acao="${esc(b.acao)}" data-ref="${esc(a.ref || '')}">${esc(b.rotulo)}</button>`;
+  }
+  function ligarAcoes(raiz) {
+    $$('[data-acao="maquina"]', raiz).forEach((b) => b.onclick = () => detalheMaquina(b.dataset.ref));
+    $$('[data-acao="avaliacao"]', raiz).forEach((b) => b.onclick = () => retornoAvaliacao(b.dataset.ref));
+    $$('[data-whats]', raiz).forEach((b) => b.addEventListener('click', () => { log('contato', 'WhatsApp aberto para comprador compatível'); salvar(); }));
+  }
+  // retorno ao cliente de uma avaliação parada: virou troca, desistiu ou ainda negociando (lembra em 3 dias)
+  function retornoAvaliacao(id) {
+    const a = estado.avaliacoes.find((x) => x.id === id); if (!a) return;
+    if (somenteLeitura()) { toast('Seu perfil é só de leitura.', true); return; }
+    abrirCamada('modal', `<h2>Retorno da avaliação</h2><p class="sub">${esc(a.maq.marca + ' ' + a.maq.modelo + ' ' + a.maq.ano)} · máximo ${real(a.teto)} · ${data(a.data)}</p>
+      <div class="acoes" style="flex-direction:column;align-items:stretch"><button class="btn btn-ouro" type="button" data-st="troca">Virou troca</button><button class="btn btn-linha" type="button" data-st="negociando">Ainda negociando (lembrar em 3 dias)</button><button class="btn btn-linha" type="button" data-st="desistiu">Cliente desistiu</button></div>`, (c) => {
+      $$('[data-st]', c).forEach((b) => b.onclick = () => {
+        const st = b.dataset.st, d = new Date(hojeISO() + 'T12:00:00'); d.setDate(d.getDate() + 3);
+        if (st === 'negociando') a.lembrar = d.toISOString().slice(0, 10); else { a.status = st; delete a.lembrar; }
+        a.retorno = { por: eu().nome, quando: new Date().toISOString(), status: st };
+        log('avaliacao', `Retorno da avaliação ${a.maq.marca} ${a.maq.modelo}: ${{ troca: 'virou troca', desistiu: 'cliente desistiu', negociando: 'ainda negociando' }[st]}`); salvar(); fecharCamada(true); toast('Retorno registrado.'); rota();
+      });
+    });
+  }
+
+  // ---------- CENTRAL DO DIA ("Hoje") ----------
+  function telaHoje() {
+    if (!A.todasTrocas.length && !estado.avaliacoes.length) return semDados();
+    const t0 = performance.now(), u = eu(), ctx = ctxDia(), { prioridades, acoes } = RT.acoesDoDia(ctx);
+    const minhas = RT.rituais(ctx).filter((r) => r.perfil === u.perfil && (r.periodo === 'dia' || new Date().getDay() === 1 || r.qtd));
+    const v = M.validar(), vend = A.todasTrocas.filter((t) => t.vendido && t.saida).length;
+    const h = new Date().getHours(), saud = h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
+    const grupos = {}; acoes.slice(3).forEach((a) => { (grupos[a.cat] = grupos[a.cat] || []).push(a); });
+    tela.innerHTML = `
+      <div class="titulo"><div><h1>Hoje</h1><p>${saud}, ${esc(primeiroNome(u))} · ${esc(PERFIL_NOME(u.perfil))} · ${estado.lojaAtual ? 'loja ' + esc(estado.lojaAtual) : estado.lojas.length ? 'todas as lojas' : esc(A.revenda.nome)} · ${new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}</p></div>
+        <div class="acoes">${pode('avaliar') && !somenteLeitura() ? '<a class="btn btn-ouro" href="#avaliar">Nova avaliação</a>' : ''}${pode('visao') ? '<a class="btn btn-linha" href="#visao">Visão geral</a>' : ''}</div></div>
+      <section class="prioridades" aria-label="As 3 prioridades de hoje">
+        ${prioridades.length ? prioridades.map((a, i) => `<article class="prio n${a.nivel}"><span class="prio-n" aria-hidden="true">${i + 1}</span><div><span class="cat">${esc(CAT_NOME[a.cat] || a.cat)}</span><h2>${esc(a.titulo)}</h2><p>${esc(a.txt)}</p>
+          <div class="acoes">${botaoAcao(a)}${a.extra ? `<a class="btn btn-linha" href="${a.extra.ir}">${esc(a.extra.rotulo)}</a>` : ''}${(a.whats || []).slice(1).map((w) => `<a class="btn btn-linha" href="${esc(w.href)}" target="_blank" rel="noopener" data-whats="${esc(a.id)}">WhatsApp de ${esc(String(w.nome).split(' ')[0])}</a>`).join('')}</div></div></article>`).join('')
+          : `<article class="prio n3"><span class="prio-n" aria-hidden="true">${ICO.baixo}</span><div><span class="cat">Em dia</span><h2>Nada urgente para você hoje</h2><p>Nenhuma aprovação, avaliação parada ou máquina mudando de faixa no seu perfil. Bom momento para cadastrar compradores ou revisar o pátio.</p><div class="acoes"><a class="btn btn-linha" href="#${pode('patio') ? 'patio' : 'perfil'}">Abrir o pátio</a></div></div></article>`}
+      </section>
+      ${acoes.length > 3 ? `<section class="painel bloco"><div class="painel-cab"><h2>${ICO.alvo}Também para hoje</h2><p>${acoes.length - 3} ${acoes.length - 3 === 1 ? 'ação' : 'ações'}, cada uma com o botão que resolve</p></div>
+        ${Object.entries(grupos).map(([cat, l]) => `<h3 class="grupo-acao">${esc(CAT_NOME[cat] || cat)} <span class="sub">${l.length}</span></h3><ul class="acoes-dia">${l.map((a) => `<li class="n${a.nivel}"><div><b>${esc(a.titulo)}</b><span>${esc(a.txt)}</span></div>${botaoAcao(a, 'btn-linha')}</li>`).join('')}</ul>`).join('')}</section>` : ''}
+      <div class="grade-2 bloco">
+        <section class="painel"><div class="painel-cab"><h2>${ICO.baixo}Sua rotina</h2><p>${esc(PERFIL_NOME(u.perfil))}</p></div>
+          <ul class="rotina">${minhas.map((r) => itemRitual(r)).join('') || '<li class="vazio">Sem rotina para o seu perfil.</li>'}</ul>
+          <div class="acoes"><a class="btn btn-linha" href="#rotina">Rotina da equipe</a></div></section>
+        ${pode('memoria') ? `<section class="painel"><div class="painel-cab"><h2>${ICO.linha}O que a revenda já aprendeu</h2></div>
+          <div class="numeros"><div><span>Trocas vendidas na memória</span><b>${vend}</b></div><div><span>Erro médio no teste às cegas</span><b>${v.n >= M.QUALIDADE.minimoValidacao ? pct(v.mape) : 'medindo'}</b></div><div><span>Avaliações feitas</span><b>${estado.avaliacoes.length}</b></div></div>
+          <p class="conta">Cada troca vendida entra na referência interna da revenda e o erro é medido de novo. É a memória da revenda, não valor de mercado.</p>
+          <div class="acoes"><a class="btn btn-linha" href="#memoria">Ver a memória comercial</a></div></section>` : ''}
+      </div>
+      <p class="nota-rodape" id="hoje-tempo">Montado em ${Math.max(1, Math.round(performance.now() - t0))} ms a partir dos dados da revenda. Cada item vem de um registro real; nada aqui é alerta inventado.</p>`;
+    ligarAcoes(tela); ligarRituais(tela);
+  }
+
+  // ---------- ROTINA POR PERFIL ----------
+  function itemRitual(r) {
+    const meu = r.perfil === eu().perfil && !somenteLeitura();
+    const st = r.feito ? `<span class="tag comprovado">Feito por ${esc(r.feito.por)} · ${new Date(r.feito.quando).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>` : r.emDia ? '<span class="tag comprovado">Em dia: nada pendente</span>' : '';
+    return `<li class="${r.feito || r.emDia ? 'ok' : ''}">${meu && !r.emDia ? `<label class="check"><input type="checkbox" data-ritual="${esc(r.chave)}" ${r.feito ? 'checked' : ''} ${r.feito && r.feito.por !== eu().nome ? 'disabled' : ''}> <span>` : '<span>'}<b>${esc(r.titulo)}</b>${r.qtd ? ` <span class="pilula">${r.qtd}</span>` : ''} <span class="sub">${r.periodo === 'dia' ? 'hoje' : 'esta semana'}</span>${meu && !r.emDia ? '</span></label>' : '</span>'} <a class="link" href="${r.ir}">abrir</a> ${st}</li>`;
+  }
+  function ligarRituais(raiz) {
+    $$('[data-ritual]', raiz).forEach((c) => c.onchange = () => {
+      estado.rituais = estado.rituais || {};
+      if (c.checked) estado.rituais[c.dataset.ritual] = { por: eu().nome, quando: new Date().toISOString() }; else delete estado.rituais[c.dataset.ritual];
+      log('rotina', `${c.checked ? 'Concluiu' : 'Reabriu'}: ${c.closest('li').querySelector('b').textContent}`); salvar(); rota();
+    });
+  }
+  function telaRotina() {
+    const ctx = ctxDia(), todos = RT.rituais(ctx), ver = ['dono', 'gerente', 'auditor'].includes(eu().perfil);
+    const exec = RT.execucaoRituais(estado.rituais, hojeISO(), 4);
+    const perfis = ver ? Object.keys(K.PERFIS) : [eu().perfil];
+    const resp = (p) => estado.usuarios.filter((x) => x.perfil === p).map((x) => x.nome);
+    tela.innerHTML = `<div class="titulo"><div><h1>Rotina da equipe</h1><p>O que cada perfil faz todo dia e toda semana, gerado dos dados de hoje. ${ver ? 'Você vê o que foi feito, por quem e quando, sem precisar cobrar.' : 'Marque o que já fez: o gerente e o dono veem sem precisar perguntar.'}</p></div></div>
+      <div class="grade-2">${perfis.map((p) => { const l = todos.filter((r) => r.perfil === p), feitos = l.filter((r) => r.feito || r.emDia).length; return `<section class="painel"><div class="painel-cab"><h2>${esc(PERFIL_NOME(p))}</h2><p>${feitos} de ${l.length} em dia</p></div>
+        <p class="sub">Responsáveis: ${esc(resp(p).join(', ') || 'ninguém com este perfil ainda')}</p>
+        <div class="progresso"><i style="width:${l.length ? feitos / l.length * 100 : 0}%"></i></div>
+        <ul class="rotina">${l.map(itemRitual).join('')}</ul></section>`; }).join('')}</div>
+      ${ver ? `<section class="painel bloco"><div class="painel-cab"><h2>${ICO.barras}Execução nas últimas 4 semanas</h2><p>Tarefas concluídas</p></div>
+        <div class="tabela-wrap"><table class="tabela"><thead><tr><th>Perfil</th><th class="n">Concluídas</th><th>Quem fez</th></tr></thead><tbody>
+        ${Object.keys(K.PERFIS).map((p) => { const e = exec[p]; return `<tr><td><b>${esc(PERFIL_NOME(p))}</b></td><td class="n">${e ? e.n : 0}</td><td>${e ? Object.entries(e.pessoas).map(([n, q]) => `${esc(n)} (${q})`).join(', ') : '<span class="sub">—</span>'}</td></tr>`; }).join('')}</tbody></table></div>
+        <p class="nota-rodape">Só mostra o que foi feito. O Anshur não manda cobrança nem notificação para a equipe por causa da rotina.</p></section>` : ''}`;
+    ligarRituais(tela);
+  }
+
+  // ---------- MEMÓRIA COMERCIAL ----------
+  function telaMemoria() {
+    const v = M.validar(), mem = RT.memoriaComercial(A.todasTrocas, v.testes), ev = mem.evolucao.slice(-12);
+    const comErro = ev.filter((e) => e.erro != null);
+    const largura = innerWidth >= 960 ? 1100 : 560;
+    const tabela = (titulo, l, extra = '') => `<section class="painel bloco"><div class="painel-cab"><h2>${titulo}</h2><p>${l.length}</p></div><div class="tabela-wrap"><table class="tabela"><thead><tr><th>${extra || 'Grupo'}</th><th class="n">Vendas na memória</th><th class="n">Venda média</th><th class="n">Última venda</th><th class="n">Erro medido</th><th>Confiança</th></tr></thead><tbody>
+      ${l.slice(0, 20).map((x) => `<tr><td><b>${esc(NOMES[x.chave] || x.chave)}</b></td><td class="n">${x.amostras}</td><td class="n">${mil(x.mediaVenda)}</td><td class="n">${data(x.ultima)} · ${mil(x.ultimoPreco)}</td><td class="n">${x.erro != null ? pct(x.erro) + ` <span class="sub">(${x.testes})</span>` : '<span class="sub">poucos testes</span>'}</td><td><span class="conf ${x.confianca}">${x.confianca}</span></td></tr>`).join('')}</tbody></table></div></section>`;
+    tela.innerHTML = `<div class="titulo"><div><h1>Memória comercial</h1><p>A referência de preço que a ${esc(A.revenda.nome)} construiu com as próprias trocas vendidas. Cresce a cada venda e é testada às cegas. <b>Não é valor de mercado</b> nem tabela: é o histórico desta revenda.</p></div>
+        <div class="acoes"><a class="btn btn-linha" href="#teste">Teste às cegas</a><button class="btn btn-linha" type="button" id="mem-csv">Exportar CSV</button></div></div>
+      <div class="kpis escalonado">
+        <div class="kpi k-marfim"><span class="rot">${ICO.camadas}Trocas vendidas na memória</span><span class="val">${conta(mem.total, 'int')}</span><span class="exp">Cada uma melhora a próxima avaliação</span></div>
+        <div class="kpi k-salvia"><span class="rot">${ICO.alvo}Erro médio no teste às cegas</span><span class="val">${v.n >= M.QUALIDADE.minimoValidacao ? pct(v.mape) : '—'}</span><span class="exp">${v.n} vendas previstas sem ver o resultado</span></div>
+        <div class="kpi k-marfim"><span class="rot">${ICO.moedas}Erro médio em reais</span><span class="val">${v.n >= M.QUALIDADE.minimoValidacao ? mil(v.mae) : '—'}</span><span class="exp">Por máquina, no preço de venda</span></div>
+        <div class="kpi k-marfim"><span class="rot">${ICO.barras}Modelos com histórico</span><span class="val">${mem.porModelo.length}</span><span class="exp">${mem.porModelo.filter((m) => m.amostras >= 3).length} com 3 ou mais vendas</span></div>
+      </div>
+      <div class="grade-2">
+        <section class="painel"><div class="painel-cab"><h2>${ICO.linha}Vendas acumuladas na memória</h2><p>Por mês</p></div>${ev.length > 1 ? G.linha(ev.map((e) => ({ r: mesCurto(e.mes), v: e.amostras })), { formato: (x) => Math.round(x) + '', altura: 170, largura: Math.min(560, largura) }) : '<p class="vazio">Ainda poucas vendas.</p>'}</section>
+        <section class="painel"><div class="painel-cab"><h2>${ICO.alvo}Erro do teste às cegas ao longo do tempo</h2><p>Média das últimas 12 previsões</p></div>${comErro.length > 1 ? G.linha(comErro.map((e) => ({ r: mesCurto(e.mes), v: e.erro })), { formato: (x) => pct(x), altura: 170, largura: Math.min(560, largura) }) : '<p class="vazio">O erro aparece depois de algumas vendas testadas.</p>'}
+          <p class="nota-rodape">Cada previsão usou só as vendas anteriores a ela. O gráfico mostra, sem maquiagem, se o erro está caindo ou subindo; com mais trocas registradas a tendência é cair.</p></section>
+      </div>
+      <section class="painel bloco"><div class="painel-cab"><h2>${ICO.baixo}Últimas vendas que entraram na memória</h2></div>
+        <ul class="linha-tempo grande">${mem.recentes.map((x) => `<li><b>${esc(x.maq)} vendida por ${mil(x.vendido)}</b><span>${data(x.quando)} · agora ${x.doModelo} ${x.doModelo === 1 ? 'venda' : 'vendas'} deste modelo e ${x.doTipo} de ${esc(NOMES[x.tipo].toLowerCase())} na memória</span></li>`).join('') || '<li>Nenhuma venda ainda.</li>'}</ul></section>
+      ${tabela(`${ICO.camadas}Por tipo de máquina`, mem.porTipo, 'Tipo')}${tabela(`${ICO.etiqueta}Por marca`, mem.porMarca, 'Marca')}${tabela(`${ICO.etiqueta}Por modelo`, mem.porModelo, 'Modelo')}
+      <p class="nota-rodape">Confiança: alta = 12+ vendas e erro até 6%; moderada = 8+ vendas e erro até 10%; abaixo disso, baixa. Os dados são da revenda e saem em CSV ou na cópia de segurança quando ela quiser.</p>`;
+    $('#mem-csv').onclick = () => baixarCSV(`anshur-memoria-${hojeISO()}.csv`, [['Grupo', 'Chave', 'Vendas', 'Venda média', 'Última venda', 'Último preço', 'Erro medido', 'Testes', 'Confiança']].concat(...[['tipo', mem.porTipo], ['marca', mem.porMarca], ['modelo', mem.porModelo]].map(([g, l]) => l.map((x) => [g, x.chave, x.amostras, Math.round(x.mediaVenda), x.ultima, x.ultimoPreco, x.erro != null ? pctCSV(x.erro) : '', x.testes, x.confianca]))));
+    contar();
+  }
+
+  // ---------- HISTÓRICO VIVO ----------
+  const fh = { tipo: '', marca: '', modelo: '', loja: '', de: '', ate: '' };
+  function telaHistorico() {
+    const tl = RT.linhaDoTempo(estado, A.todasTrocas.filter((t) => !K.lojasPermitidas || !K.lojasPermitidas.length || K.lojasPermitidas.includes(t.loja)), { ...fh, loja: fh.loja || estado.lojaAtual || '' });
+    const marcas = [...new Set(A.todasTrocas.map((t) => t.marca).filter(Boolean))].sort(), modelos = [...new Set(A.todasTrocas.filter((t) => !fh.marca || t.marca === fh.marca).map((t) => t.modelo))].sort();
+    const TIPOS_EV = { avaliacao: 'Avaliações', decisao: 'Decisões da IA', troca: 'Trocas', aprovacao: 'Aprovações', negociacao: 'Negociações de preço', venda: 'Vendas e margens' };
+    const ind = (titulo, l) => `<section class="painel"><div class="painel-cab"><h2>${titulo}</h2></div><div class="tabela-wrap"><table class="tabela"><thead><tr><th></th><th class="n">Avaliações</th><th class="n">Trocas</th><th class="n">Vendas</th><th class="n">Margem média</th></tr></thead><tbody>${l.slice(0, 12).map((x) => `<tr><td><b>${esc(x.chave)}</b></td><td class="n">${x.avaliacoes}</td><td class="n">${x.trocas}</td><td class="n">${x.vendas}</td><td class="n ${x.margem != null && x.margem < 0.06 ? 'neg' : ''}">${x.margem != null ? pct(x.margem) : '—'}</td></tr>`).join('') || '<tr><td colspan="5" class="vazio">Nada no filtro.</td></tr>'}</tbody></table></div></section>`;
+    const opt = (l, v, todos) => `<option value="">${todos}</option>` + l.map((x) => `<option ${x === v ? 'selected' : ''}>${esc(x)}</option>`).join('');
+    tela.innerHTML = `<div class="titulo"><div><h1>Histórico vivo</h1><p>Tudo o que a revenda decidiu e aprendeu: avaliações, decisões, aprovações, negociações, vendas e margens, numa linha do tempo.</p></div><div class="acoes"><button class="btn btn-linha" type="button" id="hv-csv">Exportar CSV</button></div></div>
+      <div class="filtros filtros-hist">
+        <div class="campo"><label for="hv-tipo">Evento</label><select id="hv-tipo"><option value="">Todos</option>${Object.entries(TIPOS_EV).map(([k, n]) => `<option value="${k}" ${fh.tipo === k ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
+        <div class="campo"><label for="hv-marca">Marca</label><select id="hv-marca">${opt(marcas, fh.marca, 'Todas')}</select></div>
+        <div class="campo"><label for="hv-modelo">Modelo</label><select id="hv-modelo">${opt(modelos, fh.modelo, 'Todos')}</select></div>
+        ${estado.lojas.length ? `<div class="campo"><label for="hv-loja">Loja</label><select id="hv-loja">${opt(K.lojasPermitidas && K.lojasPermitidas.length ? K.lojasPermitidas : estado.lojas, fh.loja || estado.lojaAtual, 'Todas')}</select></div>` : ''}
+        <div class="campo"><label for="hv-de">De</label><input id="hv-de" type="date" value="${fh.de}"></div><div class="campo"><label for="hv-ate">Até</label><input id="hv-ate" type="date" value="${fh.ate}"></div>
+      </div>
+      <div class="grade-2">${ind(`${ICO.etiqueta}Por marca`, tl.porMarca)}${ind(`${ICO.etiqueta}Por modelo`, tl.porModelo)}</div>
+      ${estado.lojas.length ? `<div class="bloco">${ind(`${ICO.camadas}Por loja`, tl.porLoja)}</div>` : ''}
+      <section class="painel bloco"><div class="painel-cab"><h2>${ICO.linha}Linha do tempo</h2><p>${tl.eventos.length} ${tl.eventos.length === 1 ? 'registro' : 'registros'}${tl.eventos.length > 250 ? ' (mostrando os 250 mais recentes)' : ''}</p></div>
+        <ul class="linha-tempo grande hv">${tl.eventos.slice(0, 250).map((e) => `<li class="ev-${e.tipo}"><b>${esc(e.titulo)}</b><span>${data(e.quando)} · ${esc(TIPOS_EV[e.tipo] || e.tipo)}${e.loja ? ' · ' + esc(e.loja) : ''} · ${esc(e.txt)}</span></li>`).join('') || '<li>Nada no filtro.</li>'}</ul></section>`;
+    const ligar = (id, k) => { const el = $(id); if (el) el.onchange = () => { fh[k] = el.value; if (k === 'marca') fh.modelo = ''; telaHistorico(); }; };
+    ligar('#hv-tipo', 'tipo'); ligar('#hv-marca', 'marca'); ligar('#hv-modelo', 'modelo'); ligar('#hv-loja', 'loja'); ligar('#hv-de', 'de'); ligar('#hv-ate', 'ate');
+    $('#hv-csv').onclick = () => baixarCSV(`anshur-historico-${hojeISO()}.csv`, [['Data', 'Evento', 'Título', 'Detalhe', 'Marca', 'Modelo', 'Loja', 'Valor', 'Margem']].concat(tl.eventos.map((e) => [e.quando, TIPOS_EV[e.tipo] || e.tipo, e.titulo, e.txt, e.marca, e.modelo, e.loja, e.valor != null ? Math.round(e.valor) : '', e.margem != null ? pctCSV(e.margem) : ''])));
+  }
+
+  // ---------- CONFIGURAÇÕES › INTELIGÊNCIA ARTIFICIAL e › AVISOS (só o dono) ----------
+  function blocoIAConfig() {
+    if (eu().perfil !== 'dono') return '';
+    return `<section class="painel bloco" id="cfg-ia"><h2>${ICO.alvo}Inteligência artificial</h2>
+      <p class="sub" style="margin:6px 0 10px">Usada na avaliação das fotos. Padrão: <b>IA da Blue Rose (Gemini grátis)</b>, 30 análises por dia para a revenda. Se preferir, conecte a chave da sua conta do Gemini ou da OpenAI: ela fica cifrada no servidor, ninguém a vê de novo (só o final) e não há limite nosso.</p>
+      <div id="ia-status" class="conta">${NV ? 'Carregando…' : 'Demonstração: usando a IA de exemplo (nada sai deste aparelho).'}</div>
+      <div class="campos" style="margin-top:12px">
+        <div class="campo"><label for="ia-prov">Provedor da chave própria</label><select id="ia-prov"><option value="gemini">Google Gemini</option><option value="openai">OpenAI</option></select></div>
+        <div class="campo"><label for="ia-modelo">Modelo (opcional)</label><input id="ia-modelo" list="dl-ia-modelos" placeholder="gemini-3.5-flash-lite" autocomplete="off">${lista('dl-ia-modelos', ['gemini-3.5-flash-lite', 'gemini-3.5-flash', 'gpt-5-mini', 'gpt-5'])}</div>
+        <div class="campo inteiro"><label for="ia-chave">Chave de API</label><input id="ia-chave" type="password" autocomplete="off" spellcheck="false" placeholder="Cole aqui a chave (AIza… ou sk-…)"></div>
+      </div>
+      <div class="acoes"><button class="btn btn-linha" type="button" id="ia-testar">Testar</button><button class="btn btn-ouro" type="button" id="ia-salvar">Salvar chave própria</button><button class="btn btn-linha" type="button" id="ia-voltar">Voltar para a IA da Blue Rose</button></div>
+      <p class="nota-rodape">Testar faz uma chamada mínima e mostra se funcionou; nada é salvo no teste. O custo do uso da sua chave é cobrado pela sua conta no Google ou na OpenAI.</p></section>`;
+  }
+  function ligarIAConfig() {
+    const box = $('#cfg-ia'); if (!box) return;
+    const st = $('#ia-status'), chave = $('#ia-chave'), prov = $('#ia-prov'), mod = $('#ia-modelo');
+    prov.onchange = () => { mod.placeholder = prov.value === 'openai' ? 'gpt-5-mini' : 'gemini-3.5-flash-lite'; };
+    const mostra = (s) => { st.innerHTML = s.propria ? `Usando a <b>chave própria ${s.provedor === 'openai' ? 'da OpenAI' : 'do Gemini'}</b> (••••${esc(s.final || '')}), modelo ${esc(s.modelo)}. Sem limite nosso.` : `Usando a <b>IA da Blue Rose (Gemini grátis)</b>, modelo ${esc(s.modelo)} · ${s.restantes != null ? s.restantes + ' de ' + s.limite + ' análises restantes hoje' : ''}`; };
+    const demo = () => estado.demoIA || { propria: false, provedor: 'blue_rose', modelo: 'gemini-3.5-flash-lite', restantes: 30, limite: 30 };
+    const carregar = () => (NV ? NV.ia('status').then(mostra, (e) => { st.textContent = e.message; }) : mostra(demo()));
+    carregar();
+    const pronto = (b, sim, t) => { b.disabled = sim; if (t) b.textContent = t; };
+    $('#ia-testar').onclick = async (e) => {
+      const b = e.currentTarget; pronto(b, true, 'Testando…');
+      try {
+        if (!NV) { await new Promise((ok) => setTimeout(ok, 400)); toast(chave.value.trim() ? 'Demonstração: o teste real chama a IA só na conta da revenda. Formato da chave conferido.' : 'Demonstração: IA de exemplo funcionando.'); }
+        else { const r = await NV.ia('testar', { provedor: prov.value, chave: chave.value.trim(), modelo: mod.value.trim() }); toast(r.ok ? `Funcionou (${r.provedor === 'blue_rose' ? 'IA da Blue Rose' : r.provedor === 'openai' ? 'OpenAI' : 'Gemini'}, ${r.modelo}).` : r.erro, !r.ok); }
+      } catch (er) { toast(er.message, true); }
+      pronto(b, false, 'Testar');
+    };
+    $('#ia-salvar').onclick = async (e) => {
+      const k = chave.value.trim(); if (k.length < 20 || /\s/.test(k)) { toast('Cole a chave completa (sem espaços).', true); chave.focus(); return; }
+      const b = e.currentTarget; pronto(b, true, 'Conferindo e salvando…');
+      try {
+        if (!NV) { estado.demoIA = { propria: true, provedor: prov.value, modelo: mod.value.trim() || (prov.value === 'openai' ? 'gpt-5-mini' : 'gemini-3.5-flash-lite'), final: k.slice(-4) }; salvar(); toast('Demonstração: só o final da chave foi guardado; a chave em si não sai daqui.'); }
+        else { const r = await NV.ia('salvar', { provedor: prov.value, chave: k, modelo: mod.value.trim() }); if (!r.ok) throw new Error(r.erro); toast('Chave própria salva e cifrada no servidor.'); }
+        chave.value = ''; carregar();
+      } catch (er) { toast(er.message, true); }
+      pronto(b, false, 'Salvar chave própria');
+    };
+    $('#ia-voltar').onclick = () => confirmar('Voltar para a IA da Blue Rose?', 'A chave própria é apagada do servidor. A revenda volta a usar o Gemini grátis da Blue Rose (30 análises por dia).', 'Voltar e apagar a chave', async () => {
+      try { if (!NV) { delete estado.demoIA; salvar(); } else await NV.ia('remover'); toast('Voltou para a IA da Blue Rose; a chave própria foi apagada.'); carregar(); } catch (er) { toast(er.message, true); }
+    });
+  }
+  function blocoAvisos() {
+    if (eu().perfil !== 'dono') return '';
+    return `<section class="painel bloco" id="cfg-avisos"><h2>${ICO.alerta}Avisos</h2>
+      <p class="sub" style="margin:6px 0 10px">Um e-mail por dia útil às 7h com o que pede atenção (avaliação parada, aprovação esperando, máquina mudando de faixa, garantia perto de 60 dias, comprador para máquina nova, com o link do WhatsApp pronto). <b>Só sai quando há algo relevante</b>; dia sem nada, sem e-mail. Padrão: só para o dono.</p>
+      <div class="campos"><div class="campo"><label for="av-freq">Frequência</label><select id="av-freq"><option value="diario">Diário (dias úteis, 7h)</option><option value="semanal">Semanal (segunda, 7h)</option><option value="desligado">Desligado</option></select></div></div>
+      <span class="rot-campo" style="margin-top:12px;display:block">Quem recebe</span><div class="checks" id="av-dest">Carregando…</div>
+      <div class="acoes"><button class="btn btn-ouro" type="button" id="av-salvar">Salvar avisos</button><button class="btn btn-linha" type="button" id="av-previa">Ver como fica o e-mail</button></div>
+      <div id="av-envios"></div></section>`;
+  }
+  function ligarAvisos() {
+    const box = $('#cfg-avisos'); if (!box) return;
+    const pessoas = estado.usuarios.filter((u) => NV ? u.email : true);
+    const desenha = (cfg) => {
+      const dest = cfg && cfg.destinatarios && cfg.destinatarios.length ? cfg.destinatarios : pessoas.filter((u) => u.perfil === 'dono').map((u) => u.id);
+      $('#av-freq').value = (cfg && cfg.frequencia) || 'diario';
+      $('#av-dest').innerHTML = pessoas.map((u) => `<label class="check"><input type="checkbox" data-dest="${esc(u.id)}" ${dest.includes(u.id) ? 'checked' : ''}> ${esc(u.nome)} <span class="sub">· ${esc(PERFIL_NOME(u.perfil))}${u.email ? ' · ' + esc(u.email) : ''}</span></label>`).join('') || '<p class="sub">Ninguém com e-mail na equipe.</p>';
+    };
+    if (NV) {
+      NV.avisos().then(desenha, (e) => { $('#av-dest').textContent = e.message; });
+      NV.envios().then((l) => { $('#av-envios').innerHTML = l.length ? `<p class="conta">Últimos envios: ${l.slice(0, 6).map((x) => `${data(x.dia)} para ${esc((estado.usuarios.find((u) => u.id === x.usuario) || {}).nome || 'pessoa removida')} (${x.itens} ${x.itens === 1 ? 'item' : 'itens'}, ${x.status})`).join('; ')}.</p>` : '<p class="conta">Nenhum e-mail enviado ainda.</p>'; }, () => {});
+    } else desenha(estado.avisos);
+    $('#av-salvar').onclick = async () => {
+      const freq = $('#av-freq').value, dest = $$('[data-dest]', box).filter((c) => c.checked).map((c) => c.dataset.dest);
+      try { if (NV) await NV.salvarAvisos(freq, dest); else { estado.avisos = { frequencia: freq, destinatarios: dest }; log('config', `Avisos por e-mail: ${freq}`); salvar(); } toast(freq === 'desligado' ? 'Avisos desligados.' : 'Avisos salvos.'); } catch (e) { toast(e.message, true); }
+    };
+    $('#av-previa').onclick = () => {
+      const u = eu(), { acoes } = RT.acoesDoDia(Object.assign(ctxDia('dono'), { rascunho: null, janela: 1 }));
+      const em = RT.resumoEmail({ revenda: A.revenda.nome, nome: u.nome, acoes, link: location.origin + location.pathname, hoje: hojeISO(), frequencia: $('#av-freq').value });
+      abrirCamada('modal', em ? `<h2>${esc(em.assunto)}</h2><p class="sub">Prévia com os dados de agora${OP ? '' : ' (demonstração: nenhum e-mail é enviado)'}.</p><div class="previa-email">${em.html}</div>` : '<h2>Nada a enviar agora</h2><p class="sub">Com os dados de hoje não há nada relevante: nesse caso o Anshur não manda e-mail.</p>');
+    };
+  }
+
+  // ---------- demonstração: dados fictícios para a Central, a rotina, a IA e o histórico aparecerem funcionando ----------
+  function semearDemo() {
+    if (OP || estado.semente9) return;
+    const dAtras = (n) => { const d = new Date(hojeISO() + 'T12:00:00'); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
+    const mod = (tipo, i = 0) => A.modelos.filter((m) => m.tipo === tipo)[i] || A.modelos[0];
+    const maqDe = (m, ano, horas, cond) => ({ tipo: m.tipo, marca: m.marca, modelo: m.modelo, ano, horas, cond, ficha: { motor: 4, transmissao: 4, hidraulico: 3, pneus: 3, cabine: 4, lataria: 3 } });
+    const avs = [[mod('trator', 1), 2021, 3800, 70, 3, 'Rodrigo'], [mod('pulverizador', 0), 2020, 4100, 66, 6, 'Marcos'], [mod('trator', 3), 2019, 5200, 62, 12, 'Fernanda']];
+    avs.forEach(([m, ano, h, c, d, por], i) => { const maq = maqDe(m, ano, h, c), r = M.avaliar(maq, { semValidacao: true }); if (!r) return;
+      estado.avaliacoes.push({ id: 'AVD' + i, data: dAtras(d), por, loja: estado.lojas[i % estado.lojas.length] || '', status: i === 2 ? 'desistiu' : 'aberta', maq, teto: r.teto, venda: r.venda, preparo: r.preparo, faixa: r.faixa, confianca: r.confianca, amostras: r.base, premissas: { margemAlvo: r.margem },
+        ...(i === 0 ? { ia: { exemplo: true, provedor: 'exemplo', fotos: 11, resumo: 'EXEMPLO (demonstração): IA sugeriu Motor 3, Transmissão 4, Hidráulico 3, Pneus 2, Cabine 4, Lataria 3; o avaliador aceitou 5, alterou 1 (Pneus: 2→3); avarias: 1 confirmadas, 0 descartadas.' } } : {}) }); });
+    // troca recente que combina com um comprador cadastrado (para o "comprador compatível" aparecer)
+    for (const c of A.compradores) {
+      const ms = A.modelos.filter((m) => m.tipo === c.tipo && (!c.marcas || m.marca === c.marcas)); let feito = false;
+      for (const m of ms) { const maq = maqDe(m, Math.max(+c.anoMin || 0, anoAtual - 4), 2800, 78), r = M.avaliar(maq, { semValidacao: true }); if (!r) continue;
+        const t = K.fecharTroca(estado, maq, r, r.teto, dAtras(2), { vendedor: 'Rodrigo', origem: 'Faz. Recreio', loja: estado.lojas[0] || '' });
+        if (RT.compradoresPara(t, A.compradores).length) { A.trocas.push({ ...t }); feito = true; break; } estado.fechadas.pop(); }
+      if (feito) break;
+    }
+    // pedido de aprovação acima do teto esperando o gerente
+    const mp = maqDe(mod('colhedora', 0), anoAtual - 5, 14000, 68), rp = M.avaliar(mp, { semValidacao: true });
+    if (rp) estado.pendentes.push({ id: 'PD1', nivel: 'gerente', quando: new Date(Date.now() - 5 * 3600e3).toISOString(), por: 'Tiago', maq: mp, rec: { teto: rp.teto, venda: rp.venda, preparo: rp.preparo, dias: rp.dias, margem: rp.margem, margemSobreVenda: rp.margemSobreVenda, confianca: rp.confianca, doTipo: rp.doTipo }, valor: rp.teto + 25000, data: hojeISO(), motivo: 'Cliente fecha a colhedora nova se pagarmos isso no usado', status: 'pendente', extra: { vendedor: 'Tiago', origem: 'Usina fictícia', fotos: [] } });
+    // rotina: o que a equipe fictícia já concluiu
+    const ch = (per, perfil, id, dias) => RT.chavePeriodo(per, dAtras(dias)) + '|' + perfil + '|' + id;
+    estado.rituais = Object.assign({}, estado.rituais, { [ch('dia', 'vendedor', 'compradores', 0)]: { por: 'Rodrigo', quando: new Date(Date.now() - 2 * 3600e3).toISOString() }, [ch('semana', 'financeiro', 'comissoes', 0)]: { por: 'Lúcia', quando: new Date(Date.now() - 26 * 3600e3).toISOString() },
+      [ch('dia', 'gerente', 'faixas', 1)]: { por: 'Carlos', quando: new Date(Date.now() - 22 * 3600e3).toISOString() }, [ch('dia', 'vendedor', 'retorno', 1)]: { por: 'Marcos', quando: new Date(Date.now() - 25 * 3600e3).toISOString() }, [ch('dia', 'oficina', 'preparo', 2)]: { por: 'Zé da Oficina', quando: new Date(Date.now() - 50 * 3600e3).toISOString() } });
+    estado.semente9 = true; salvar(); cacheLimpa();
+  }
+
   // ---------- rotas com transição ----------
-  const TELAS = { visao: telaVisao, avaliar: telaAvaliar, patio: telaPatio, trocas: telaTrocas, teste: telaTeste, passaportes: telaPassaportes, vendedores: telaVendedores, garantias: telaGarantias, financiamento: telaFinanciamento, relatorio: telaRelatorios, mensal: telaRelatorio, documentos: telaDocumentos, usuarios: telaUsuarios, config: telaConfig, atividades: telaAtividades, compradores: telaCompradores, mercado: telaMercado, aprovacoes: telaAprovacoes, perfil: telaPerfil };
+  const TELAS = { visao: telaVisao, avaliar: telaAvaliar, patio: telaPatio, trocas: telaTrocas, teste: telaTeste, passaportes: telaPassaportes, vendedores: telaVendedores, garantias: telaGarantias, financiamento: telaFinanciamento, relatorio: telaRelatorios, mensal: telaRelatorio, documentos: telaDocumentos, usuarios: telaUsuarios, config: telaConfig, atividades: telaAtividades, compradores: telaCompradores, mercado: telaMercado, aprovacoes: telaAprovacoes, perfil: telaPerfil, hoje: telaHoje, rotina: telaRotina, memoria: telaMemoria, historico: telaHistorico };
   function moverIndicador() {
     const ativo = $('.menu a[aria-current="page"]'), ind = $('.menu-indicador');
     if (!ativo || !ind) return;
@@ -2051,9 +2423,9 @@
   }
   let primeira = true;
   function rota() {
-    const nome = (location.hash || '#visao').slice(1);
-    let ativa = TELAS[nome] ? nome : 'visao';
-    if (!pode(ativa)) { ativa = (PERM[eu().perfil] || [])[0] || 'visao'; }
+    const nome = (location.hash || '#hoje').slice(1);
+    let ativa = TELAS[nome] ? nome : 'hoje';
+    if (!pode(ativa)) { ativa = (PERM[eu().perfil] || [])[0] || 'hoje'; }
     $$('.menu a').forEach((a) => { if (a.dataset.aba === ativa) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
     moverIndicador();
     fecharCamada(true);
@@ -2069,6 +2441,7 @@
   $$('.menu a').forEach((a) => { if (!pode(a.dataset.aba)) a.hidden = true; });
   $$('.menu-grupo').forEach((g) => { let x = g.nextElementSibling, algum = false; while (x && x.tagName === 'A') { if (!x.hidden) algum = true; x = x.nextElementSibling; } g.hidden = !algum; });
   if (OP) sincronizar(false).then((r) => { if (r === 'novas') { toast(`Sincronizado com o seu sistema: ${estado.ultimaSync.novas} trocas novas.`); setTimeout(() => K.recarregar(), 1200); } else if (r === 'permissao') toast('Toque em Teste às cegas › Importar planilha › Sincronizar agora para atualizar com o seu sistema.'); }).catch(() => {});
+  semearDemo();
   atualizarSino();
   window.addEventListener('hashchange', rota);
   // celular: barra com 4 atalhos + "Mais", que abre todos os módulos por categoria
@@ -2080,7 +2453,7 @@
     $('#menu-mais').onclick = () => abrir(!document.body.classList.contains('menu-aberto'));
     $('#menu-fundo').onclick = () => abrir(false);
     menu.addEventListener('click', (e) => { if (e.target.closest('a')) abrir(false); });
-    const marcar = () => { const a = $('.menu a[aria-current="page"]'); $('#menu-mais').classList.toggle('ativo', !!a && !['visao', 'avaliar', 'patio', 'aprovacoes'].includes(a.dataset.aba)); };
+    const marcar = () => { const a = $('.menu a[aria-current="page"]'); $('#menu-mais').classList.toggle('ativo', !!a && !['hoje', 'avaliar', 'patio', 'aprovacoes'].includes(a.dataset.aba)); };
     window.addEventListener('hashchange', () => setTimeout(marcar, 50)); setTimeout(marcar, 300);
   })();
   window.addEventListener('resize', moverIndicador);
