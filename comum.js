@@ -1,7 +1,9 @@
 // Camada de dados (fonte única) + regras de negócio puras + utilidades de formatação.
-// Hoje grava no navegador (localStorage). A interface `repo` é o ponto que vira Supabase depois.
+// Demonstração: grava no navegador (localStorage), dados fictícios.
+// Ambiente real com conta: a fonte oficial é o servidor (nuvem.js → Supabase); `repo` envia para lá.
 (function (raiz) {
   const A = raiz.ANSHUR;
+  const N = raiz.ANSHUR_NUVEM || null; // existe só no ambiente real, depois do login
   const temStorage = (() => { try { return typeof localStorage !== 'undefined'; } catch (e) { return false; } })();
   const getItem = (k) => { try { return temStorage ? localStorage.getItem(k) : null; } catch (e) { return null; } };
   const setItem = (k, v) => { try { if (!temStorage) return false; localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -11,13 +13,19 @@
   const CHAVES = { demo: 'anshur-demo-v2', op: 'anshur-op-v1' };
   const ambiente = getItem('anshur-ambiente') === 'op' ? 'op' : 'demo';
   const vazio = () => ({ versao: 3, fechadas: [], avaliacoes: [], precos: {}, vendas: {}, preparos: {}, historico: [], config: {} });
+  const nuvem = (amb) => amb === 'op' && N && ambiente === 'op';
+  let vivo = null; // no ambiente real, o estado carregado do servidor é o único em memória
   const repo = {
-    ler: (amb = ambiente) => { try { return Object.assign(vazio(), JSON.parse(getItem(CHAVES[amb])) || {}); } catch (e) { return vazio(); } },
-    gravar: (d, amb = ambiente) => setItem(CHAVES[amb], JSON.stringify(d)),
-    apagar: (amb = ambiente) => delItem(CHAVES[amb]),
+    ler: (amb = ambiente) => {
+      if (nuvem(amb)) return vivo || Object.assign(vazio(), JSON.parse(JSON.stringify(N.dados || {})));
+      try { return Object.assign(vazio(), JSON.parse(getItem(CHAVES[amb])) || {}); } catch (e) { return vazio(); }
+    },
+    gravar: (d, amb = ambiente) => (nuvem(amb) ? N.salvar(d) : setItem(CHAVES[amb], JSON.stringify(d))),
+    apagar: (amb = ambiente) => (nuvem(amb) ? false : delItem(CHAVES[amb])),
     trocarAmbiente: (amb) => setItem('anshur-ambiente', amb)
   };
   const estado = repo.ler();
+  if (nuvem('op')) vivo = estado;
 
   // premissas configuráveis pela revenda (nunca resultado garantido)
   // comissão e valor da hora da oficina também são políticas da revenda (configuráveis)
@@ -27,7 +35,8 @@
   A.margemAlvo = cfg.margemAlvo;
 
   if (ambiente === 'op') {
-    A.revenda = { nome: estado.nomeRevenda || 'Minha revenda', cidade: estado.cidadeRevenda || 'dados reais', aviso: 'Dados da sua revenda, guardados só neste navegador' };
+    A.revenda = N ? { nome: estado.nomeRevenda || N.revenda.nome, cidade: estado.cidadeRevenda || N.revenda.cidade || 'dados reais', aviso: 'Dados da sua revenda, guardados na conta da revenda' }
+      : { nome: estado.nomeRevenda || 'Minha revenda', cidade: estado.cidadeRevenda || 'dados reais', aviso: 'Dados da sua revenda, guardados só neste navegador' };
     A.trocas = (estado.historico || []).map((t) => ({ ...t })).concat(estado.fechadas.map((t) => ({ ...t })));
     A.garantias = []; A.financiadas = []; // nada fictício no ambiente real (o que for cadastrado entra por estado.extras)
     // modelos que vieram na planilha e não estão no catálogo entram com a referência (Fipe) informada
@@ -53,14 +62,24 @@
       { id: 'u3', nome: 'Rodrigo', perfil: 'vendedor', email: '' }, { id: 'u4', nome: 'Marcos', perfil: 'vendedor', email: '' }, { id: 'u5', nome: 'Tiago', perfil: 'vendedor', email: '' },
       { id: 'u6', nome: 'Fernanda', perfil: 'vendedor', email: '' }, { id: 'u7', nome: 'Zé da Oficina', perfil: 'oficina', email: '' }, { id: 'u8', nome: 'Lúcia', perfil: 'financeiro', email: '' }];
   }
+  // com conta: quem usa e qual perfil vêm do servidor (anshur_membros); foto, PIN e preferências continuam no estado
+  if (N && ambiente === 'op') {
+    const antes = new Map((estado.usuarios || []).map((u) => [u.id, u]));
+    estado.usuarios = N.membros.map((m) => Object.assign({}, antes.get(m.usuario) || {}, { id: m.usuario, nome: (antes.get(m.usuario) || {}).nome || m.nome, perfil: m.perfil, email: m.email, lojas: m.lojas || null }));
+    if (!estado.usuarios.some((u) => u.id === N.eu.usuario)) estado.usuarios.push({ id: N.eu.usuario, nome: N.eu.nome, perfil: N.eu.perfil, email: N.eu.email });
+    estado.usuarioAtual = N.eu.usuario;
+  }
   if (ambiente !== 'op' && !estado.usuarios.some((u) => u.perfil === 'auditor')) estado.usuarios.push({ id: 'u9', nome: 'Auditoria Externa', perfil: 'auditor', email: 'auditoria@mogiana.demo' });
   estado.atividades = estado.atividades || [];
   estado.resolvidos = estado.resolvidos || {};
   estado.documentos = estado.documentos || [];
   const usuarioAtual = () => estado.usuarios.find((u) => u.id === estado.usuarioAtual) || estado.usuarios[0];
+  // atividades críticas também vão para a trilha do servidor (anshur_eventos: só inserção)
+  const CRITICOS = new Set(['troca', 'aprovacao', 'preco', 'venda', 'usuario', 'convite', 'lgpd', 'exportacao', 'seguranca', 'importacao', 'exclusao', 'config']);
   function registrar(tipo, texto, extra = {}) {
     estado.atividades.unshift({ id: 'a' + Date.now() + Math.random().toString(36).slice(2, 6), quando: new Date().toISOString(), usuario: usuarioAtual().nome, perfil: usuarioAtual().perfil, tipo, texto, ...extra });
     if (estado.atividades.length > 600) estado.atividades.length = 600;
+    if (N && ambiente === 'op' && CRITICOS.has(tipo)) N.evento(tipo, texto);
   }
 
   (estado.modelosExtra || []).forEach((m) => { if (!A.modelos.some((x) => x.modelo === m.modelo)) A.modelos.push({ ...m, hAno: { trator: 750, colhedora: 2600, pulverizador: 820, plantadeira: 270 }[m.tipo] || 800, importado: true }); });
@@ -69,6 +88,11 @@
   estado.lojas = estado.lojas && estado.lojas.length ? estado.lojas : (ambiente === 'op' ? [] : ['Orlândia', 'Sertãozinho', 'Bebedouro']);
   const hashL = (s) => [...String(s)].reduce((h, c) => (h * 33 + c.charCodeAt(0)) >>> 0, 5);
   A.trocas.forEach((t) => { if (!t.loja && estado.lojas.length) t.loja = estado.lojas[hashL(t.id) % estado.lojas.length]; });
+  // com conta, a loja escolhida é deste aparelho (não muda a tela dos outros); lojas permitidas vêm do servidor
+  const lojasPermitidas = N && ambiente === 'op' && N.eu.lojas && N.eu.lojas.length ? N.eu.lojas.filter((l) => estado.lojas.includes(l)) : null;
+  if (N && ambiente === 'op') estado.lojaAtual = getItem('anshur-loja:' + N.revenda.id) || '';
+  if (lojasPermitidas && lojasPermitidas.length && !lojasPermitidas.includes(estado.lojaAtual)) estado.lojaAtual = lojasPermitidas[0];
+  const lembrarLoja = (l) => { if (N && ambiente === 'op') setItem('anshur-loja:' + N.revenda.id, l || ''); };
   A.todasTrocas = A.trocas;
   if (estado.lojaAtual && estado.lojas.includes(estado.lojaAtual)) A.trocas = A.trocas.filter((t) => t.loja === estado.lojaAtual);
 
@@ -133,7 +157,9 @@
   function registrarPreparo(est, id, valor, dataReg) { est.preparos[id] = { valor: Math.round(valor), data: dataReg }; }
   function registrarVenda(est, id, valor, dataVenda) { est.vendas[id] = { valor: Math.round(valor), data: dataVenda }; }
 
-  raiz.COMUM = { A, ambiente, repo, estado, cfg, PADRAO, PERFIS, usuarioAtual, registrar, real, mil, pct, hojeISO, diasEntre, diasDesde, data, esc, NOMES, FICHA, logo, C,
+  // recarregar só depois de terminar de enviar ao servidor
+  const recarregar = () => (N && ambiente === 'op' ? N.recarregar() : location.reload());
+  raiz.COMUM = { A, ambiente, nuvem: N && ambiente === 'op' ? N : null, lojasPermitidas, lembrarLoja, recarregar, repo, estado, cfg, PADRAO, PERFIS, usuarioAtual, registrar, real, mil, pct, hojeISO, diasEntre, diasDesde, data, esc, NOMES, FICHA, logo, C,
     fecharTroca, registrarPreparo, registrarVenda, aplicarMovimentos,
     gravar: (d) => repo.gravar(d), ler: () => repo.ler(), restaurar: () => { repo.apagar('demo'); delItem('anshur-demo-v1'); } };
 })(typeof window !== 'undefined' ? window : globalThis);

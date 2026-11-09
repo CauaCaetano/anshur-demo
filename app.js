@@ -14,33 +14,58 @@
   btnPerfil.onclick = (e) => { e.stopPropagation(); const ab = menuPerfil.hidden; menuPerfil.hidden = !ab; btnPerfil.setAttribute('aria-expanded', ab); };
   document.addEventListener('click', (e) => { if (!menuPerfil.hidden && !menuPerfil.contains(e.target)) { menuPerfil.hidden = true; btnPerfil.setAttribute('aria-expanded', 'false'); } });
   const OP = K.ambiente === 'op';
-  $('.selo-demo').textContent = OP ? 'Minha revenda' : 'Dados demonstrativos';
-  $('.lateral-rodape').textContent = OP ? 'Dados reais da sua revenda, guardados só neste navegador.' : 'Dados demonstrativos de uma revenda fictícia.';
-  menuPerfil.innerHTML = `<p><b>${esc(K.usuarioAtual().nome)}</b><span>${K.PERFIS[K.usuarioAtual().perfil]} · ${esc(A.revenda.nome)}${OP ? ' · dados reais' : ''}</span></p>
+  const NV = K.nuvem; // conta no servidor (só no ambiente real)
+  $('.selo-demo').textContent = OP ? (NV && NV.offline ? 'Sem internet · só leitura' : 'Minha revenda') : 'Dados demonstrativos';
+  $('.lateral-rodape').textContent = OP ? (NV ? 'Dados da sua revenda, guardados na conta da revenda.' : 'Dados reais da sua revenda, guardados só neste navegador.') : 'Dados demonstrativos de uma revenda fictícia.';
+  const ehDono = () => K.usuarioAtual().perfil === 'dono';
+  menuPerfil.innerHTML = `<p><b>${esc(K.usuarioAtual().nome)}</b><span>${K.PERFIS[K.usuarioAtual().perfil]} · ${esc(A.revenda.nome)}${OP ? ' · dados reais' : ''}${NV ? '<br>' + esc(NV.usuario.email || '') : ''}</span></p>
     <button type="button" role="menuitem" id="m-perfil">Meu perfil</button>
     <button type="button" role="menuitem" id="m-instalar">Instalar o app</button>
     <button type="button" role="menuitem" id="m-premissas">Premissas da revenda</button>
     <button type="button" role="menuitem" id="m-seg">Segurança dos dados</button>
     <button type="button" role="menuitem" id="m-ambiente">${OP ? 'Voltar para a demonstração' : 'Usar com os dados da minha revenda'}</button>
-    ${OP ? '<button type="button" role="menuitem" id="m-nome">Nome da revenda</button><button type="button" role="menuitem" id="m-apagar">Apagar dados da minha revenda</button>' : '<button type="button" role="menuitem" id="m-restaurar">Restaurar dados demonstrativos</button>'}`;
+    ${NV ? `<button type="button" role="menuitem" id="m-nome">Nome da revenda</button>${(NV.revendas || []).length > 1 ? '<button type="button" role="menuitem" id="m-trocar">Trocar de revenda</button>' : ''}${ehDono() && !NV.offline ? '<button type="button" role="menuitem" id="m-apagar">Excluir a revenda e todos os dados</button>' : ''}<button type="button" role="menuitem" id="m-sair">Sair da conta</button>`
+      : OP ? '<button type="button" role="menuitem" id="m-nome">Nome da revenda</button><button type="button" role="menuitem" id="m-apagar">Apagar dados da minha revenda</button>' : '<button type="button" role="menuitem" id="m-restaurar">Restaurar dados demonstrativos</button>'}`;
   const fechaMenu = () => { menuPerfil.hidden = true; btnPerfil.setAttribute('aria-expanded', 'false'); };
   $('#m-perfil').onclick = () => { fechaMenu(); location.hash = '#perfil'; };
   $('#m-instalar').onclick = () => { fechaMenu(); $('#instalar-btn').click(); };
   $('#m-premissas').onclick = () => { fechaMenu(); abrirPremissas(); };
   $('#m-seg').onclick = () => { fechaMenu(); abrirCamada('modal', `<h2>Segurança dos dados</h2>
       <p class="sub" style="margin-bottom:12px">O que acontece hoje com os seus números, sem promessa além do que existe.</p>
-      <ul style="margin:0;padding-left:20px;display:grid;gap:8px;font-size:16px">
+      ${NV ? `<ul style="margin:0;padding-left:20px;display:grid;gap:8px;font-size:16px">
+        <li><b>Os dados da revenda ficam no servidor</b> (banco Postgres no Supabase), separados por revenda: cada pessoa só vê a revenda para a qual foi convidada.</li>
+        <li>Cada pessoa entra com e-mail e senha próprios. O perfil (dono, gerente, vendedor, oficina, financeiro, auditor) é definido pelo dono e conferido pelo servidor.</li>
+        <li>Trocas fechadas, aprovações, preços, vendas, convites e exclusões também vão para uma trilha no servidor que ninguém da revenda consegue alterar ou apagar.</li>
+        <li>Documentos ficam numa pasta privada da revenda (até 10 MB cada); o link para abrir um original vale 2 minutos.</li>
+        <li>Sem internet, o Anshur abre a última cópia deste aparelho só para leitura.</li>
+        <li>O dono baixa uma cópia completa quando quiser (Configurações) e pode pedir a exclusão de tudo pelo menu do perfil.</li>
+      </ul>` : `<ul style="margin:0;padding-left:20px;display:grid;gap:8px;font-size:16px">
         <li><b>Nesta versão, nada sai do seu computador.</b> Planilhas importadas, avaliações e trocas ficam guardadas só neste navegador.</li>
         <li>A demonstração e o ambiente com os dados da sua revenda são separados e não se misturam.</li>
         <li>Você pode apagar os dados da sua revenda a qualquer momento pelo menu do perfil.</li>
         <li>As planilhas exportadas são suas: dá para levar os dados para outro sistema quando quiser.</li>
-      </ul>`); };
-  $('#m-ambiente').onclick = () => { fechaMenu(); confirmar(OP ? 'Voltar para a demonstração?' : 'Usar com os dados da sua revenda?', OP ? 'Seus dados continuam guardados neste navegador; você pode voltar quando quiser.' : 'Abre um ambiente separado, vazio, para importar o histórico real de trocas. A demonstração não se mistura com ele.', 'Trocar', () => { K.repo.trocarAmbiente(OP ? 'demo' : 'op'); location.hash = OP ? '#visao' : '#teste'; location.reload(); }); };
+      </ul>`}`); };
+  $('#m-ambiente').onclick = () => { fechaMenu(); confirmar(OP ? 'Voltar para a demonstração?' : 'Usar com os dados da sua revenda?', OP ? (NV ? 'Seus dados continuam na conta da revenda; você pode voltar quando quiser.' : 'Seus dados continuam guardados neste navegador; você pode voltar quando quiser.') : 'Abre um ambiente separado, vazio, para importar o histórico real de trocas. A demonstração não se mistura com ele.', 'Trocar', () => { K.repo.trocarAmbiente(OP ? 'demo' : 'op'); location.hash = OP ? '#visao' : '#teste'; K.recarregar(); }); };
   if (OP) {
-    $('#m-nome').onclick = () => { fechaMenu(); abrirCamada('modal', `<h2>Nome da revenda</h2><div class="campos" style="margin-top:12px"><div class="campo"><label for="n-nome">Nome</label><input id="n-nome" value="${esc(estado.nomeRevenda || '')}"></div><div class="campo"><label for="n-cid">Cidade</label><input id="n-cid" value="${esc(estado.cidadeRevenda || '')}"></div></div><div class="acoes"><button class="btn btn-ouro" type="button" id="n-ok">Salvar</button></div>`, (c) => { $('#n-ok', c).onclick = () => { estado.nomeRevenda = $('#n-nome', c).value.trim(); estado.cidadeRevenda = $('#n-cid', c).value.trim(); salvar(); location.reload(); }; }); };
-    $('#m-apagar').onclick = () => { fechaMenu(); confirmar('Apagar os dados da sua revenda?', 'Remove deste navegador o histórico importado, as avaliações e as trocas registradas no ambiente real. Não dá para desfazer.', 'Apagar', () => { K.repo.apagar('op'); location.reload(); }); };
+    $('#m-nome').onclick = () => { fechaMenu(); abrirCamada('modal', `<h2>Nome da revenda</h2><div class="campos" style="margin-top:12px"><div class="campo"><label for="n-nome">Nome</label><input id="n-nome" value="${esc(estado.nomeRevenda || '')}"></div><div class="campo"><label for="n-cid">Cidade</label><input id="n-cid" value="${esc(estado.cidadeRevenda || '')}"></div></div><div class="acoes"><button class="btn btn-ouro" type="button" id="n-ok">Salvar</button></div>`, (c) => { $('#n-ok', c).onclick = async () => { estado.nomeRevenda = $('#n-nome', c).value.trim(); estado.cidadeRevenda = $('#n-cid', c).value.trim(); if (NV && estado.nomeRevenda.length >= 2 && ['dono', 'gerente'].includes(K.usuarioAtual().perfil)) await NV.renomear(estado.nomeRevenda, estado.cidadeRevenda).catch((e) => toast(e.message, true)); salvar(); K.recarregar(); }; }); };
+    if (NV) {
+      const tr = $('#m-trocar'); if (tr) tr.onclick = () => { fechaMenu(); NV.trocarRevenda(); };
+      $('#m-sair').onclick = () => { fechaMenu(); NV.sair(); };
+      const ap = $('#m-apagar');
+      if (ap) ap.onclick = () => { fechaMenu(); abrirCamada('modal', `<h2>Excluir a revenda e todos os dados</h2>
+        <p class="sub" style="margin:6px 0 12px">Apaga do servidor, para sempre, tudo de <b>${esc(NV.revenda.nome)}</b>: trocas, avaliações, documentos, equipe, convites e a trilha de atividades. Antes, baixe uma cópia em Configurações. Não dá para desfazer.</p>
+        <div class="campo"><label for="x-conf">Para confirmar, digite o nome da revenda: <b>${esc(NV.revenda.nome)}</b></label><input id="x-conf" autocomplete="off"></div>
+        <div class="acoes"><button class="btn btn-perigo" type="button" id="x-ok">Excluir para sempre</button></div>`, (c) => {
+        $('#x-ok', c).onclick = async (e) => {
+          const v = $('#x-conf', c).value.trim(); if (v !== NV.revenda.nome) { toast('O nome digitado não confere.', true); return; }
+          e.currentTarget.disabled = true; e.currentTarget.textContent = 'Excluindo…';
+          try { await NV.excluirRevenda(v); toast('Revenda e dados excluídos do servidor.'); setTimeout(() => location.reload(), 900); }
+          catch (er) { toast(er.message, true); e.currentTarget.disabled = false; e.currentTarget.textContent = 'Excluir para sempre'; }
+        };
+      }); };
+    } else $('#m-apagar').onclick = () => { fechaMenu(); confirmar('Apagar os dados da sua revenda?', 'Remove deste navegador o histórico importado, as avaliações e as trocas registradas no ambiente real. Não dá para desfazer.', 'Apagar', () => { K.repo.apagar('op'); K.recarregar(); }); };
   } else {
-    $('#m-restaurar').onclick = () => { fechaMenu(); confirmar('Restaurar dados demonstrativos?', 'As avaliações, trocas fechadas, vendas e preços alterados nesta demonstração serão apagados deste navegador.', 'Restaurar', () => { K.restaurar(); location.hash = '#visao'; location.reload(); }); };
+    $('#m-restaurar').onclick = () => { fechaMenu(); confirmar('Restaurar dados demonstrativos?', 'As avaliações, trocas fechadas, vendas e preços alterados nesta demonstração serão apagados deste navegador.', 'Restaurar', () => { K.restaurar(); location.hash = '#visao'; K.recarregar(); }); };
   }
   function abrirPremissas() {
     const cfg = K.cfg;
@@ -119,7 +144,8 @@
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     toast('Planilha gerada: ' + nome);
   }
-  const salvar = () => { if (!K.gravar(estado)) toast('Não foi possível salvar neste navegador.', true); };
+  // com conta, a faixa da nuvem já avisa quando não dá para gravar (só leitura ou sem internet)
+  const salvar = () => { if (!K.gravar(estado) && !K.nuvem) toast('Não foi possível salvar neste navegador.', true); };
 
   // ---------- contas ----------
   const recCache = new Map();
@@ -185,9 +211,9 @@
 
   function semDados() {
     tela.innerHTML = `<div class="titulo"><div><h1>Bem-vindo ao Anshur</h1><p>Este é o ambiente com os dados reais da sua revenda. Ele começa vazio e não se mistura com a demonstração.</p></div></div>
-      <section class="painel"><h2>Comece pelo histórico de trocas</h2><p class="sub" style="margin:6px 0 14px">Importe de 10 a 200 trocas já vendidas (planilha do Excel ou CSV do seu sistema). O Anshur aprende com elas, mede o próprio erro e passa a avaliar as próximas trocas. Os dados ficam só neste navegador.</p>
+      <section class="painel"><h2>Comece pelo histórico de trocas</h2><p class="sub" style="margin:6px 0 14px">Importe de 10 a 200 trocas já vendidas (planilha do Excel ou CSV do seu sistema). O Anshur aprende com elas, mede o próprio erro e passa a avaliar as próximas trocas. ${K.nuvem ? 'Os dados ficam na conta da revenda.' : 'Os dados ficam só neste navegador.'}</p>
       <div class="acoes"><a class="btn btn-ouro" href="#teste">Importar histórico</a><button class="btn btn-linha" type="button" id="volta-demo">Ver a demonstração</button></div></section>`;
-    $('#volta-demo').onclick = () => { K.repo.trocarAmbiente('demo'); location.reload(); };
+    $('#volta-demo').onclick = () => { K.repo.trocarAmbiente('demo'); K.recarregar(); };
   }
 
   function telaVisao() {
@@ -756,14 +782,14 @@
       revelar(casos, true, e.currentTarget, p.comDatas);
     };
     const sh = $('#salvar-hist', caixa);
-    if (sh) sh.onclick = () => confirmar('Usar como histórico da sua revenda?', `As ${p.aceitas.length} trocas vão para o ambiente com dados reais (separado da demonstração), guardadas só neste navegador. O Anshur passa a avaliar com base nelas.`, 'Usar como histórico', () => {
+    if (sh) sh.onclick = () => confirmar('Usar como histórico da sua revenda?', `As ${p.aceitas.length} trocas vão para o ambiente com dados reais (separado da demonstração), ${K.nuvem ? 'guardadas na conta da revenda' : 'guardadas neste navegador e enviadas para a conta quando você entrar'}. O Anshur passa a avaliar com base nelas.`, 'Usar como histórico', () => {
       const op = K.repo.ler('op');
       const chave = (t) => [t.tipo, t.modelo, t.ano, t.horas, t.pago, t.vendido].join('|');
       const ja = new Set((op.historico || []).map(chave));
       const novas = p.aceitas.filter((t) => !ja.has(chave(t))).map((t, i) => ({ ...t, id: 'H' + ((op.historico || []).length + i + 1), ficha: { motor: t.cond / 20, transmissao: t.cond / 20, hidraulico: t.cond / 20, pneus: t.cond / 20, cabine: t.cond / 20, lataria: t.cond / 20 }, manutencoes: [] }));
       op.historico = (op.historico || []).concat(novas);
       if (!K.repo.gravar(op, 'op')) { toast('Não foi possível salvar neste navegador.', true); return; }
-      K.repo.trocarAmbiente('op'); location.hash = '#trocas'; location.reload();
+      K.repo.trocarAmbiente('op'); location.hash = '#trocas'; K.recarregar();
     });
   }
 
@@ -1028,7 +1054,7 @@
       await idb('readwrite', (st) => st.put(h, 'pasta'));
       const r = await sincronizar(true);
       toast(r === 'novas' ? `Pasta ligada: ${estado.ultimaSync.novas} trocas novas importadas.` : r === 'vazia' ? 'Pasta ligada, mas ainda não há CSV nela.' : 'Pasta ligada.');
-      if (r === 'novas') setTimeout(() => location.reload(), 900); else rota();
+      if (r === 'novas') setTimeout(() => K.recarregar(), 900); else rota();
     } catch (e) { if (e.name !== 'AbortError') toast('Não foi possível ligar a pasta.', true); }
   }
   function blocoSync() {
@@ -1044,8 +1070,8 @@
   function ligarBotoesSync(raiz) {
     const a = $('#ligar-pasta', raiz), b = $('#sinc-agora', raiz), c = $('#ir-op', raiz);
     if (a) a.onclick = ligarPasta;
-    if (b) b.onclick = async () => { const r = await sincronizar(true); toast({ novas: `${estado.ultimaSync.novas} trocas novas importadas.`, 'em-dia': 'Tudo em dia: nenhuma troca nova.', 'sem-pasta': 'Escolha a pasta primeiro.', vazia: 'A pasta não tem CSV.', permissao: 'O navegador não liberou a leitura da pasta.' }[r] || 'Não foi possível sincronizar.', !['novas', 'em-dia'].includes(r)); if (r === 'novas') setTimeout(() => location.reload(), 900); };
-    if (c) c.onclick = () => { K.repo.trocarAmbiente('op'); location.hash = '#teste'; location.reload(); };
+    if (b) b.onclick = async () => { const r = await sincronizar(true); toast({ novas: `${estado.ultimaSync.novas} trocas novas importadas.`, 'em-dia': 'Tudo em dia: nenhuma troca nova.', 'sem-pasta': 'Escolha a pasta primeiro.', vazia: 'A pasta não tem CSV.', permissao: 'O navegador não liberou a leitura da pasta.' }[r] || 'Não foi possível sincronizar.', !['novas', 'em-dia'].includes(r)); if (r === 'novas') setTimeout(() => K.recarregar(), 900); };
+    if (c) c.onclick = () => { K.repo.trocarAmbiente('op'); location.hash = '#teste'; K.recarregar(); };
   }
 
   // =====================================================================================
@@ -1155,6 +1181,7 @@
     });
   }
   function addUsuario(u) {
+    if (K.nuvem) { location.hash = '#usuarios'; return; }
     formulario(u ? 'Editar usuário' : 'Adicionar usuário', [{ k: 'nome', r: 'Nome', obr: true }, { k: 'email', r: 'E-mail' }, { k: 'perfil', r: 'Perfil', tipo: 'select', ops: Object.entries(K.PERFIS) }], u || { perfil: 'vendedor' }, (v) => {
       if (u) { Object.assign(u, v); log('usuario', `Usuário ${v.nome} alterado para ${K.PERFIS[v.perfil]}`); }
       else { estado.usuarios.push({ id: 'u' + Date.now(), ...v }); log('usuario', `Usuário ${v.nome} criado como ${K.PERFIS[v.perfil]}`); }
@@ -1231,12 +1258,15 @@
     zona.ondragover = (e) => { e.preventDefault(); zona.classList.add('sobre'); }; zona.ondragleave = () => zona.classList.remove('sobre');
     zona.ondrop = (e) => { e.preventDefault(); zona.classList.remove('sobre'); processar([...e.dataTransfer.files]); };
     $$('[data-ver]', tela).forEach((b) => b.onclick = async () => {
+      const d = estado.documentos.find((x) => x.id === b.dataset.ver);
+      if (K.nuvem && d && d.caminho) { const w = window.open('', '_blank'); try { const url = await K.nuvem.abrirDoc(d.caminho); if (w) w.location = url; else location.href = url; } catch (e) { if (w) w.close(); toast(e.message, true); } return; }
       try { const blob = await idbDoc('readonly', (st) => st.get('doc:' + b.dataset.ver)); if (!blob) { toast('Original não está neste aparelho.', true); return; } window.open(URL.createObjectURL(blob), '_blank'); } catch (e) { toast('Não foi possível abrir o original.', true); }
     });
   }
   async function processar(arquivos) {
     const caixa = $('#doc-proc'); if (!arquivos.length) return;
     for (const arq of arquivos) {
+      if (K.nuvem && arq.size > K.nuvem.limiteDoc) { toast(`${arq.name}: arquivo acima de 10 MB.`, true); continue; }
       if (arq.size > 15 * 1024 * 1024) { toast(`${arq.name}: arquivo acima de 15 MB.`, true); continue; }
       caixa.innerHTML = `<section class="painel bloco"><div class="carregando-linha"><span class="giro"></span><b id="doc-st">Recebendo ${esc(arq.name)}…</b></div></section>`;
       const prog = (m) => { const s = $('#doc-st'); if (s) s.textContent = m; };
@@ -1245,6 +1275,7 @@
       const id = 'd' + Date.now();
       try { await idbDoc('readwrite', (st) => st.put(arq, 'doc:' + id)); } catch (e) { /* original fica só nesta sessão */ }
       const doc = { id, nome: arq.name, tamanho: arq.size, tipo: { planilha: 'Planilha', pdf: 'PDF', foto: 'Foto' }[lido.tipo], quando: new Date().toISOString(), usuario: eu().nome, virou: '' };
+      if (K.nuvem) { prog('Guardando o original na pasta da revenda…'); try { doc.caminho = await K.nuvem.subirDoc(id, arq); } catch (e) { toast(`${arq.name}: o original não foi guardado no servidor (${e.message}).`, true); } }
       estado.documentos.push(doc); salvar(); log('documento', `Documento recebido: ${arq.name}`);
       if (lido.tipo === 'planilha') {
         const p = window.IMPORTAR.ler(lido.texto, { refDe: M.refDe, anoMax: anoAtual });
@@ -1277,6 +1308,7 @@
 
   // ---------- usuários e permissões ----------
   function telaUsuarios() {
+    if (K.nuvem) return telaEquipe();
     const paginas = [['visao', 'Visão geral'], ['avaliar', 'Avaliar troca'], ['patio', 'Pátio'], ['trocas', 'Inteligência'], ['vendedores', 'Vendedores'], ['garantias', 'Garantias'], ['financiamento', 'Financiado'], ['relatorio', 'Relatórios'], ['config', 'Configurações']];
     tela.innerHTML = `
       <div class="titulo"><div><h1>Usuários e permissões</h1><p>Quem usa o Anshur e o que cada perfil pode ver e fazer.</p></div>${botaoAdicionar([{ nome: 'Adicionar usuário', desc: 'Nome, e-mail e perfil', acao: () => addUsuario() }])}</div>
@@ -1287,9 +1319,71 @@
         <div class="tabela-wrap"><table class="tabela"><thead><tr><th>Perfil</th>${paginas.map(([, n]) => `<th class="n">${n}</th>`).join('')}<th class="n">Aprovar acima do teto</th></tr></thead><tbody>
         ${Object.entries(K.PERFIS).map(([p, n]) => `<tr><td><b>${n}</b></td>${paginas.map(([k]) => `<td class="n">${PERM[p].includes(k) ? '<span class="pos">✓</span>' : '<span class="sub">—</span>'}</td>`).join('')}<td class="n">${['dono', 'gerente'].includes(p) ? '<span class="pos">✓</span>' : '<span class="sub">—</span>'}</td></tr>`).join('')}</tbody></table></div>
         <p class="nota-rodape">Nesta versão, "Entrar como" serve para ver o sistema como cada pessoa. O login com senha por usuário entra na versão com servidor.</p></section>`;
-    $$('[data-entrar]', tela).forEach((b) => b.onclick = () => { estado.usuarioAtual = b.dataset.entrar; salvar(); log('usuario', `Entrou como ${eu().nome}`); toast('Agora você está vendo como ' + eu().nome + '.'); location.hash = pode('visao') ? '#visao' : '#patio'; location.reload(); });
+    $$('[data-entrar]', tela).forEach((b) => b.onclick = () => { estado.usuarioAtual = b.dataset.entrar; salvar(); log('usuario', `Entrou como ${eu().nome}`); toast('Agora você está vendo como ' + eu().nome + '.'); location.hash = pode('visao') ? '#visao' : '#patio'; K.recarregar(); });
     $$('[data-editar]', tela).forEach((b) => b.onclick = () => addUsuario(estado.usuarios.find((u) => u.id === b.dataset.editar)));
     $$('[data-tirar]', tela).forEach((b) => b.onclick = () => { const u = estado.usuarios.find((x) => x.id === b.dataset.tirar); confirmar(`Remover ${u.nome}?`, 'A pessoa deixa de aparecer na lista. As atividades dela continuam no histórico.', 'Remover', () => { estado.usuarios = estado.usuarios.filter((x) => x !== u); log('usuario', `Usuário ${u.nome} removido`); salvar(); rota(); }); });
+  }
+
+  // equipe com conta: convites por link, perfil e lojas definidos pelo dono, conferidos pelo servidor
+  function telaEquipe() {
+    const NV = K.nuvem, souDono = eu().perfil === 'dono', gere = ['dono', 'gerente'].includes(eu().perfil) && !NV.somenteLeitura;
+    const perfisConvite = Object.entries(K.PERFIS).filter(([p]) => souDono || !['dono', 'gerente'].includes(p));
+    const paginas = [['visao', 'Visão geral'], ['avaliar', 'Avaliar troca'], ['patio', 'Pátio'], ['trocas', 'Inteligência'], ['vendedores', 'Vendedores'], ['garantias', 'Garantias'], ['financiamento', 'Financiado'], ['relatorio', 'Relatórios'], ['config', 'Configurações']];
+    tela.innerHTML = `
+      <div class="titulo"><div><h1>Equipe e acessos</h1><p>Cada pessoa entra com o próprio e-mail e senha. O perfil define o que ela vê e faz, e o servidor confere.</p></div></div>
+      ${gere ? `<section class="painel"><h2>${ICO.alvo}Convidar pessoa</h2>
+        <form id="cv-f" class="campos" style="margin-top:12px" novalidate><div class="campo"><label for="cv-email">E-mail da pessoa</label><input id="cv-email" type="email" autocomplete="off" required></div>
+        <div class="campo"><label for="cv-perfil">Perfil</label><select id="cv-perfil">${perfisConvite.map(([p, n]) => `<option value="${p}" ${p === 'vendedor' ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
+        <div class="acoes inteiro"><button class="btn btn-ouro" type="submit">Gerar convite</button></div></form>
+        <div id="cv-link"></div>
+        <p class="nota-rodape">O convite vale 7 dias e só funciona com o e-mail convidado. Mande o link por WhatsApp ou e-mail: a pessoa cria a conta com esse e-mail e entra direto na revenda.</p></section>` : ''}
+      <section class="painel bloco"><div class="painel-cab"><h2>Pessoas com acesso</h2><p>${estado.usuarios.length}</p></div>
+        <div class="tabela-wrap"><table class="tabela grande"><thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th>${estado.lojas.length ? '<th>Lojas (vazio = todas)</th>' : ''}<th></th></tr></thead><tbody>
+        ${estado.usuarios.map((u) => `<tr><td>${avatarHTML(u, 36)} <b>${esc(u.nome)}</b>${u.id === eu().id ? ' <span class="tag comprovado">você</span>' : ''}</td><td>${esc(u.email || '—')}</td>
+          <td>${souDono && !NV.offline ? `<select data-perfil="${esc(u.id)}" aria-label="Perfil de ${esc(u.nome)}">${Object.entries(K.PERFIS).map(([p, n]) => `<option value="${p}" ${u.perfil === p ? 'selected' : ''}>${n}</option>`).join('')}</select>` : K.PERFIS[u.perfil]}</td>
+          ${estado.lojas.length ? `<td>${souDono && !NV.offline ? `<input data-lojas="${esc(u.id)}" value="${esc((u.lojas || []).join(', '))}" list="dl-lojas" placeholder="Todas" aria-label="Lojas de ${esc(u.nome)}">` : esc((u.lojas || []).join(', ') || 'Todas')}</td>` : ''}
+          <td style="white-space:nowrap">${souDono && !NV.offline ? `<button class="link" type="button" data-guardar="${esc(u.id)}">Salvar</button>${u.id !== eu().id ? ` · <button class="link neg" type="button" data-tirar="${esc(u.id)}">Remover acesso</button>` : ''}` : ''}</td></tr>`).join('')}</tbody></table></div>
+        ${lista('dl-lojas', estado.lojas)}</section>
+      ${gere ? '<section class="painel bloco" id="cv-pend"><h2>Convites em aberto</h2><p class="sub">Carregando…</p></section>' : ''}
+      <section class="painel bloco"><div class="painel-cab"><h2>${ICO.alvo}O que cada perfil acessa</h2></div>
+        <div class="tabela-wrap"><table class="tabela"><thead><tr><th>Perfil</th>${paginas.map(([, n]) => `<th class="n">${n}</th>`).join('')}<th class="n">Aprovar acima do teto</th></tr></thead><tbody>
+        ${Object.entries(K.PERFIS).map(([p, n]) => `<tr><td><b>${n}</b></td>${paginas.map(([k]) => `<td class="n">${PERM[p].includes(k) ? '<span class="pos">✓</span>' : '<span class="sub">—</span>'}</td>`).join('')}<td class="n">${['dono', 'gerente'].includes(p) ? '<span class="pos">✓</span>' : '<span class="sub">—</span>'}</td></tr>`).join('')}</tbody></table></div>
+        <p class="nota-rodape">O auditor só lê: o servidor recusa qualquer gravação dele. A restrição por loja vale nas telas; os dados da revenda são um conjunto único.</p></section>`;
+    const mostrarLink = (link, email) => {
+      const txt = `Você foi convidado para o Anshur da ${A.revenda.nome}. Crie sua conta com o e-mail ${email} neste link (vale 7 dias): ${link}`;
+      $('#cv-link').innerHTML = `<div class="campo" style="margin-top:12px"><label for="cv-url">Link do convite para ${esc(email)}</label><input id="cv-url" readonly value="${esc(link)}"></div>
+        <div class="acoes"><button class="btn btn-linha" type="button" id="cv-copiar">Copiar link</button><a class="btn btn-linha" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(txt)}">Mandar pelo WhatsApp</a></div>`;
+      $('#cv-copiar').onclick = () => { $('#cv-url').select(); (navigator.clipboard ? navigator.clipboard.writeText(link) : Promise.reject()).then(() => toast('Link copiado.'), () => { document.execCommand('copy'); toast('Link copiado.'); }); };
+    };
+    const carregarConvites = async () => {
+      const box = $('#cv-pend'); if (!box) return;
+      try {
+        const l = await NV.convites();
+        box.innerHTML = `<h2>Convites em aberto</h2>${l.length ? `<div class="tabela-wrap"><table class="tabela"><thead><tr><th>E-mail</th><th>Perfil</th><th>Vence</th><th></th></tr></thead><tbody>${l.map((c) => `<tr><td>${esc(c.email)}</td><td>${K.PERFIS[c.perfil]}</td><td>${new Date(c.expira).toLocaleDateString('pt-BR')}${new Date(c.expira) < new Date() ? ' <span class="neg">vencido</span>' : ''}</td><td><button class="link neg" type="button" data-cancelar="${esc(c.id)}">Cancelar</button></td></tr>`).join('')}</tbody></table></div>` : '<p class="vazio">Nenhum convite em aberto.</p>'}`;
+        $$('[data-cancelar]', box).forEach((b) => b.onclick = async () => { try { await NV.cancelarConvite(b.dataset.cancelar); toast('Convite cancelado.'); carregarConvites(); } catch (e) { toast(e.message, true); } });
+      } catch (e) { box.innerHTML = `<h2>Convites em aberto</h2><p class="neg">${esc(e.message)}</p>`; }
+    };
+    const f = $('#cv-f');
+    if (f) f.onsubmit = async (e) => {
+      e.preventDefault();
+      const email = $('#cv-email').value.trim().toLowerCase(), perfil = $('#cv-perfil').value, bt = f.querySelector('button');
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { toast('Confira o e-mail.', true); $('#cv-email').focus(); return; }
+      bt.disabled = true;
+      try { const link = await NV.convidar(email, perfil); log('equipe', `Convite gerado para ${email} como ${K.PERFIS[perfil]}`); salvar(); mostrarLink(link, email); carregarConvites(); }
+      catch (er) { toast(er.message, true); }
+      bt.disabled = false;
+    };
+    $$('[data-guardar]', tela).forEach((b) => b.onclick = async () => {
+      const id = b.dataset.guardar, u = estado.usuarios.find((x) => x.id === id);
+      const perfil = $(`[data-perfil="${id}"]`).value, campo = $(`[data-lojas="${id}"]`);
+      const lojas = campo ? campo.value.split(',').map((x) => x.trim()).filter(Boolean) : null;
+      try { await NV.alterarMembro(id, perfil, lojas, u.nome); log('equipe', `${u.nome}: perfil ${K.PERFIS[perfil]}${lojas && lojas.length ? ', lojas ' + lojas.join(', ') : ''}`); salvar(); toast('Acesso atualizado.'); K.recarregar(); }
+      catch (e) { toast(e.message, true); }
+    });
+    $$('[data-tirar]', tela).forEach((b) => b.onclick = () => { const u = estado.usuarios.find((x) => x.id === b.dataset.tirar); confirmar(`Remover o acesso de ${u.nome}?`, 'A pessoa deixa de entrar nesta revenda na hora. As atividades dela continuam no histórico.', 'Remover acesso', async () => {
+      try { await NV.removerMembro(u.id); log('equipe', `Acesso de ${u.nome} removido`); salvar(); toast('Acesso removido.'); K.recarregar(); } catch (e) { toast(e.message, true); }
+    }); });
+    carregarConvites();
   }
 
   // ---------- configurações ----------
@@ -1325,16 +1419,27 @@
         <section class="painel"><h2>${ICO.linha}Integrações e dados</h2>
           <ul class="lista-motivos" style="margin-top:8px"><li><span>Sincronização com a pasta do sistema (DMS)</span><b>${estado.ultimaSync ? 'Ligada' : 'Desligada'}</b></li><li><span>Documentos recebidos</span><b>${estado.documentos.length}</b></li><li><span>Atividades registradas</span><b>${estado.atividades.length}</b></li></ul>
           <div class="acoes"><a class="btn btn-linha" href="#teste">Sincronizar com o sistema</a><button class="btn btn-linha" type="button" id="c-backup">Baixar cópia de segurança</button><label class="btn btn-linha" style="cursor:pointer">Restaurar cópia<input type="file" accept=".json" id="c-restaura" class="sr"></label><button class="btn btn-linha" type="button" id="c-instalar">Instalar o app</button></div></section>
+      ${K.nuvem && !K.nuvem.offline && ['dono', 'gerente', 'auditor'].includes(eu().perfil) ? '<section class="painel bloco" id="c-copias"><h2>Cópias diárias no servidor</h2><p class="sub">Carregando…</p></section>' : ''}
       </div>`;
-    $('#c-salvar').onclick = () => { estado.nomeRevenda = $('#c-nome').value.trim(); estado.cnpj = $('#c-cnpj').value.trim(); estado.cidadeRevenda = $('#c-cid').value.trim(); estado.marcasRevenda = $('#c-marcas').value.trim(); salvar(); log('config', 'Dados da revenda atualizados'); toast('Dados da revenda salvos.'); setTimeout(() => location.reload(), 600); };
+    $('#c-salvar').onclick = () => { if (K.nuvem && $('#c-nome').value.trim().length >= 2 && ['dono', 'gerente'].includes(eu().perfil)) K.nuvem.renomear($('#c-nome').value.trim(), $('#c-cid').value.trim()).catch((e) => toast(e.message, true)); estado.nomeRevenda = $('#c-nome').value.trim(); estado.cnpj = $('#c-cnpj').value.trim(); estado.cidadeRevenda = $('#c-cid').value.trim(); estado.marcasRevenda = $('#c-marcas').value.trim(); salvar(); log('config', 'Dados da revenda atualizados'); toast('Dados da revenda salvos.'); setTimeout(() => K.recarregar(), 600); };
     $('#c-prem').onclick = abrirPremissas; ligarLGPD(); ligarLojas();
     $('#c-alc').onclick = () => { const n = {}; $$('[data-alc]', tela).forEach((i) => { const [k, q] = i.dataset.alc.split('|'); n[k] = n[k] || {}; n[k][q] = Math.max(0, num(i.value) || 0); }); Object.values(n).forEach((a) => { if (a.gerente < a.vendedor) a.gerente = a.vendedor; }); estado.alcadas = n; log('config', 'Alçadas de aprovação alteradas'); salvar(); toast('Alçadas salvas.'); rota(); };
     $('#c-modelo').onclick = () => formulario('Adicionar modelo ao catálogo', [{ k: 'tipo', r: 'Categoria', tipo: 'select', ops: Object.entries(NOMES) }, { k: 'marca', r: 'Fabricante', lista: 'dl-marca', obr: true }, { k: 'modelo', r: 'Modelo', lista: 'dl-modelo', obr: true }, { k: 'base', r: 'Referência de preço seminovo (R$)', num: true, obr: true }], { tipo: 'trator' }, (v) => {
       A.modelos.push({ tipo: v.tipo, marca: v.marca, modelo: v.modelo, base: v.base, hAno: { trator: 750, colhedora: 2600, pulverizador: 820, plantadeira: 270 }[v.tipo], importado: true });
       estado.modelosExtra = (estado.modelosExtra || []).concat([{ tipo: v.tipo, marca: v.marca, modelo: v.modelo, base: v.base }]); salvar(); log('config', `Modelo ${v.marca} ${v.modelo} adicionado ao catálogo`); fecharCamada(true); toast('Modelo adicionado.'); rota();
     });
+    const caixaCopias = $('#c-copias');
+    if (caixaCopias) K.nuvem.copias().then((l) => {
+      const dono = eu().perfil === 'dono';
+      caixaCopias.innerHTML = `<h2>Cópias diárias no servidor</h2><p class="sub" style="margin:6px 0 10px">Todo dia de madrugada o servidor guarda uma cópia dos dados da revenda e mantém os últimos 30 dias. ${dono ? 'Restaurar troca os dados atuais pelos daquele dia (fica registrado na trilha).' : 'Só o dono pode restaurar.'}</p>
+        ${l.length ? `<div class="tabela-wrap"><table class="tabela"><thead><tr><th>Dia</th><th>Versão</th><th>Guardada em</th><th></th></tr></thead><tbody>${l.map((c) => `<tr><td>${data(c.dia)}</td><td>${c.versao}</td><td>${new Date(c.criado).toLocaleString('pt-BR')}</td><td>${dono ? `<button class="link" type="button" data-restaurar="${esc(c.dia)}">Restaurar</button>` : ''}</td></tr>`).join('')}</tbody></table></div>` : '<p class="vazio">A primeira cópia é feita esta madrugada.</p>'}
+        <p class="nota-rodape">As cópias ficam no mesmo banco de dados; para ter uma cópia fora dele, use "Baixar cópia de segurança".</p>`;
+      $$('[data-restaurar]', caixaCopias).forEach((b) => b.onclick = () => confirmar(`Restaurar a cópia de ${data(b.dataset.restaurar)}?`, 'Os dados atuais da revenda serão trocados pelos daquele dia, para todos da equipe. Antes, baixe uma cópia de segurança se quiser guardar a versão atual.', 'Restaurar', async () => {
+        try { await K.nuvem.restaurarCopia(b.dataset.restaurar); toast('Cópia restaurada.'); setTimeout(() => location.reload(), 700); } catch (e) { toast(e.message, true); }
+      }));
+    }, (e) => { caixaCopias.innerHTML = `<h2>Cópias diárias no servidor</h2><p class="neg">${esc(e.message)}</p>`; });
     $('#c-backup').onclick = () => { const url = URL.createObjectURL(new Blob([JSON.stringify(estado, null, 1)], { type: 'application/json' })); const a = document.createElement('a'); a.href = url; a.download = `anshur-copia-${hojeISO()}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); log('config', 'Cópia de segurança baixada'); salvar(); toast('Cópia de segurança gerada.'); };
-    $('#c-restaura').onchange = (e) => { const f = e.target.files[0]; if (!f) return; f.text().then((tx) => { let d; try { d = JSON.parse(tx); } catch (er) { toast('Arquivo inválido.', true); return; } if (!d || !Array.isArray(d.fechadas)) { toast('Este arquivo não é uma cópia do Anshur.', true); return; } confirmar('Restaurar esta cópia?', 'Os dados atuais deste ambiente serão substituídos pelos da cópia.', 'Restaurar', () => { K.repo.gravar(d); location.reload(); }); }); };
+    $('#c-restaura').onchange = (e) => { const f = e.target.files[0]; if (!f) return; f.text().then((tx) => { let d; try { d = JSON.parse(tx); } catch (er) { toast('Arquivo inválido.', true); return; } if (!d || !Array.isArray(d.fechadas)) { toast('Este arquivo não é uma cópia do Anshur.', true); return; } confirmar('Restaurar esta cópia?', 'Os dados atuais deste ambiente serão substituídos pelos da cópia.', 'Restaurar', () => { K.repo.gravar(d); K.recarregar(); }); }); };
     $('#c-instalar').onclick = simularInstalacao;
   }
   function primeirosPassos() {
@@ -1420,7 +1525,13 @@
     const l = estado.atividades;
     tela.innerHTML = `<div class="titulo"><div><h1>Atividades</h1><p>Tudo o que foi feito no sistema, por quem e quando.</p></div>${botaoAdicionar([{ nome: 'Anotação', desc: 'Registro manual (visita, ligação, combinado)', acao: () => formulario('Adicionar anotação', [{ k: 'texto', r: 'O que aconteceu', obr: true, inteiro: true }], {}, (v) => { log('anotacao', v.texto); salvar(); fecharCamada(true); toast('Anotação registrada.'); rota(); }) }])}</div>
       <section class="painel">${l.length ? `<ul class="linha-tempo grande">${l.slice(0, 200).map((a) => `<li><b>${esc(a.texto)}</b><span>${new Date(a.quando).toLocaleString('pt-BR')} · ${esc(a.usuario)} (${K.PERFIS[a.perfil] || ''})</span></li>`).join('')}</ul>` : '<p class="vazio">Nenhuma atividade ainda. Avaliações, trocas, vendas, documentos e mudanças de regra aparecem aqui.</p>'}
-      <p class="nota-rodape">Nesta versão o registro fica neste navegador. Na versão com servidor, ele é gravado de forma que não pode ser alterado.</p></section>`;
+      <p class="nota-rodape">${K.nuvem ? 'Trocas, aprovações, preços, vendas, convites e exclusões também vão para a trilha do servidor, abaixo, que ninguém da revenda consegue alterar ou apagar.' : 'Na demonstração o registro fica neste navegador. Na conta da revenda, as atividades críticas vão também para uma trilha no servidor que não pode ser alterada.'}</p></section>
+      ${K.nuvem && !K.nuvem.offline ? '<section class="painel bloco" id="ev-srv"><h2>Trilha do servidor</h2><p class="sub">Carregando…</p></section>' : ''}`;
+    const box = $('#ev-srv');
+    if (box) K.nuvem.eventosServidor().then((ev) => {
+      const nome = (id) => { const u = estado.usuarios.find((x) => x.id === id); return u ? u.nome : 'pessoa removida'; };
+      box.innerHTML = `<h2>Trilha do servidor</h2><p class="sub" style="margin-bottom:8px">Registro só de inclusão: não tem edição nem exclusão.</p>${ev.length ? `<ul class="linha-tempo grande">${ev.map((a) => `<li><b>${esc(a.texto)}</b><span>${new Date(a.quando).toLocaleString('pt-BR')} · ${esc(nome(a.usuario))} · ${esc(a.tipo)}</span></li>`).join('')}</ul>` : '<p class="vazio">Nenhum registro ainda.</p>'}`;
+    }, (e) => { box.innerHTML = `<h2>Trilha do servidor</h2><p class="neg">${esc(e.message)}</p>`; });
   }
 
   // ---------- busca global (Ctrl+K) ----------
@@ -1690,7 +1801,7 @@
             <div class="campo"><label for="pf-apelido">Como prefere ser chamado</label><input id="pf-apelido" value="${esc(u.apelido || '')}" placeholder="Ex.: Seu Antônio"></div>
             <div class="campo"><label for="pf-cargo">Cargo</label><input id="pf-cargo" list="dl-cargos" value="${esc(u.cargo || K.PERFIS[u.perfil])}">${lista('dl-cargos', ['Proprietário', 'Diretor comercial', 'Gerente de usados', 'Gerente de loja', 'Vendedor', 'Avaliador', 'Chefe de oficina', 'Financeiro'])}</div>
             <div class="campo"><label for="pf-loja">Loja / unidade</label><input id="pf-loja" list="dl-cidade" value="${esc(u.loja || A.revenda.cidade)}"></div>
-            <div class="campo"><label for="pf-email">E-mail</label><input id="pf-email" type="email" value="${esc(u.email || '')}" autocomplete="email"></div>
+            <div class="campo"><label for="pf-email">E-mail</label><input id="pf-email" type="email" value="${esc(u.email || '')}" autocomplete="email" ${K.nuvem ? 'readonly title="E-mail da conta de acesso"' : ''}></div>
             <div class="campo"><label for="pf-tel">Celular / WhatsApp</label><input id="pf-tel" inputmode="tel" value="${esc(u.telefone || '')}" placeholder="(16) 99999-0000" autocomplete="tel"></div>
             <div class="campo"><label for="pf-desde">Na revenda desde</label><input id="pf-desde" type="date" value="${esc(u.desde || '')}"></div>
             ${u.perfil === 'vendedor' ? `<div class="campo"><label for="pf-meta">Meta de trocas por mês</label><input id="pf-meta" inputmode="numeric" value="${esc(u.meta || '')}"></div>` : `<div class="campo"><label for="pf-ass">Assinatura nos relatórios</label><input id="pf-ass" value="${esc(u.assinatura || '')}" placeholder="Ex.: Antônio Silva, diretor"></div>`}
@@ -1709,7 +1820,7 @@
           <div class="campos"><div class="campo"><label for="pf-pin">${u.pin ? 'Novo PIN de aprovação' : 'Criar PIN de aprovação'} (4 a 6 números)</label><input id="pf-pin" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password"></div></div>
           <div class="acoes"><button class="btn btn-linha" type="button" id="pf-pin-ok">${u.pin ? 'Trocar PIN' : 'Criar PIN'}</button>${u.pin ? '<span class="tag comprovado">PIN ativo</span>' : ''}</div>` : '<p class="sub" style="margin-top:6px">Seu perfil não aprova trocas acima do teto.</p>'}
           <ul class="lista-motivos" style="margin-top:14px"><li><span>Último acesso</span><b>${new Date(u.ultimoAcesso || Date.now()).toLocaleString('pt-BR')}</b></li><li><span>Atividades registradas</span><b>${minhas.length}</b></li></ul>
-          <div class="acoes"><a class="btn btn-linha" href="#atividades">Ver minhas atividades</a>${estado.usuarios.length > 1 && pode('usuarios') ? '<a class="btn btn-linha" href="#usuarios">Trocar de usuário</a>' : ''}</div></section>
+          <div class="acoes"><a class="btn btn-linha" href="#atividades">Ver minhas atividades</a>${K.nuvem ? '<button class="btn btn-linha" type="button" id="pf-sair">Sair da conta</button>' : estado.usuarios.length > 1 && pode('usuarios') ? '<a class="btn btn-linha" href="#usuarios">Trocar de usuário</a>' : ''}</div></section>
       </div>`;
     $('#pf-foto').onchange = (e) => {
       const f = e.target.files[0]; if (!f) return;
@@ -1717,6 +1828,7 @@
       img.onload = () => { const lado = Math.min(img.width, img.height), cv = document.createElement('canvas'); cv.width = cv.height = 256; cv.getContext('2d').drawImage(img, (img.width - lado) / 2, (img.height - lado) / 2, lado, lado, 0, 0, 256, 256); u.foto = cv.toDataURL('image/jpeg', 0.82); URL.revokeObjectURL(url); salvar(); log('perfil', 'Foto do perfil atualizada'); atualizarAvatar(); toast('Foto atualizada.'); telaPerfil(); };
       img.onerror = () => toast('Não foi possível ler essa imagem.', true); img.src = url;
     };
+    const sairBt = $('#pf-sair'); if (sairBt) sairBt.onclick = () => K.nuvem.sair();
     const tira = $('#pf-tira'); if (tira) tira.onclick = () => { delete u.foto; salvar(); atualizarAvatar(); telaPerfil(); };
     $('#pf-salvar').onclick = () => {
       const nome = $('#pf-nome').value.trim(), email = $('#pf-email').value.trim();
@@ -1727,6 +1839,7 @@
       if ($('#pf-meta')) u.meta = $('#pf-meta').value.trim(); if ($('#pf-ass')) u.assinatura = $('#pf-ass').value.trim();
       // mantém o histórico ligado ao novo nome
       if (antes !== nome) estado.atividades.forEach((a) => { if (a.usuario === antes) a.usuario = nome; });
+      if (K.nuvem && antes !== nome) K.nuvem.alterarMembro(u.id, u.perfil, null, nome).catch(() => {});
       log('perfil', 'Perfil atualizado'); salvar(); atualizarAvatar(); toast('Perfil salvo.'); telaPerfil();
     };
     $('#pf-notif').onclick = () => { u.notif = {}; $$('[data-pref]', tela).forEach((c) => { u.notif[c.dataset.pref] = c.checked; }); u.resumo = $('#pf-resumo').checked; salvar(); atualizarSino(); toast('Preferências salvas.'); };
@@ -1749,8 +1862,9 @@
   function seletorLoja() {
     const s = $('#loja-sel'); if (!s) return;
     if (!estado.lojas.length) { s.hidden = true; return; }
-    s.innerHTML = `<option value="">Todas as lojas</option>` + estado.lojas.map((l) => `<option ${estado.lojaAtual === l ? 'selected' : ''}>${esc(l)}</option>`).join('');
-    s.onchange = () => { estado.lojaAtual = s.value; salvar(); log('loja', s.value ? `Vendo a loja ${s.value}` : 'Vendo todas as lojas'); salvar(); location.reload(); };
+    const permitidas = K.lojasPermitidas && K.lojasPermitidas.length ? K.lojasPermitidas : null;
+    s.innerHTML = (permitidas ? '' : `<option value="">Todas as lojas</option>`) + (permitidas || estado.lojas).map((l) => `<option ${estado.lojaAtual === l ? 'selected' : ''}>${esc(l)}</option>`).join('');
+    s.onchange = () => { estado.lojaAtual = s.value; K.lembrarLoja(s.value); salvar(); log('loja', s.value ? `Vendo a loja ${s.value}` : 'Vendo todas as lojas'); salvar(); K.recarregar(); };
   }
   const somenteLeitura = () => eu().perfil === 'auditor';
   // privacidade: contatos mascarados para quem não precisa ver
@@ -1779,7 +1893,7 @@
       <div class="cartoes-lojas">${estado.lojas.map((l) => { const ts = A.todasTrocas.filter((t) => t.loja === l); const p = ts.filter((t) => !t.vendido); return `<div class="loja-c"><b>${esc(l)}</b><span>${p.length} no pátio · ${mil(p.reduce((s, t) => s + t.pago, 0))} parados</span><span>${ts.filter((t) => t.vendido).length} vendidas</span></div>`; }).join('') || '<p class="vazio">Nenhuma loja cadastrada.</p>'}</div>
       <div class="acoes"><button class="btn btn-linha" type="button" id="lj-add">Adicionar loja</button></div></section>`;
   }
-  function ligarLojas() { const b = $('#lj-add'); if (b) b.onclick = () => formulario('Adicionar loja', [{ k: 'nome', r: 'Nome da loja (cidade ou unidade)', lista: 'dl-cidade', obr: true }], {}, (v) => { if (estado.lojas.includes(v.nome)) { toast('Essa loja já existe.', true); return; } estado.lojas.push(v.nome); log('loja', `Loja ${v.nome} adicionada`); salvar(); fecharCamada(true); toast('Loja adicionada.'); location.reload(); }); }
+  function ligarLojas() { const b = $('#lj-add'); if (b) b.onclick = () => formulario('Adicionar loja', [{ k: 'nome', r: 'Nome da loja (cidade ou unidade)', lista: 'dl-cidade', obr: true }], {}, (v) => { if (estado.lojas.includes(v.nome)) { toast('Essa loja já existe.', true); return; } estado.lojas.push(v.nome); log('loja', `Loja ${v.nome} adicionada`); salvar(); fecharCamada(true); toast('Loja adicionada.'); K.recarregar(); }); }
 
   // manter ou vender agora (custo de ficar mais 6 ou 12 meses)
   function manterOuVender(i) {
@@ -1831,10 +1945,11 @@
   }
   $('#sino').onclick = abrirNotificacoes; seletorLoja(); if (somenteLeitura()) document.body.classList.add('so-leitura');
   $('#busca-btn').onclick = abrirBusca; $('#instalar-btn').onclick = simularInstalacao;
-  atualizarAvatar(); eu().ultimoAcesso = new Date().toISOString(); salvar();
+  // com conta, abrir o app não grava nada (evita versão nova a cada acesso e conflito com quem está usando)
+  atualizarAvatar(); eu().ultimoAcesso = new Date().toISOString(); if (!K.nuvem) salvar();
   $$('.menu a').forEach((a) => { if (!pode(a.dataset.aba)) a.hidden = true; });
   $$('.menu-grupo').forEach((g) => { let x = g.nextElementSibling, algum = false; while (x && x.tagName === 'A') { if (!x.hidden) algum = true; x = x.nextElementSibling; } g.hidden = !algum; });
-  if (OP) sincronizar(false).then((r) => { if (r === 'novas') { toast(`Sincronizado com o seu sistema: ${estado.ultimaSync.novas} trocas novas.`); setTimeout(() => location.reload(), 1200); } else if (r === 'permissao') toast('Toque em Teste às cegas › Importar planilha › Sincronizar agora para atualizar com o seu sistema.'); }).catch(() => {});
+  if (OP) sincronizar(false).then((r) => { if (r === 'novas') { toast(`Sincronizado com o seu sistema: ${estado.ultimaSync.novas} trocas novas.`); setTimeout(() => K.recarregar(), 1200); } else if (r === 'permissao') toast('Toque em Teste às cegas › Importar planilha › Sincronizar agora para atualizar com o seu sistema.'); }).catch(() => {});
   atualizarSino();
   window.addEventListener('hashchange', rota);
   // celular: barra com 4 atalhos + "Mais", que abre todos os módulos por categoria
