@@ -1,10 +1,28 @@
 {
-  "name": "Anshur",
+  "id": "./",
+  "name": "Anshur · gestão da revenda",
   "short_name": "Anshur",
-  "description": "Inteligência de margem para revendas de máquinas agrícolas: valor máximo na troca, pátio e histórico.",
-  "start_url": "./#visao",
+  "description": "O sistema da revenda de máquinas agrícolas: usados e trocas com IA, financeiro, relatórios e mais, funcionando até sem internet no pátio.",
+  "lang": "pt-BR",
+  "dir": "ltr",
+  "start_url": "./?origem=app",
+  "scope": "./",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
+  "orientation": "any",
   "background_color": "#F4F0E8",
-  "theme_color": "#F4F0E8",
-  "icons": [{ "src": "icone-192.png", "sizes": "192x192", "type": "image/png" }, { "src": "icone-512.png", "sizes": "512x512", "type": "image/png" }]
+  "theme_color": "#111820",
+  "categories": ["business", "finance", "productivity"],
+  "icons": [
+    { "src": "icone-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icone-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icone-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icone-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Escolher a área", "short_name": "Áreas", "url": "./?origem=atalho#inicio", "icons": [{ "src": "icone-192.png", "sizes": "192x192" }] },
+    { "name": "Usados e Trocas: Hoje", "short_name": "Usados", "url": "./?origem=atalho#hoje", "icons": [{ "src": "icone-192.png", "sizes": "192x192" }] },
+    { "name": "Nova avaliação de troca", "short_name": "Avaliar", "url": "./?origem=atalho#avaliar", "icons": [{ "src": "icone-192.png", "sizes": "192x192" }] },
+    { "name": "Financeiro", "short_name": "Financeiro", "url": "./?origem=atalho#fin", "icons": [{ "src": "icone-192.png", "sizes": "192x192" }] }
+  ]
 }

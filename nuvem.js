@@ -84,6 +84,15 @@
   // nada (idempotente) e o que outra pessoa salvou nos outros itens continua lá.
   const LISTAS_ID = ['avaliacoes', 'fechadas', 'historico', 'documentos', 'atividades', 'pendentes', 'usuarios', 'modelosExtra'];
   const EXTRAS = ['garantias', 'financiadas', 'compradores', 'anuncios'];
+  // grupos com listas por id dentro do estado (estado.extras.garantias, estado.fin.lancamentos, estado.cadastros.clientes...).
+  // As áreas novas registram os seus em ANSHUR_AREAS.registrar({ dados: { grupo: ['lista'] } }) e entram aqui sozinhas.
+  const GRUPOS_BASE = { extras: EXTRAS, fin: ['contas', 'lancamentos', 'transferencias', 'extrato', 'categorias', 'centros'], cadastros: ['clientes', 'fornecedores'] };
+  function gruposDados() {
+    const g = {}; Object.entries(GRUPOS_BASE).forEach(([k, l]) => { g[k] = l.slice(); });
+    const reg = raiz.ANSHUR_AREAS && raiz.ANSHUR_AREAS.gruposDados ? raiz.ANSHUR_AREAS.gruposDados() : {};
+    Object.entries(reg).forEach(([k, l]) => { g[k] = [...new Set((g[k] || []).concat(l))]; });
+    return g;
+  }
   const MAPAS_OP = ['precos', 'vendas', 'preparos', 'resolvidos', 'retratos', 'custos', 'rituais'];
   const js = (x) => JSON.stringify(x);
   const copia = (x) => (x === undefined ? undefined : JSON.parse(JSON.stringify(x)));
@@ -103,9 +112,12 @@
       ma.forEach((x, id) => { if (!vistos.has(id)) add({ t: 'tirar', l: nome, id }); });
     };
     LISTAS_ID.forEach((k) => { if (a[k] !== undefined || d[k] !== undefined) listas(a[k], d[k], k); });
-    const ea = a.extras || {}, ed = d.extras || {};
-    EXTRAS.forEach((k) => { if (ea[k] !== undefined || ed[k] !== undefined) listas(ea[k], ed[k], 'extras.' + k); });
-    new Set([...Object.keys(ea), ...Object.keys(ed)]).forEach((k) => { if (!EXTRAS.includes(k) && js(ea[k]) !== js(ed[k])) add({ t: 'campo', c: 'extras.' + k, v: copia(ed[k]) }); });
+    const GR = gruposDados();
+    Object.entries(GR).forEach(([g, ls]) => {
+      const ea = (a[g] && typeof a[g] === 'object' && !Array.isArray(a[g])) ? a[g] : {}, ed = (d[g] && typeof d[g] === 'object' && !Array.isArray(d[g])) ? d[g] : {};
+      ls.forEach((k) => { if (ea[k] !== undefined || ed[k] !== undefined) listas(ea[k], ed[k], g + '.' + k); });
+      new Set([...Object.keys(ea), ...Object.keys(ed)]).forEach((k) => { if (!ls.includes(k) && js(ea[k]) !== js(ed[k])) add({ t: 'campo', c: g + '.' + k, v: copia(ed[k]) }); });
+    });
     MAPAS_OP.forEach((m) => {
       const ma = (a[m] && typeof a[m] === 'object') ? a[m] : {}, md = (d[m] && typeof d[m] === 'object') ? d[m] : {};
       Object.keys(md).forEach((k) => {
@@ -118,14 +130,16 @@
       });
       Object.keys(ma).forEach((k) => { if (!(k in md)) add({ t: 'apagar', m, k }); });
     });
-    const fixos = new Set([...LISTAS_ID, ...MAPAS_OP, 'extras']);
+    const fixos = new Set([...LISTAS_ID, ...MAPAS_OP, ...Object.keys(GR)]);
     new Set([...Object.keys(a), ...Object.keys(d)]).forEach((k) => { if (!fixos.has(k) && js(a[k]) !== js(d[k])) add({ t: 'campo', c: k, v: copia(d[k]) }); });
     return ops;
   }
   function aplicarOps(base, ops) {
     const r = copia(base || {}) || {};
+    const grupo = (g) => { if (!r[g] || typeof r[g] !== 'object' || Array.isArray(r[g])) r[g] = {}; return r[g]; };
     const lista = (nome) => {
-      if (nome.startsWith('extras.')) { const k = nome.slice(7); r.extras = r.extras && typeof r.extras === 'object' ? r.extras : {}; if (!Array.isArray(r.extras[k])) r.extras[k] = []; return r.extras[k]; }
+      const p = nome.indexOf('.');
+      if (p > 0) { const G = grupo(nome.slice(0, p)), k = nome.slice(p + 1); if (!Array.isArray(G[k])) G[k] = []; return G[k]; }
       if (!Array.isArray(r[nome])) r[nome] = [];
       return r[nome];
     };
@@ -137,7 +151,7 @@
       else if (o.t === 'apagar') { if (r[o.m] && typeof r[o.m] === 'object') delete r[o.m][o.k]; }
       else if (o.t === 'anexar') { const M = mapa(o.m); if (!Array.isArray(M[o.k])) M[o.k] = []; if (!M[o.k].some((x) => js(x) === js(o.v))) M[o.k].push(copia(o.v)); }
       else if (o.t === 'campo') {
-        const alvo = o.c.startsWith('extras.') ? (r.extras = r.extras && typeof r.extras === 'object' ? r.extras : {}) : r, k = o.c.startsWith('extras.') ? o.c.slice(7) : o.c;
+        const p = o.c.indexOf('.'), alvo = p > 0 ? grupo(o.c.slice(0, p)) : r, k = p > 0 ? o.c.slice(p + 1) : o.c;
         if (o.v === undefined) delete alvo[k]; else alvo[k] = copia(o.v);
       }
     });

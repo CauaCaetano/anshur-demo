@@ -76,8 +76,46 @@
   estado.resolvidos = estado.resolvidos || {};
   estado.documentos = estado.documentos || [];
   const usuarioAtual = () => estado.usuarios.find((u) => u.id === estado.usuarioAtual) || estado.usuarios[0];
+
+  // ---------- cadastros comuns: UM lugar para todas as áreas (clientes, fornecedores, máquinas, lojas, usuários) ----------
+  // Clientes e fornecedores ficam em estado.cadastros (listas por id: a fila offline grava item a item).
+  // Máquinas não têm cadastro próprio: são os usados (A.todasTrocas, por id) e as novas do floor plan (A.financiadas, por chassi).
+  // Lojas = estado.lojas; usuários = estado.usuarios. Nenhuma área cria lista paralela destes cadastros.
+  estado.cadastros = Object.assign({ clientes: [], fornecedores: [] }, estado.cadastros);
+  const normal = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+  const digitos = (s) => String(s || '').replace(/\D/g, '');
+  const novoIdCad = (pre) => pre + Date.now().toString(36).toUpperCase() + Math.random().toString(36).slice(2, 5).toUpperCase();
+  // acha pela mesma pessoa: documento (CPF/CNPJ) quando houver; senão o nome sem acento e sem diferença de maiúsculas
+  function acharCadastro(lista, { documento, nome } = {}) {
+    const d = digitos(documento), n = normal(nome);
+    return (lista || []).find((x) => !x.inativo && ((d && digitos(x.documento) === d) || (!d && n && normal(x.nome) === n) || (d && !digitos(x.documento) && n && normal(x.nome) === n))) || null;
+  }
+  // devolve o cadastro existente ou cria um (nunca duplica); tipo: 'clientes' | 'fornecedores'
+  function garantirCadastro(est, tipo, dados = {}) {
+    est.cadastros = Object.assign({ clientes: [], fornecedores: [] }, est.cadastros);
+    const l = est.cadastros[tipo] = est.cadastros[tipo] || [];
+    const nome = String(dados.nome || '').trim(); if (!nome && !digitos(dados.documento)) return null;
+    const ja = acharCadastro(l, dados);
+    if (ja) { ['documento', 'telefone', 'cidade', 'email'].forEach((k) => { if (dados[k] && !ja[k]) ja[k] = dados[k]; }); return ja; }
+    const c = { id: dados.id || novoIdCad(tipo === 'clientes' ? 'CL' : 'FO'), nome, documento: dados.documento || '', telefone: dados.telefone || '', cidade: dados.cidade || '', email: dados.email || '', criadoEm: dados.criadoEm || hojeISO() };
+    l.push(c); return c;
+  }
+  const maquinasCad = () => (A.todasTrocas || A.trocas || []).map((t) => ({ id: t.id, chassi: t.chassi || '', nome: `${t.marca || ''} ${t.modelo || ''}`.trim(), ano: t.ano, tipo: t.tipo, marca: t.marca, modelo: t.modelo, loja: t.loja || '', origem: 'usado', vendido: !!t.vendido, t }))
+    .concat((A.financiadas || []).map((f) => ({ id: 'F:' + f.chassi, chassi: f.chassi, nome: `${f.marca} ${f.modelo}`, ano: f.ano || '', tipo: f.tipo, marca: f.marca, modelo: f.modelo, loja: f.loja || '', origem: 'nova', vendido: !!f.venda, f })));
+  const CAD = {
+    clientes: () => estado.cadastros.clientes.filter((c) => !c.inativo),
+    fornecedores: () => estado.cadastros.fornecedores.filter((c) => !c.inativo),
+    cliente: (id) => estado.cadastros.clientes.find((c) => c.id === id) || null,
+    fornecedor: (id) => estado.cadastros.fornecedores.find((c) => c.id === id) || null,
+    maquinas: maquinasCad,
+    maquina: (idOuChassi) => { const k = String(idOuChassi || ''); return maquinasCad().find((m) => m.id === k || (m.chassi && m.chassi === k)) || null; },
+    lojas: () => estado.lojas || [],
+    usuarios: () => estado.usuarios || [],
+    garantir: (tipo, dados) => garantirCadastro(estado, tipo, dados),
+    achar: acharCadastro
+  };
   // atividades críticas também vão para a trilha do servidor (anshur_eventos: só inserção)
-  const CRITICOS = new Set(['troca', 'aprovacao', 'preco', 'venda', 'usuario', 'convite', 'lgpd', 'exportacao', 'seguranca', 'importacao', 'exclusao', 'config', 'ia']);
+  const CRITICOS = new Set(['troca', 'aprovacao', 'preco', 'venda', 'usuario', 'convite', 'lgpd', 'exportacao', 'seguranca', 'importacao', 'exclusao', 'config', 'ia', 'financeiro']);
   function registrar(tipo, texto, extra = {}) {
     estado.atividades.unshift({ id: 'a' + Date.now() + Math.random().toString(36).slice(2, 6), quando: new Date().toISOString(), usuario: usuarioAtual().nome, perfil: usuarioAtual().perfil, tipo, texto, ...extra });
     if (estado.atividades.length > 600) estado.atividades.length = 600;
@@ -86,6 +124,7 @@
 
   (estado.modelosExtra || []).forEach((m) => { if (!A.modelos.some((x) => x.modelo === m.modelo)) A.modelos.push({ ...m, hAno: { trator: 750, colhedora: 2600, pulverizador: 820, plantadeira: 270 }[m.tipo] || 800, importado: true }); });
   aplicarMovimentos(A.trocas, estado);
+  aplicarFinanceiro(A.trocas, estado);
   // várias lojas: cada máquina pertence a uma unidade; o motor aprende com todas, as telas mostram a loja escolhida
   estado.lojas = estado.lojas && estado.lojas.length ? estado.lojas : (ambiente === 'op' ? [] : ['Orlândia', 'Sertãozinho', 'Bebedouro']);
   const hashL = (s) => [...String(s)].reduce((h, c) => (h * 33 + c.charCodeAt(0)) >>> 0, 5);
@@ -160,6 +199,33 @@
     est.fechadas.push(t);
     return t;
   }
+  // Financeiro → margem: contas pagas ligadas a uma máquina (frete, documentação, comissão, juros do floor plan).
+  // Recalcula do zero (idempotente). Comissão e juros lançados à mão em "Lançar custos" continuam valendo; o Financeiro só preenche o que falta.
+  function custosDoFinanceiro(est) {
+    const r = {};
+    ((est.fin && est.fin.lancamentos) || []).forEach((l) => {
+      if (l.tipo !== 'pagar' || l.cancelado || !l.pago || !l.maquina || !l.margem) return;
+      const v = Math.round(typeof l.pago.valor === 'number' ? l.pago.valor : l.valor) || 0;
+      const o = r[l.maquina] = r[l.maquina] || {};
+      o[l.margem] = (o[l.margem] || 0) + v;
+    });
+    return r;
+  }
+  function aplicarFinanceiro(trocas, est) {
+    const f = custosDoFinanceiro(est);
+    (trocas || []).forEach((t) => {
+      const v = f[t.id];
+      if (!v && !(t.custos && (t.custos.despesasFin || t.custos.comissaoFin || t.custos.jurosFin))) return;
+      const c = Object.assign({}, t.custos);
+      if (c.despesasFin) { delete c.despesas; delete c.despesasFin; }
+      if (c.comissaoFin) { delete c.comissao; delete c.comissaoFin; }
+      if (c.jurosFin) { delete c.juros; delete c.jurosFin; }
+      if (v && v.despesas) { c.despesas = v.despesas; c.despesasFin = true; }
+      if (v && typeof v.comissao === 'number' && typeof c.comissao !== 'number') { c.comissao = v.comissao; c.comissaoFin = true; }
+      if (v && typeof v.juros === 'number' && typeof c.juros !== 'number') { c.juros = v.juros; c.jurosFin = true; }
+      t.custos = c;
+    });
+  }
   function registrarPreparo(est, id, valor, dataReg) { est.preparos[id] = { valor: Math.round(valor), data: dataReg }; }
   function registrarVenda(est, id, valor, dataVenda) { est.vendas[id] = { valor: Math.round(valor), data: dataVenda }; }
   // comissão e juros do floor plan de uma operação: só entram valores informados (vazio = não registrado)
@@ -195,17 +261,18 @@
     const comissao = typeof cu.comissao === 'number' ? cu.comissao : 0;
     if (typeof cu.comissao !== 'number') faltando.push('comissão');
     const juros = typeof cu.juros === 'number' ? cu.juros : 0;
+    const despesas = typeof cu.despesas === 'number' ? cu.despesas : 0; // pagas no Financeiro ligadas à máquina (frete, documentação...)
     const receita = t.vendido, aquisicao = t.pago;
-    const margem = receita - aquisicao - preparo - juros - comissao;
+    const margem = receita - aquisicao - preparo - juros - comissao - despesas;
     return { id: t.id, mes: mesDe(t.saida), saida: t.saida, marca: t.marca || '—', tipo: t.tipo, modelo: t.modelo, ano: t.ano, loja: t.loja || '', vendedor: t.vendedor || '',
-      receita, aquisicao, preparo, pecas, maoDeObra, horasOficina, preparoPrevisto, juros, jurosRegistrado: typeof cu.juros === 'number', comissao,
+      receita, aquisicao, preparo, pecas, maoDeObra, horasOficina, preparoPrevisto, juros, jurosRegistrado: typeof cu.juros === 'number', comissao, despesas,
       margem, pct: receita ? margem / receita : NaN, faltando, status: faltando.length ? 'estimada' : 'real' };
   }
   function somar(lista) {
-    const s = { n: 0, nReal: 0, nEst: 0, receita: 0, aquisicao: 0, preparo: 0, juros: 0, comissao: 0, margem: 0, faltaPreparo: 0, faltaComissao: 0 };
+    const s = { n: 0, nReal: 0, nEst: 0, receita: 0, aquisicao: 0, preparo: 0, juros: 0, comissao: 0, despesas: 0, margem: 0, faltaPreparo: 0, faltaComissao: 0 };
     lista.forEach((o) => {
       s.n++; if (o.status === 'real') s.nReal++; else s.nEst++;
-      ['receita', 'aquisicao', 'preparo', 'juros', 'comissao', 'margem'].forEach((k) => { s[k] += o[k]; });
+      ['receita', 'aquisicao', 'preparo', 'juros', 'comissao', 'despesas', 'margem'].forEach((k) => { s[k] += o[k] || 0; });
       if (o.faltando.includes('preparo')) s.faltaPreparo++;
       if (o.faltando.includes('comissão')) s.faltaComissao++;
     });
@@ -230,5 +297,6 @@
   const recarregar = () => (N && ambiente === 'op' ? N.recarregar() : location.reload());
   raiz.COMUM = { A, ambiente, nuvem: N && ambiente === 'op' ? N : null, lojasPermitidas, lembrarLoja, recarregar, repo, estado, cfg, PADRAO, PERFIS, usuarioAtual, registrar, real, mil, pct, hojeISO, diasEntre, diasDesde, data, esc, NOMES, FICHA, logo, C,
     fecharTroca, registrarPreparo, registrarVenda, registrarCustos, aplicarMovimentos, margemOperacao, relatorioMargem,
+    cad: CAD, garantirCadastro, acharCadastro, normal, digitos, custosDoFinanceiro, aplicarFinanceiro,
     gravar: (d) => repo.gravar(d), ler: () => repo.ler(), restaurar: () => { repo.apagar('demo'); delItem('anshur-demo-v1'); } };
 })(typeof window !== 'undefined' ? window : globalThis);

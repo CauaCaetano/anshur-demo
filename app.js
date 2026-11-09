@@ -1225,7 +1225,8 @@
     financeiro: ['hoje', 'visao', 'patio', 'trocas', 'garantias', 'financiamento', 'relatorio', 'documentos', 'atividades', 'rotina', 'memoria', 'historico'],
     auditor: ['hoje', 'visao', 'patio', 'trocas', 'vendedores', 'garantias', 'financiamento', 'relatorio', 'atividades', 'aprovacoes', 'rotina', 'memoria', 'historico']
   };
-  const pode = (aba) => aba === 'perfil' || (PERM[eu().perfil] || PERM.dono).includes(aba);
+  const permArea = (aba) => (window.ANSHUR_AREAS ? window.ANSHUR_AREAS.permissao(aba) : null);
+  const pode = (aba) => aba === 'perfil' || aba === 'inicio' || (permArea(aba) ? permArea(aba).includes(eu().perfil) : (PERM[eu().perfil] || PERM.dono).includes(aba));
   const podeAprovar = () => ['dono', 'gerente'].includes(eu().perfil);
   const log = (tipo, texto, extra) => { K.registrar(tipo, texto, extra); };
 
@@ -1543,7 +1544,7 @@
             <div><span>Desconto por troca acima</span><b>${pct(K.cfg.descontoAcima, 0)}</b></div><div><span>Hora da oficina</span><b>${real(K.cfg.valorHora)}</b></div><div><span>Base do custo</span><b>${K.cfg.baseJuros === 'total' ? 'Pago + preparo' : 'Valor pago'}</b></div></div>
           <div class="acoes"><button class="btn btn-linha" type="button" id="c-prem">Alterar regras</button></div></section>
       </div>
-      ${blocoIAConfig()}${blocoAvisos()}${blocoLojas()}${blocoLGPD()}
+      ${blocoInstalar()}${blocoIAConfig()}${blocoAvisos()}${blocoLojas()}${blocoLGPD()}
       <section class="painel bloco"><h2>${ICO.alvo}Alçadas de aprovação por tipo de máquina</h2><p class="sub" style="margin:6px 0 12px">Quanto acima do valor máximo cada um pode liberar. Acima da alçada do gerente, só o dono libera. Zero = qualquer valor acima precisa de aprovação.</p>
         <div class="tabela-wrap"><table class="tabela grande"><thead><tr><th>Tipo</th><th class="n">Vendedor libera até (R$)</th><th class="n">Gerente libera até (R$)</th><th>Acima disso</th></tr></thead><tbody>
         ${Object.entries(alcadas()).map(([k, a]) => `<tr><td><b>${NOMES[k]}</b></td><td class="n"><input class="campo-in" style="max-width:150px;text-align:right" data-alc="${k}|vendedor" inputmode="numeric" value="${a.vendedor.toLocaleString('pt-BR')}"></td><td class="n"><input class="campo-in" style="max-width:150px;text-align:right" data-alc="${k}|gerente" inputmode="numeric" value="${a.gerente.toLocaleString('pt-BR')}"></td><td>Só o dono</td></tr>`).join('')}</tbody></table></div>
@@ -1593,18 +1594,47 @@
   // ---------- instalação (simulação) ----------
   let promptInstalar = null;
   window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); promptInstalar = e; });
-  function simularInstalacao() {
-    abrirCamada('modal', `<div class="instala"><img src="icone-192.png" alt="" width="88" height="88" class="instala-ico"><h2>Instalar o Anshur</h2>
-      <p class="sub" id="ins-txt">Abre direto da tela inicial, em tela cheia, e funciona sem internet no pátio.</p>
-      <div class="progresso grande" id="ins-bar" hidden><i style="width:0%"></i></div>
-      <div class="acoes" style="justify-content:center"><button class="btn btn-ouro" type="button" id="ins-ok">Instalar</button></div></div>`, (c) => {
-      $('#ins-ok', c).onclick = () => {
-        const bar = $('#ins-bar', c), txt = $('#ins-txt', c); $('#ins-ok', c).hidden = true; bar.hidden = false;
-        const etapas = [[20, 'Baixando o aplicativo…'], [55, 'Guardando para usar sem internet…'], [80, 'Criando o atalho na tela inicial…'], [100, 'Pronto! O Anshur está instalado.']];
-        etapas.forEach(([p, m], i) => setTimeout(() => { $('i', bar).style.width = p + '%'; txt.textContent = m; if (p === 100) { c.querySelector('.instala').classList.add('feito'); $('.acoes', c).innerHTML = `<button class="btn btn-ouro" type="button" id="ins-fim">Abrir o Anshur</button>${promptInstalar ? '<button class="btn btn-linha" type="button" id="ins-real">Instalar de verdade neste aparelho</button>' : ''}`; $('#ins-fim', c).onclick = () => fecharCamada(); const r = $('#ins-real', c); if (r) r.onclick = () => { promptInstalar.prompt(); }; log('config', 'Instalação do app (simulação)'); salvar(); } }, 700 * (i + 1)));
-      };
+  // instalação de verdade: pedido do navegador quando existe; senão, o caminho daquele aparelho (instalar.js)
+  const INS = window.ANSHUR_INSTALAR;
+  const enderecoApp = () => location.origin + location.pathname.replace(/index\.html$/, '') + (OP ? '?entrar' : '');
+  function carregarQR() {
+    if (window.qrcode) return Promise.resolve();
+    return new Promise((ok, erro) => { const sc = document.createElement('script'); sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js'; sc.onload = ok; sc.onerror = erro; document.head.appendChild(sc); });
+  }
+  async function abrirInstalacao(alvo) {
+    if (!INS) return;
+    if (INS.instalado()) { toast('O Anshur já está aberto como aplicativo neste aparelho.'); return; }
+    const ins = INS.instrucoes(alvo);
+    if (ins.modo === 'pedido') {
+      const r = await INS.pedir();
+      if (r === 'aceito') { toast('Pronto: o Anshur foi instalado neste aparelho.'); atualizarInstalar(); return; }
+      if (r === 'recusado') { toast('Instalação cancelada. Dá para instalar depois pelo mesmo botão.'); return; }
+    }
+    const fim = ins.modo === 'pedido' ? INS.instrucoes(alvo, INS.detectar(), false) : ins, url = enderecoApp();
+    abrirCamada('modal instala-modal', `<div class="instala-topo"><img src="icone-192.png" alt="" width="56" height="56"><div><h2>${esc(fim.titulo)}</h2><p class="sub">Abre pela tela inicial, em janela própria, e funciona sem internet no pátio.</p></div></div>
+      ${fim.modo === 'outro-aparelho' && alvo === 'celular' ? '<div class="qr-instalar" id="ins-qr" aria-label="QR Code com o endereço do Anshur"></div>' : ''}
+      <ol class="passos-instalar">${fim.passos.map((x) => `<li>${esc(x)}</li>`).join('')}</ol>
+      ${fim.modo === 'outro-aparelho' ? `<div class="campo"><label for="ins-url">Endereço do Anshur</label><input id="ins-url" readonly value="${esc(url)}"></div><div class="acoes"><button class="btn btn-linha" type="button" id="ins-copiar">Copiar endereço</button></div>` : ''}`, (c) => {
+      const cp = $('#ins-copiar', c); if (cp) cp.onclick = () => { const inp = $('#ins-url', c); inp.select(); (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).then(() => toast('Endereço copiado.'), () => { document.execCommand('copy'); toast('Endereço copiado.'); }); };
+      const q = $('#ins-qr', c); if (q) carregarQR().then(() => { const qr = window.qrcode(0, 'M'); qr.addData(url); qr.make(); q.innerHTML = qr.createSvgTag({ cellSize: 4, margin: 2, scalable: true }); }, () => { q.remove(); });
     });
   }
+  function simularInstalacao() { abrirInstalacao(INS && INS.detectar().celular ? 'celular' : 'computador'); }
+  function blocoInstalar() {
+    if (!INS || INS.instalado()) return '';
+    const d = INS.detectar();
+    return `<section class="painel instalar-bloco" id="bloco-instalar"><h2><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Instalar o Anshur</h2>
+      <p class="sub">Vira um aplicativo: ícone próprio, abre em tela cheia e funciona sem internet no pátio. Grátis, sem loja de aplicativos.</p>
+      <div class="acoes"><button class="btn ${d.celular ? 'btn-linha' : 'btn-ouro'}" type="button" data-instalar="computador"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v11H3zM8 20h8M12 16v4"/></svg>Instalar no computador</button>
+      <button class="btn ${d.celular ? 'btn-ouro' : 'btn-linha'}" type="button" data-instalar="celular"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2h10v20H7zM11 18h2"/></svg>Instalar no celular</button></div></section>`;
+  }
+  function atualizarInstalar() {
+    const sim = INS && INS.instalado(); const b = $('#instalar-btn'); if (b) b.hidden = !!sim;
+    const mi = $('#m-instalar'); if (mi) mi.hidden = !!sim;
+    if (sim) { const bl = $('#bloco-instalar'); if (bl) bl.remove(); }
+  }
+  document.addEventListener('click', (e) => { const b = e.target.closest('[data-instalar]'); if (b) { e.preventDefault(); abrirInstalacao(b.dataset.instalar); } });
+  window.addEventListener('anshur:instalar', atualizarInstalar);
 
   // ---------- relatórios diário, semanal e mensal ----------
   let periodo = 'semanal';
@@ -1685,8 +1715,8 @@
     const periodoTxt = fm.de === fm.ate ? nomeMes(fm.de) : `${nomeMes(fm.de)} a ${nomeMes(fm.ate)}`;
     const opt = (lista, sel) => lista.map(([v, n]) => `<option value="${esc(v)}" ${v === sel ? 'selected' : ''}>${esc(n)}</option>`).join('');
     const mesesOpt = meses.slice().reverse().map((m) => [m, nomeMes(m)]);
-    const linhaNum = (x) => `<td class="n">${real(x.receita)}</td><td class="n">${real(x.aquisicao)}</td><td class="n">${real(x.preparo)}</td><td class="n">${real(x.juros)}</td><td class="n">${real(x.comissao)}</td><td class="n forte ${neg(x.margem)}">${real(x.margem)}</td><td class="n ${neg(x.margem)}">${pc(x.pct)}</td>`;
-    const cab = `<th class="n">Receita</th><th class="n">Aquisição</th><th class="n">Preparo</th><th class="n">Juros floor plan</th><th class="n">Comissão</th><th class="n">Margem líquida</th><th class="n">%</th>`;
+    const linhaNum = (x) => `<td class="n">${real(x.receita)}</td><td class="n">${real(x.aquisicao)}</td><td class="n">${real(x.preparo)}</td><td class="n">${real(x.juros)}</td><td class="n">${real(x.comissao)}</td><td class="n">${real(x.despesas || 0)}</td><td class="n forte ${neg(x.margem)}">${real(x.margem)}</td><td class="n ${neg(x.margem)}">${pc(x.pct)}</td>`;
+    const cab = `<th class="n">Receita</th><th class="n">Aquisição</th><th class="n">Preparo</th><th class="n">Juros floor plan</th><th class="n">Comissão</th><th class="n" title="Frete, documentação e outras pagas no Financeiro">Outras despesas</th><th class="n">Margem líquida</th><th class="n">%</th>`;
     tela.innerHTML = `
       <div class="titulo"><div><h1>Relatórios</h1><p>Margem líquida por ${nomeG.toLowerCase()} das operações concluídas (vendidas), mês a mês.</p></div>
         <div class="acoes"><button class="btn btn-linha" type="button" id="mg-csv">Exportar CSV</button><button class="btn btn-linha" type="button" id="mg-print">Imprimir ou PDF</button></div></div>
@@ -1702,7 +1732,7 @@
         <p class="sub" style="margin-top:6px">${esc(A.revenda.nome)} · ${fm.loja ? 'loja ' + esc(fm.loja) : K.lojasPermitidas ? 'lojas ' + esc(K.lojasPermitidas.join(', ')) : 'todas as lojas'} · ${esc(periodoTxt)} · emitido em ${new Date().toLocaleString('pt-BR')} por ${esc(eu().nome)}</p>
         <h2 style="margin-top:14px">Margem líquida por ${nomeG.toLowerCase()}</h2>
         <div class="numeros"><div><span>Operações concluídas</span><b>${r.total.n} <small class="sub">(${r.total.nReal} reais · ${r.total.nEst} estimadas)</small></b></div><div><span>Receita (vendas)</span><b>${mil(r.total.receita)}</b></div>
-          <div><span>Custos registrados</span><b>${mil(r.total.aquisicao + r.total.preparo + r.total.juros + r.total.comissao)}</b></div><div><span>Margem líquida</span><b class="${neg(r.total.margem)}">${mil(r.total.margem)}</b></div><div><span>Margem líquida %</span><b class="${neg(r.total.margem)}">${pc(r.total.pct)}</b></div></div>
+          <div><span>Custos registrados</span><b>${mil(r.total.aquisicao + r.total.preparo + r.total.juros + r.total.comissao + (r.total.despesas || 0))}</b></div><div><span>Margem líquida</span><b class="${neg(r.total.margem)}">${mil(r.total.margem)}</b></div><div><span>Margem líquida %</span><b class="${neg(r.total.margem)}">${pc(r.total.pct)}</b></div></div>
         ${r.total.nEst ? `<p class="conta">${r.total.nEst} de ${r.total.n} operações estão com margem <b>estimada</b>: faltam custos registrados (${[r.total.faltaPreparo ? `preparo em ${r.total.faltaPreparo}` : '', r.total.faltaComissao ? `comissão em ${r.total.faltaComissao}` : ''].filter(Boolean).join(', ')}). O Anshur não inventa custo: a margem dessas operações usa só o que foi registrado e pode ser menor.${lancar ? ' Lance os custos em cada operação, abaixo.' : ''}</p>` : ''}
         ${!r.total.n ? '<p class="conta">Nenhuma operação concluída (vendida) neste período e nesta loja.</p>' : `
         <div class="tabela-wrap"><table class="tabela" id="mg-grupos"><thead><tr><th>${nomeG}</th><th class="n">Vendas</th>${cab}<th>Situação</th></tr></thead><tbody>
@@ -1714,7 +1744,7 @@
         <h2>Operações</h2>
         <div class="tabela-wrap"><table class="tabela" id="mg-ops"><thead><tr><th>Venda</th><th>Máquina</th>${lojasVer.length ? '<th>Loja</th>' : ''}${cab}<th>Situação</th>${lancar ? '<th class="sem-impressao"></th>' : ''}</tr></thead><tbody>
           ${r.operacoes.map((o) => `<tr data-op="${esc(o.id)}"><td>${data(o.saida)}</td><td class="maq"><span><b>${esc(o.marca + ' ' + o.modelo)}</b><span>${esc(NOMES[o.tipo] || o.tipo)} · ${o.ano || ''}${o.pecas != null ? ` · peças ${real(o.pecas)}, mão de obra ${real(o.maoDeObra)} (${(o.horasOficina || 0).toLocaleString('pt-BR')} h)` : ''}</span></span></td>${lojasVer.length ? `<td>${esc(o.loja || '—')}</td>` : ''}${linhaNum(o)}<td>${sitO(o)}</td>${lancar ? `<td class="sem-impressao"><button class="link" type="button" data-custos="${esc(o.id)}">Lançar custos</button></td>` : ''}</tr>`).join('')}</tbody></table></div>`}
-        <p class="nota-rodape">Margem líquida = venda − valor pago na troca − preparo (peças e horas) − juros do floor plan − comissão. Real: preparo e comissão registrados. Estimada: falta algum desses custos; a margem mostrada usa só os custos registrados e pode ser menor. Juros do floor plan entram quando registrados (usado fora do floor plan não tem juros). Só operações vendidas, pela data da venda. ${OP ? '' : 'Revenda e dados fictícios.'}</p>
+        <p class="nota-rodape">Margem líquida = venda − valor pago na troca − preparo (peças e horas) − juros do floor plan − comissão − outras despesas pagas no Financeiro ligadas à máquina (frete, documentação). Real: preparo e comissão registrados. Estimada: falta algum desses custos; a margem mostrada usa só os custos registrados e pode ser menor. Juros do floor plan entram quando registrados (usado fora do floor plan não tem juros). Só operações vendidas, pela data da venda. ${OP ? '' : 'Revenda e dados fictícios.'}</p>
       </article>`;
     $$('[data-per]', tela).forEach((b) => b.onclick = () => { periodo = b.dataset.per; telaRelatorios(); });
     $('#mg-de').onchange = (e) => { fm.de = e.target.value; telaMargem(); };
@@ -1723,10 +1753,10 @@
     $('#mg-agr').onchange = (e) => { fm.agrupar = e.target.value; telaMargem(); };
     $('#mg-print').onclick = () => print();
     $('#mg-csv').onclick = () => {
-      const L = [['Mês', 'Data da venda', 'Operação', 'Tipo', 'Marca', 'Modelo', 'Ano', 'Loja', 'Receita', 'Aquisição', 'Preparo', 'Peças', 'Mão de obra', 'Juros floor plan', 'Comissão', 'Margem líquida', 'Margem %', 'Situação', 'Custos faltando']]
-        .concat(r.operacoes.map((o) => [o.mes, o.saida, o.id, NOMES[o.tipo] || o.tipo, o.marca, o.modelo, o.ano, o.loja, o.receita, o.aquisicao, o.preparo, o.pecas ?? '', o.maoDeObra ?? '', o.juros, o.comissao, o.margem, pctCSV(o.pct), o.status === 'real' ? 'Real' : 'Estimada', o.faltando.join(', ')]))
-        .concat([[], [nomeG, 'Vendas', 'Reais', 'Estimadas', 'Receita', 'Aquisição', 'Preparo', 'Juros floor plan', 'Comissão', 'Margem líquida', 'Margem %']])
-        .concat(r.grupos.concat([Object.assign({ chave: 'Total' }, r.total)]).map((g) => [rotG(g.chave), g.n, g.nReal, g.nEst, g.receita, g.aquisicao, g.preparo, g.juros, g.comissao, g.margem, pctCSV(g.pct)]));
+      const L = [['Mês', 'Data da venda', 'Operação', 'Tipo', 'Marca', 'Modelo', 'Ano', 'Loja', 'Receita', 'Aquisição', 'Preparo', 'Peças', 'Mão de obra', 'Juros floor plan', 'Comissão', 'Outras despesas', 'Margem líquida', 'Margem %', 'Situação', 'Custos faltando']]
+        .concat(r.operacoes.map((o) => [o.mes, o.saida, o.id, NOMES[o.tipo] || o.tipo, o.marca, o.modelo, o.ano, o.loja, o.receita, o.aquisicao, o.preparo, o.pecas ?? '', o.maoDeObra ?? '', o.juros, o.comissao, o.despesas || 0, o.margem, pctCSV(o.pct), o.status === 'real' ? 'Real' : 'Estimada', o.faltando.join(', ')]))
+        .concat([[], [nomeG, 'Vendas', 'Reais', 'Estimadas', 'Receita', 'Aquisição', 'Preparo', 'Juros floor plan', 'Comissão', 'Outras despesas', 'Margem líquida', 'Margem %']])
+        .concat(r.grupos.concat([Object.assign({ chave: 'Total' }, r.total)]).map((g) => [rotG(g.chave), g.n, g.nReal, g.nEst, g.receita, g.aquisicao, g.preparo, g.juros, g.comissao, g.despesas || 0, g.margem, pctCSV(g.pct)]));
       baixarCSV(`anshur-margem-por-${fm.agrupar}-${fm.de}-a-${fm.ate}${fm.loja ? '-' + fm.loja.replace(/\W+/g, '-') : ''}.csv`, L);
     };
     $$('[data-custos]', tela).forEach((b) => b.onclick = () => {
@@ -1769,8 +1799,9 @@
         const maq = A.trocas.filter((t) => !q || [t.marca, t.modelo, t.id, t.chassi, t.vendedor, t.origem].join(' ').toLowerCase().includes(q)).slice(0, 6).map((t) => ({ g: t.vendido ? 'Vendidas' : 'No pátio', n: `${t.marca} ${t.modelo} · ${t.ano}`, d: t.vendido ? `vendida ${data(t.saida)} por ${mil(t.vendido)}` : `${diasDesde(t.entrada)} dias no pátio`, ir: () => { location.hash = t.vendido ? '#trocas' : '#patio'; setTimeout(() => !t.vendido && detalheMaquina(t.id), 300); } }));
         const gar = (A.garantias || []).filter((g) => q && [g.os, g.servico, g.cliente, g.marca].join(' ').toLowerCase().includes(q)).slice(0, 4).map((g) => ({ g: 'Garantias', n: `${g.os} · ${g.servico}`, d: `${g.marca} · ${real(g.valor)}`, ir: () => { location.hash = '#garantias'; } }));
         const fin = (A.financiadas || []).filter((f) => q && [f.chassi, f.modelo, f.marca].join(' ').toLowerCase().includes(q)).slice(0, 4).map((f) => ({ g: 'Financiadas', n: `${f.marca} ${f.modelo}`, d: f.chassi, ir: () => { location.hash = '#financiamento'; } }));
-        const pag = acoes.filter(([n]) => !q || n.toLowerCase().includes(q)).slice(0, 5).map(([n, h]) => ({ g: 'Ir para', n, d: '', ir: () => { location.hash = h; } }));
-        itens = [...pag, ...maq, ...gar, ...fin]; sel = Math.min(sel, Math.max(0, itens.length - 1));
+        const pag = acoes.concat(acoesDasAreas()).filter(([n], i, l) => (!q || n.toLowerCase().includes(q)) && l.findIndex((x) => x[0] === n) === i).slice(0, q ? 8 : 5).map(([n, h]) => ({ g: 'Ir para', n, d: '', ir: () => { location.hash = h; } }));
+        const deAreas = q ? areasVisiveis().filter((a) => a.pronta && a.buscar).flatMap((a) => { try { return a.buscar(q, UI) || []; } catch (er) { return []; } }) : [];
+        itens = [...pag, ...maq, ...gar, ...fin, ...deAreas]; sel = Math.min(sel, Math.max(0, itens.length - 1));
         let g = ''; res.innerHTML = itens.map((x, i) => `${x.g !== g ? `<div class="busca-g">${(g = x.g)}</div>` : ''}<button type="button" class="busca-it ${i === sel ? 'sel' : ''}" data-i="${i}"><b>${esc(x.n)}</b><span>${esc(x.d)}</span></button>`).join('') || '<p class="vazio">Nada encontrado.</p>';
         $$('.busca-it', res).forEach((b) => b.onclick = () => { fecharCamada(true); itens[+b.dataset.i].ir(); });
       };
@@ -2421,27 +2452,138 @@
     if (matchMedia('(min-width: 960px)').matches) { ind.style.transform = `translateY(${ativo.offsetTop}px)`; ind.style.width = ''; }
     else { ind.style.transform = `translateX(${ativo.offsetLeft}px)`; ind.style.width = ativo.offsetWidth + 'px'; }
   }
+  // =====================================================================================
+  // ÁREAS: tela de entrada (escolha de área), menu de cada área, troca rápida e telas dos módulos (areas/*.js)
+  // =====================================================================================
+  const AR = window.ANSHUR_AREAS;
+  const lsG = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+  const lsS = (k, v) => { try { if (v) localStorage.setItem(k, v); else localStorage.removeItem(k); } catch (e) { /* sem armazenamento */ } };
+  const chaveU = (k) => `anshur-${k}:${NV ? NV.revenda.id : OP ? 'op' : 'demo'}:${eu().id}`; // por revenda e pessoa, só neste aparelho
+  const telaDe = (aba) => TELAS[aba] || (AR && AR.tela(aba) ? () => AR.tela(aba)(UI) : null);
+  const itensVisiveis = (a) => (AR ? AR.itens(a).filter((x) => pode(x.aba) && telaDe(x.aba)) : []);
+  const areaVisivel = (a) => (a.pronta ? itensVisiveis(a).length > 0 && (!a.perfis || a.perfis.includes(eu().perfil)) : (!a.perfis || a.perfis.includes(eu().perfil)));
+  const areasVisiveis = () => (AR ? AR.lista().filter(areaVisivel) : []);
+  const inicioDaArea = (a) => { const l = itensVisiveis(a); return (l.find((x) => x.aba === a.inicio) || l[0] || {}).aba || 'inicio'; };
+  const abrirDireto = () => { const a = AR && AR.area(lsG(chaveU('area-fixa'))); return a && a.pronta && areaVisivel(a) ? inicioDaArea(a) : ''; };
+  const acoesDasAreas = () => areasVisiveis().filter((a) => a.pronta).flatMap((a) => [['Área ' + a.nome, '#' + inicioDaArea(a)]].concat(itensVisiveis(a).map((x) => [`${x.rotulo} · ${a.nome}`, '#' + x.aba])));
+  let areaAtual = lsG(chaveU('area')) || '';
+  const svgI = (d) => `<svg viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
+  const ICO_AREAS = '<path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/>';
+  let menuDe = null;
+  function montarMenu(id) {
+    const chave = id || '#inicio'; if (menuDe === chave) return; menuDe = chave;
+    const menu = $('#menu'); $$('a, .menu-grupo', menu).forEach((x) => x.remove());
+    let html = '', n = 0;
+    const link = (href, aba, curto, icone, rotulo, extra = '', at = null) => { const atalho = at === null ? n < 4 : at; n++; return `<a href="${href}" ${aba ? `data-aba="${aba}"` : ''} data-curto="${esc(curto)}" class="${atalho ? 'atalho' : ''}" ${extra}>${svgI(icone)}<span>${esc(rotulo)}</span></a>`; };
+    const a = id && AR.area(id);
+    if (a) {
+      const atalhos = a.atalhos || [];
+      a.menu.forEach((g) => { const its = g.itens.filter((x) => pode(x.aba) && telaDe(x.aba)); if (!its.length) return; html += `<p class="menu-grupo">${esc(g.grupo)}</p>` + its.map((x) => link('#' + x.aba, x.aba, x.curto || x.rotulo, x.icone, x.rotulo, '', atalhos.length ? atalhos.includes(x.aba) : null)).join(''); });
+    } else {
+      const as = areasVisiveis();
+      html += '<p class="menu-grupo">Áreas</p>' + link('#inicio', 'inicio', 'Áreas', ICO_AREAS, 'Todas as áreas');
+      html += as.filter((x) => x.pronta).map((x) => link('#' + inicioDaArea(x), '', x.curto || x.nome, x.icone, x.nome, `data-area="${x.id}"`)).join('');
+      const br = as.filter((x) => !x.pronta); if (br.length) html += '<p class="menu-grupo">Em breve</p>' + br.map((x) => link('#inicio', '', x.curto || x.nome, x.icone, x.nome, `data-breve="${x.id}"`)).join('');
+    }
+    const mais = $('#menu-mais', menu);
+    if (mais) mais.insertAdjacentHTML('beforebegin', html); else menu.insertAdjacentHTML('beforeend', html);
+    // troca rápida (lateral e cabeçalho) e botão principal da área
+    const nome = a ? a.nome : 'Escolha a área', ico = a ? a.icone : ICO_AREAS;
+    $$('.area-troca').forEach((b) => { b.innerHTML = `${svgI(ico)}<span><small>Área</small><b>${esc(nome)}</b></span><svg class="seta" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg>`; b.setAttribute('aria-label', 'Trocar de área (agora: ' + nome + ')'); });
+    const nova = $('.cab-nova');
+    if (nova) { const ac = a && a.acao ? a.acao : null; nova.hidden = !ac || somenteLeitura(); if (ac) { nova.href = ac.href; $('span', nova).textContent = ac.rotulo; nova.onclick = ac.novo && a.novo ? (e) => { e.preventDefault(); a.novo(UI); } : null; } }
+    document.body.dataset.areaAtual = id || 'inicio';
+  }
+  function irArea(id) {
+    const a = AR.area(id); if (!a) return;
+    if (!a.pronta) { abrirEmBreve(a); return; }
+    areaAtual = id; lsS(chaveU('area'), id); fecharTrocaArea();
+    const alvo = '#' + inicioDaArea(a);
+    if (location.hash === alvo) rota(); else location.hash = alvo;
+  }
+  function abrirEmBreve(a) {
+    abrirCamada('modal', `<div class="instala-topo"><span class="area-ico">${svgI(a.icone)}</span><div><h2>${esc(a.nome)}</h2><p class="sub"><span class="tag declarado">Em breve</span> Esta área ainda está sendo construída.</p></div></div>
+      ${a.previsto && a.previsto.length ? `<p style="margin:14px 0 6px;font-weight:650">O que vai ter</p><ul class="passos-instalar">${a.previsto.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
+      ${a.hoje ? `<p class="nota-rodape" style="margin-top:12px">${esc(a.hoje)}</p>` : ''}<p class="nota-rodape">Enquanto isso, a revenda continua usando o sistema atual para esta parte. Nada aqui é demonstração disfarçada.</p>`);
+  }
+  // seletor de áreas (popover) aberto pela lateral ou pelo cabeçalho
+  function fecharTrocaArea() { const p = $('#area-pop'); if (p) p.remove(); $$('.area-troca').forEach((b) => b.setAttribute('aria-expanded', 'false')); }
+  function abrirTrocaArea(botao) {
+    if ($('#area-pop')) { fecharTrocaArea(); return; }
+    const r = botao.getBoundingClientRect(), as = areasVisiveis();
+    const pop = document.createElement('div'); pop.id = 'area-pop'; pop.className = 'area-pop'; pop.setAttribute('role', 'menu');
+    pop.innerHTML = `<a href="#inicio" role="menuitem" data-ir-inicio>${svgI(ICO_AREAS)}<span><b>Todas as áreas</b><small>Tela de entrada</small></span></a>` + as.map((a) => `<a href="${a.pronta ? '#' + inicioDaArea(a) : '#inicio'}" role="menuitem" ${a.pronta ? `data-area="${a.id}"` : `data-breve="${a.id}"`} class="${a.id === areaAtual && document.body.dataset.areaAtual !== 'inicio' ? 'atual' : ''} ${a.pronta ? '' : 'breve'}">${svgI(a.icone)}<span><b>${esc(a.nome)}</b><small>${a.pronta ? esc(a.descricao.split(',')[0]) : 'Em breve'}</small></span></a>`).join('');
+    document.body.appendChild(pop);
+    const larg = Math.min(340, innerWidth - 16); pop.style.width = larg + 'px';
+    pop.style.left = Math.max(8, Math.min(r.left, innerWidth - larg - 8)) + 'px'; pop.style.top = (r.bottom + 6) + 'px';
+    botao.setAttribute('aria-expanded', 'true');
+    const ini = $('[data-ir-inicio]', pop); ini.onclick = () => fecharTrocaArea();
+    setTimeout(() => (pop.querySelector('a.atual') || pop.querySelector('a')).focus(), 30);
+    pop.onkeydown = (e) => { const l = $$('a', pop), i = l.indexOf(document.activeElement); if (e.key === 'ArrowDown') { (l[i + 1] || l[0]).focus(); e.preventDefault(); } if (e.key === 'ArrowUp') { (l[i - 1] || l[l.length - 1]).focus(); e.preventDefault(); } if (e.key === 'Escape') { fecharTrocaArea(); botao.focus(); } };
+  }
+  document.addEventListener('click', (e) => {
+    const tr = e.target.closest('.area-troca'); if (tr) { e.preventDefault(); e.stopPropagation(); abrirTrocaArea(tr); return; }
+    const ar = e.target.closest('[data-area]'); if (ar) { e.preventDefault(); fecharTrocaArea(); document.body.classList.remove('menu-aberto'); irArea(ar.dataset.area); return; }
+    const br = e.target.closest('[data-breve]'); if (br) { e.preventDefault(); fecharTrocaArea(); document.body.classList.remove('menu-aberto'); abrirEmBreve(AR.area(br.dataset.breve)); return; }
+    if ($('#area-pop') && !e.target.closest('#area-pop')) fecharTrocaArea();
+  });
+  // troca de área pelo teclado: Alt+1…9 na ordem da tela de entrada
+  document.addEventListener('keydown', (e) => { if (e.altKey && !e.ctrlKey && /^[1-9]$/.test(e.key)) { const a = areasVisiveis().filter((x) => x.pronta)[+e.key - 1]; if (a) { e.preventDefault(); irArea(a.id); } } });
+
+  function telaInicio() {
+    const as = areasVisiveis(), ult = AR.area(lsG(chaveU('area'))), fixa = lsG(chaveU('area-fixa')) || '';
+    const h = new Date().getHours(), saud = h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite', nome = (() => { const w = String(eu().nome || '').trim().split(/\s+/); return /^(seu|dona|dr\.?|dra\.?)$/i.test(w[0]) ? w.slice(0, 2).join(' ') : w[0]; })();
+    const cartao = (a, i) => {
+      if (!a.pronta) return `<button type="button" class="area-cartao breve" data-breve="${a.id}"><span class="area-ico">${svgI(a.icone)}</span><span class="area-nome">${esc(a.nome)}<span class="tag declarado">Em breve</span></span><span class="area-desc">${esc(a.descricao)}</span><span class="area-num">${esc(a.hoje || 'Ainda não está pronta.')}</span></button>`;
+      let n = null; try { n = a.numero ? a.numero(UI) : null; } catch (er) { n = null; }
+      return `<a class="area-cartao ${a.id === (ult && ult.id) ? 'ultima' : ''}" href="#${inicioDaArea(a)}" data-area="${a.id}"><span class="area-ico">${svgI(a.icone)}</span><span class="area-nome">${esc(a.nome)}${a.id === fixa ? '<span class="tag comprovado">Abre direto</span>' : ''}</span><span class="area-desc">${esc(a.descricao)}</span>
+        ${n ? `<span class="area-num ${n.alerta ? 'alerta' : ''}"><b>${esc(n.valor)}</b> ${esc(n.texto)}</span>` : '<span class="area-num"></span>'}<span class="area-ir"><kbd>Alt ${i + 1}</kbd>Abrir<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></a>`;
+    };
+    const prontas = as.filter((a) => a.pronta), breves = as.filter((a) => !a.pronta);
+    tela.innerHTML = `<div class="titulo inicio-titulo"><div><h1>${saud}${nome ? ', ' + esc(nome) : ''}</h1><p>${esc(A.revenda.nome)} · escolha a área para trabalhar. O menu mostra só o que é daquela área; troque quando quiser pelo seletor de área.</p></div>
+        ${ult && ult.pronta && areaVisivel(ult) ? `<a class="btn btn-ouro" href="#${inicioDaArea(ult)}" data-area="${ult.id}">Continuar em ${esc(ult.nome)}</a>` : ''}</div>
+      <div class="areas-grade">${prontas.map(cartao).join('')}</div>
+      ${breves.length ? `<h2 class="areas-sub">Em construção</h2><p class="sub" style="margin-bottom:12px">Aparecem aqui para você saber o que vem. Ainda não funcionam: nada de dado inventado.</p><div class="areas-grade breves">${breves.map(cartao).join('')}</div>` : ''}
+      <div class="grade-2 bloco inicio-rodape">
+        <section class="painel"><h2><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>Ao abrir o Anshur</h2><p class="sub">Neste aparelho, para ${esc(eu().nome)}.</p>
+          <div class="campo" style="margin-top:12px"><label for="in-fixa">Abrir em</label><select id="in-fixa"><option value="">Esta tela de áreas</option>${prontas.map((a) => `<option value="${a.id}" ${a.id === fixa ? 'selected' : ''}>Direto em ${esc(a.nome)}</option>`).join('')}</select></div></section>
+        ${blocoInstalar()}
+      </div>`;
+    $('#in-fixa').onchange = (e) => { lsS(chaveU('area-fixa'), e.target.value); toast(e.target.value ? `O Anshur vai abrir direto em ${AR.area(e.target.value).nome}.` : 'O Anshur vai abrir nesta tela de áreas.'); telaInicio(); };
+  }
+  TELAS.inicio = telaInicio;
+
   let primeira = true;
   function rota() {
-    const nome = (location.hash || '#hoje').slice(1);
-    let ativa = TELAS[nome] ? nome : 'hoje';
-    if (!pode(ativa)) { ativa = (PERM[eu().perfil] || [])[0] || 'hoje'; }
+    let nome = (location.hash || '').slice(1);
+    if (!nome) { nome = abrirDireto() || 'inicio'; history.replaceState(null, '', '#' + nome); }
+    let ativa = telaDe(nome) ? nome : 'inicio';
+    if (!pode(ativa)) ativa = 'inicio';
+    if (ativa !== 'inicio') { const ar = AR ? AR.areaDaAba(ativa, areaAtual) : null; if (ar && ar !== areaAtual) { areaAtual = ar; lsS(chaveU('area'), ar); } montarMenu(ar || areaAtual); }
+    else montarMenu(null);
+    fecharTrocaArea();
     $$('.menu a').forEach((a) => { if (a.dataset.aba === ativa) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
     moverIndicador();
     fecharCamada(true);
-    const desenhar = () => { tela.classList.remove('saindo'); TELAS[ativa](); tela.classList.remove('entrando'); void tela.offsetWidth; tela.classList.add('entrando'); };
+    const fn = telaDe(ativa);
+    const desenhar = () => { tela.classList.remove('saindo'); fn(); tela.classList.remove('entrando'); void tela.offsetWidth; tela.classList.add('entrando'); };
     if (primeira || reduzido) { primeira = false; desenhar(); return; }
     tela.classList.add('saindo');
     setTimeout(() => { desenhar(); window.scrollTo(0, 0); }, 120);
   }
   $('#sino').onclick = abrirNotificacoes; seletorLoja(); if (somenteLeitura()) document.body.classList.add('so-leitura');
-  $('#busca-btn').onclick = abrirBusca; $('#instalar-btn').onclick = simularInstalacao;
+  $('#busca-btn').onclick = abrirBusca; $('#instalar-btn').onclick = simularInstalacao; atualizarInstalar();
   // com conta, abrir o app não grava nada (evita versão nova a cada acesso e conflito com quem está usando)
   atualizarAvatar(); eu().ultimoAcesso = new Date().toISOString(); if (!K.nuvem) salvar();
   $$('.menu a').forEach((a) => { if (!pode(a.dataset.aba)) a.hidden = true; });
   $$('.menu-grupo').forEach((g) => { let x = g.nextElementSibling, algum = false; while (x && x.tagName === 'A') { if (!x.hidden) algum = true; x = x.nextElementSibling; } g.hidden = !algum; });
   if (OP) sincronizar(false).then((r) => { if (r === 'novas') { toast(`Sincronizado com o seu sistema: ${estado.ultimaSync.novas} trocas novas.`); setTimeout(() => K.recarregar(), 1200); } else if (r === 'permissao') toast('Toque em Teste às cegas › Importar planilha › Sincronizar agora para atualizar com o seu sistema.'); }).catch(() => {});
   semearDemo();
+  // contexto que cada área (areas/*.js) recebe para desenhar as próprias telas: as mesmas ferramentas do app
+  const UI = { A, K, C, G, M, estado, tela, $, $$, ICO, ic, esc, real, mil, pct, data, hojeISO, diasDesde, diasEntre, num, NOMES, OP, NV, toast, abrirCamada, fecharCamada, confirmar, formulario, baixarCSV, salvar,
+    log, eu, pode, rota, conta, contar, mascarar, somenteLeitura, fotoMini, irArea, abrirInstalacao };
+  window.ANSHUR_UI = UI;
+  if (AR) AR.lista().forEach((a) => { if (a.iniciar) try { a.iniciar(UI); } catch (e) { console.error('Área ' + a.id, e); } });
   atualizarSino();
   window.addEventListener('hashchange', rota);
   // celular: barra com 4 atalhos + "Mais", que abre todos os módulos por categoria
@@ -2453,7 +2595,7 @@
     $('#menu-mais').onclick = () => abrir(!document.body.classList.contains('menu-aberto'));
     $('#menu-fundo').onclick = () => abrir(false);
     menu.addEventListener('click', (e) => { if (e.target.closest('a')) abrir(false); });
-    const marcar = () => { const a = $('.menu a[aria-current="page"]'); $('#menu-mais').classList.toggle('ativo', !!a && !['hoje', 'avaliar', 'patio', 'aprovacoes'].includes(a.dataset.aba)); };
+    const marcar = () => { const a = $('.menu a[aria-current="page"]'); $('#menu-mais').classList.toggle('ativo', !!a && !a.classList.contains('atalho')); };
     window.addEventListener('hashchange', () => setTimeout(marcar, 50)); setTimeout(marcar, 300);
   })();
   window.addEventListener('resize', moverIndicador);
