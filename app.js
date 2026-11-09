@@ -2582,6 +2582,7 @@
   // contexto que cada área (areas/*.js) recebe para desenhar as próprias telas: as mesmas ferramentas do app
   const UI = { A, K, C, G, M, estado, tela, $, $$, ICO, ic, esc, real, mil, pct, data, hojeISO, diasDesde, diasEntre, num, NOMES, OP, NV, toast, abrirCamada, fecharCamada, confirmar, formulario, baixarCSV, salvar,
     log, eu, pode, rota, conta, contar, mascarar, somenteLeitura, fotoMini, irArea, abrirInstalacao };
+  Object.assign(UI, { SAFRA, alcadas }); // calendário de safra e alçadas dos usados, reutilizados por Máquinas Novas e CRM
   window.ANSHUR_UI = UI;
   if (AR) AR.lista().forEach((a) => { if (a.iniciar) try { a.iniciar(UI); } catch (e) { console.error('Área ' + a.id, e); } });
   atualizarSino();

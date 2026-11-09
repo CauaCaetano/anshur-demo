@@ -115,7 +115,7 @@
     achar: acharCadastro
   };
   // atividades críticas também vão para a trilha do servidor (anshur_eventos: só inserção)
-  const CRITICOS = new Set(['troca', 'aprovacao', 'preco', 'venda', 'usuario', 'convite', 'lgpd', 'exportacao', 'seguranca', 'importacao', 'exclusao', 'config', 'ia', 'financeiro']);
+  const CRITICOS = new Set(['troca', 'aprovacao', 'preco', 'venda', 'usuario', 'convite', 'lgpd', 'exportacao', 'seguranca', 'importacao', 'exclusao', 'config', 'novas', 'crm', 'ia', 'financeiro']);
   function registrar(tipo, texto, extra = {}) {
     estado.atividades.unshift({ id: 'a' + Date.now() + Math.random().toString(36).slice(2, 6), quando: new Date().toISOString(), usuario: usuarioAtual().nome, perfil: usuarioAtual().perfil, tipo, texto, ...extra });
     if (estado.atividades.length > 600) estado.atividades.length = 600;

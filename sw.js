@@ -1,8 +1,8 @@
 // Funciona sem internet no pátio e sempre busca a versão nova quando há sinal.
-const CACHE = 'anshur-v18';
-const V = '?v=18';
+const CACHE = 'anshur-v19';
+const V = '?v=19';
 const ARQUIVOS = ['./', 'index.html', 'passaporte.html', 'estilo.css' + V, 'passaporte.css' + V, 'instalar.js' + V, 'areas.js' + V, 'dados.js' + V, 'comum.js' + V, 'importar.js' + V, 'fotos.js' + V, 'motor.js' + V, 'retencao.js' + V, 'graficos.js' + V,
-  'areas/nucleo.js' + V, 'areas/novas.js' + V, 'areas/financeiro-regras.js' + V, 'areas/financeiro.js' + V, 'areas/oficina.js' + V, 'areas/pecas.js' + V, 'areas/crm.js' + V, 'areas/fiscal.js' + V,
+  'areas/nucleo.js' + V, 'areas/novas-regras.js' + V, 'areas/novas.js' + V,'areas/financeiro-regras.js' + V, 'areas/financeiro.js' + V, 'areas/pecas-regras.js' + V, 'areas/oficina-regras.js' + V, 'areas/oficina.js' + V, 'areas/pecas.js' + V, 'areas/crm-regras.js' + V, 'areas/crm.js' + V,'areas/fiscal-regras.js' + V, 'areas/fiscal.js' + V,
   'app.js' + V, 'passaporte.js' + V, 'nuvem.js' + V, 'icone-192.png', 'icone-512.png', 'icone-180.png', 'icone-maskable-192.png', 'icone-maskable-512.png', 'manifest.webmanifest', 'logo/anshur-logo.png?v=5'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ARQUIVOS.map((u) => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting())); });
 self.addEventListener('activate', (e) => { e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim())); });
